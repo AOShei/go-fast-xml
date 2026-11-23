@@ -37,6 +37,36 @@ func TestProfilePartInsideBlock(t *testing.T) {
 	}
 }
 
+// TestProfileUnmappedPerPart: the unmapped warnings go on the part where
+// the elements were met.
+func TestProfileUnmappedPerPart(t *testing.T) {
+	prof := head("perpart", `{"root": "doc"}`) + `"rules": [
+		{"match": "p", "as": "block", "kind": "paragraph"},
+		{"match": "part", "as": "part", "kind": "chapter"}]}`
+	src := `<doc><part><p x="1">one</p><zz>u1</zz></part><part><p>two</p><yy>u2</yy><yy>u3</yy></part></doc>`
+	doc := extractWith(t, prof, src, nil)
+	if len(doc.Parts) != 2 {
+		t.Fatalf("parts %s", dump(doc))
+	}
+	msg := func(p int, code string) string {
+		for _, w := range doc.Parts[p].Warnings {
+			if w.Code == code {
+				return w.Message
+			}
+		}
+		return ""
+	}
+	if m := msg(0, WarnUnmappedElements); !strings.Contains(m, "zz") || strings.Contains(m, "yy") {
+		t.Errorf("part 1: %q", m)
+	}
+	if m := msg(1, WarnUnmappedElements); !strings.Contains(m, "yy") || strings.Contains(m, "zz") {
+		t.Errorf("part 2: %q", m)
+	}
+	if msg(0, WarnUnmappedAttributes) == "" || msg(1, WarnUnmappedAttributes) != "" {
+		t.Errorf("attributes: %q, %q", msg(0, WarnUnmappedAttributes), msg(1, WarnUnmappedAttributes))
+	}
+}
+
 // TestProfileSpansSurviveSplit: a paragraph over the block bound keeps its
 // spans, each on the piece that holds it; one across the cut is in two.
 func TestProfileSpansSurviveSplit(t *testing.T) {
