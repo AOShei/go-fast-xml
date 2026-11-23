@@ -183,7 +183,7 @@
     {"match": "abbreviated-form", "as": "inline", "attrs": {"dita.keyref": {"attr": "keyref"}}},
     {"match": "text", "as": "inline"},
     {"match": "data", "as": "inline", "attrs": {"dita.data_name": {"attr": "name"}, "dita.data_value": {"attr": "value"}}},
-    {"match": "fn", "as": "block", "kind": "footnote", "anchor": {"attr": "id"}, "marker": {"attr": "callout"}},
+    {"match": "fn", "as": "block", "split": true, "kind": "footnote", "anchor": {"attr": "id"}, "marker": {"attr": "callout"}},
     {"match": "indexterm", "as": "stored", "kind": "custom_xml"},
     {"match": "index-see", "as": "inline", "space": true},
     {"match": "index-see-also", "as": "inline", "space": true},

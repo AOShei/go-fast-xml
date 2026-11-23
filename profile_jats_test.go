@@ -507,9 +507,8 @@ heading2:Abstract
 paragraph:We test.
 # body body
 heading2(1.):Introduction #s1
-paragraph:See [1] and the site, bold H2O.
- a
-A footnote. #p1
+paragraph:See [1] and the site, bold H2O. #p1
+footnote(a):A footnote. #fn1
 list_item1(1.):First ^s1
 list_item1(2.):Second ^s1
 list_item1:API ^s1

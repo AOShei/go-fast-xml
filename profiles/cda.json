@@ -82,7 +82,7 @@
     {"match": "sup", "as": "inline", "style": "superscript"},
     {"match": "br", "as": "inline"},
     {"match": "linkHtml", "as": "inline", "link": {"attr": "href"}, "attrs": {"cda.title": {"attr": "title"}}},
-    {"match": "footnote", "as": "block", "kind": "footnote", "anchor": {"attr": "ID"}},
+    {"match": "footnote", "as": "block", "split": true, "kind": "footnote", "anchor": {"attr": "ID"}},
     {"match": "footnoteRef", "as": "inline", "style": "superscript", "link": {"attr": "IDREF"}},
     {"match": "renderMultiMedia", "as": "image", "id": {"attr": "referencedObject"}, "alt": {"child": "caption"}, "anchor": {"attr": "ID"}},
 

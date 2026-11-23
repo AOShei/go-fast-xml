@@ -45,7 +45,7 @@ the two disagree.
 | `table`, `informaltable` | table: CALS (`tgroup`, `colspec`, `spanspec`, `morerows`) or HTML (`tr`, `td`, `th`, `thead`); `title`/`caption` a caption |
 | `mediaobject/imageobject/imagedata` | image, id = `fileref`; `textobject` and `alt` a paragraph (`db.field`) after it |
 | `equation` | `mathphrase` and MathML a `formula` (plain) |
-| `footnote` | footnote (inside a `para` its text is joined to the paragraph's, after a line break: see below) |
+| `footnote` | footnote; inside a `para` it ends the paragraph there (`split`), and text after it is a new paragraph |
 | `biblioentry`, `bibliomixed` | footnote, anchor = id, the entry's fields set off by spaces |
 | `indexterm` | **stored**: a block in the stored part, `stored=custom_xml`, text `primary secondary ...`; not body text |
 | `remark`, `annotation` | `note`, type `comment` |
@@ -75,9 +75,11 @@ carry their section's (chapter's, figure's...) id in
 
 ## Limits of the format met here
 
-- A `footnote`, `table`, `itemizedlist` or `programlisting` inside a
-  `para` is joined into the paragraph's text (blocks in a block are
-  joined with `\n`); the footnote's kind and anchor are lost there.
+- A `footnote`, table, figure, example, admonition, `blockquote` or
+  verbatim block inside a `para` ends the paragraph there (`split`, or
+  the engine's rule for tables and images) and keeps its own kind and
+  anchor; text after it is a new paragraph. A list inside a `para` is
+  still joined into the paragraph's text, one item per line.
 - DocBook entities declared in an external DTD (KDE's `&kate;`) are kept
   as written; the reader expands those of the internal subset.
 

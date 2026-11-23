@@ -74,8 +74,8 @@ var (
 	allowed = map[As][]string{
 		AsSection:     common,
 		AsHeading:     append(slices.Clone(common), "level", "marker", "duplicate_of", "key"),
-		AsBlock:       append(slices.Clone(common), "kind", "language", "notation", "marker", "value", "duplicate_of", "key", "out_of_line"),
-		AsList:        append(slices.Clone(common), "ordered"),
+		AsBlock:       append(slices.Clone(common), "kind", "language", "notation", "marker", "value", "duplicate_of", "key", "out_of_line", "split"),
+		AsList:        append(slices.Clone(common), "ordered", "split"),
 		AsItem:        append(slices.Clone(common), "marker"),
 		AsTable:       append(slices.Clone(common), "model", "header"),
 		AsRow:         append(slices.Clone(common), "header", "cells"),
@@ -83,11 +83,11 @@ var (
 		AsInline:      {"match", "as", "style", "link", "title", "attrs", "extra", "space"},
 		AsLabel:       {"match", "as"},
 		AsImage:       append(slices.Clone(common), "id", "alt"),
-		AsNote:        append(slices.Clone(common), "type", "value", "out_of_line"),
+		AsNote:        append(slices.Clone(common), "type", "value", "out_of_line", "split"),
 		AsMetadata:    {"match", "as", "field", "key", "value", "also_heading", "join", "extra"},
 		AsPart:        append(slices.Clone(common), "kind", "name"),
 		AsStored:      {"match", "as", "kind", "extra"},
-		AsTransparent: common,
+		AsTransparent: append(slices.Clone(common), "split"),
 		AsSkip:        {"match", "as"},
 	}
 	allKeys = map[string]bool{}
@@ -166,6 +166,10 @@ type Rule struct {
 	AlsoHeading int
 	DuplicateOf string
 	OutOfLine   bool // a block or note met inside an open block is a block of its own
+	// Split: met inside an open paragraph-like block, the element ends
+	// that block, is read on its own, and text after it starts a new
+	// block ("split"), as a table or image does.
+	Split bool
 	// Space: the element's text is set off by white space ("space",
 	// inline): a space is held before and after it, where the source has
 	// none, as between the fields of a name or a citation.
@@ -649,6 +653,14 @@ func compileRule(raw json.RawMessage, i int, f *fileJSON, builtin bool) (*Rule, 
 	if v, ok := m["out_of_line"]; ok {
 		if err := json.Unmarshal(v, &r.OutOfLine); err != nil {
 			return nil, fmt.Errorf("%s: \"out_of_line\" must be true or false", where)
+		}
+	}
+	if v, ok := m["split"]; ok {
+		if err := json.Unmarshal(v, &r.Split); err != nil {
+			return nil, fmt.Errorf("%s: \"split\" must be true or false", where)
+		}
+		if r.Split && r.OutOfLine {
+			return nil, fmt.Errorf("%s: \"split\" and \"out_of_line\" are two ways to read one element; a rule has one", where)
 		}
 	}
 	if v, ok := m["also_heading"]; ok {

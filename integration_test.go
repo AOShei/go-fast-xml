@@ -1,6 +1,7 @@
 package gofastxml
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -24,6 +25,37 @@ func TestProfileLabelBeforeTableInBlock(t *testing.T) {
 		`<tblock><num>TABLE 1A</num><table><tr><td>b</td></tr></table></tblock></mod></p></doc>`
 	doc := extractWith(t, prof, src, nil)
 	wantBrief(t, doc, "paragraph:for Table 1 TABLE 1\ntable:\nparagraph:TABLE 1A\ntable:\n")
+}
+
+// TestProfileSplit: a rule with "split" met inside an open paragraph ends
+// it there and is read on its own; text after it is a new block. A
+// nested block without it is still a line of the paragraph; in a cell a
+// split element is read into the cell.
+func TestProfileSplit(t *testing.T) {
+	prof := head("split", `{"root": "doc"}`) + `"rules": [
+		{"match": "doc", "as": "transparent"},
+		{"match": "p", "as": "block", "kind": "paragraph"},
+		{"match": "fig", "as": "transparent", "split": true},
+		{"match": "fig/label", "as": "label"},
+		{"match": "caption", "as": "block", "kind": "caption"},
+		{"match": "fn", "as": "block", "kind": "footnote", "split": true},
+		{"match": "q", "as": "block", "kind": "quote"},
+		{"match": "table", "as": "table"},
+		{"match": "tr", "as": "row"},
+		{"match": "td", "as": "cell"}]}`
+	src := `<doc><p>See <fig><label>Fig. 1</label><caption>A cat</caption></fig> and<fn>Note</fn> more<q>joined</q></p>` +
+		`<table><tr><td>a<fn>in cell</fn></td></tr></table></doc>`
+	doc := extractWith(t, prof, src, nil)
+	wantBrief(t, doc, "paragraph:See\ncaption(Fig. 1):A cat\nparagraph:and\nfootnote:Note\nparagraph:more\njoined\ntable:\n")
+	if got := blocks(doc)[5].Table.Rows[0][0]; got != "a\nin cell" {
+		t.Errorf("cell %q", got)
+	}
+	if _, err := LoadProfile(strings.NewReader(head("bad", `{"root": "doc"}`) + `"rules": [{"match": "a", "as": "block", "kind": "footnote", "split": true, "out_of_line": true}]}`)); err == nil {
+		t.Error("split with out_of_line loaded")
+	}
+	if _, err := LoadProfile(strings.NewReader(head("bad", `{"root": "doc"}`) + `"rules": [{"match": "a", "as": "inline", "split": true}]}`)); err == nil {
+		t.Error("split on an inline loaded")
+	}
 }
 
 // TestProfileNoteInTableInBlock: an out_of_line note inside a table that

@@ -57,11 +57,12 @@ them); a reader that wants one body can ignore the parts.
 | `permissions` outside `article-meta` (figures, sub-articles) | paragraphs, `jats.field` the element name, marked `jats.in=permissions` |
 | `front-stub` of a sub-article | content of its part: `article-title` a level-1 heading, contributors as paragraphs with their names, ids, dates and permissions as paragraphs (`jats.field`) |
 
-A `p` may hold a `fig`, `table-wrap`, `disp-formula`, list or `fn`.
-Their text is then joined into the paragraph (line breaks between), their
-labels kept at their place in it; the `graphic` is an image block before
-the paragraph. The format has no rule that ends a paragraph at a nested
-block.
+A `p` may hold a `fig`, `table-wrap`, `disp-formula`, `disp-quote`,
+`boxed-text`, `fn` and the like. Their rules have `"split": true`: the
+paragraph ends there, the nested element is read as it is outside a
+paragraph (its `label` the marker of its first block), and text after it
+is a new paragraph. A list in a `p` is still joined into the paragraph,
+one item per line with its label.
 
 ## Metadata.Extra keys
 

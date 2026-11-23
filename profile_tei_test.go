@@ -22,8 +22,9 @@ paragraph:That is the question. #l2
 note:12 ^a1s2
 paragraph:One line ^a1s2
 paragraph:Two line ^a1s2
-paragraph:The teh the end
-A note.. #p1
+paragraph:The teh the end #p1
+footnote(a):A note. ^p1
+paragraph:. #p1
 list_item1(1.):First ^a1s2
 list_item1(2.):Second ^a1s2
 table: ^a1s2
@@ -47,8 +48,8 @@ note:the
 	if pb := bs[6]; pb.Attrs[gofastcore.AttrNoteType] != gofastcore.NoteAttribute || pb.Attrs[AttrAttribute] != "n" || pb.Attrs["tei.milestone"] != "pb" {
 		t.Errorf("pb %+v", pb)
 	}
-	if tb := bs[12].Table; tb == nil || mustJSON(tb.Rows) != `[["H"],["v"]]` || tb.HeaderRows != 1 {
-		t.Errorf("table %+v", bs[12])
+	if tb := bs[14].Table; tb == nil || mustJSON(tb.Rows) != `[["H"],["v"]]` || tb.HeaderRows != 1 {
+		t.Errorf("table %+v", bs[14])
 	}
 	st := doc.Parts[len(doc.Parts)-1].Blocks
 	if st[0].Attrs["tei.milestone"] != "pb" || st[1].Attrs["tei.choice"] != "sic" || st[2].Attrs["tei.choice"] != "corr" {

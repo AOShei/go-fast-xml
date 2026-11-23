@@ -157,8 +157,9 @@ type frame struct {
 	kept    []xmlread.Attr
 	sink    *sink
 	prevCur *sink
-	// suspended: a part met inside an open block; prevCur is that block's
-	// sink, resumed when the part ends.
+	// suspended: a part, table, image or "split" element met inside an
+	// open block, which it ended; resume is that block's sink, resumed
+	// when the element ends.
 	suspended bool
 	// outOfLine: an out_of_line rule's element read beside an open block,
 	// whose waiting label it does not take; resume is that block's sink.
@@ -468,11 +469,12 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 		return
 	}
 	if e.cur != nil && (rule.As == profile.AsPart ||
-		(rule.As == profile.AsTable || rule.As == profile.AsImage) && e.cur.kind == skBlock) && e.breakOpen(el.Start) {
-		// The open block is finished; the part (or a table or image met
-		// inside a paragraph-like block) is read on its own, and what
-		// follows it in the block starts a new block.
-		f.prevCur, e.cur, f.suspended = e.cur, nil, true
+		(rule.As == profile.AsTable || rule.As == profile.AsImage || rule.Split) && e.cur.kind == skBlock) && e.breakOpen(el.Start) {
+		// The open block is finished; the part (or a table, an image or
+		// a "split" rule's element met inside a paragraph-like block) is
+		// read on its own, and what follows it in the block starts a new
+		// block.
+		f.resume, e.cur, f.suspended = e.cur, nil, true
 		e.flushStray()
 		e.startRule(f, el)
 		return
@@ -1660,10 +1662,7 @@ func (e *Engine) EndElement(r *xmlread.Reader, el *xmlread.Element, start, end i
 	if e.label != nil && e.label.depth >= n-1 {
 		e.flushLabel() // a label whose container ends with no block after it
 	}
-	if f.suspended {
-		e.cur = f.prevCur
-	}
-	if f.outOfLine {
+	if f.suspended || f.outOfLine {
 		e.cur = f.resume
 	}
 	e.marks = e.marks[:min(f.marks, len(e.marks))]

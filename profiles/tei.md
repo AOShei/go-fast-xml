@@ -29,7 +29,7 @@ for each `TEI` in turn. `text` and `group` are transparent.
 | `sp` | its blocks marked `tei.who`; `speaker` is the `Marker` of the speech's first block |
 | `stage` | paragraph, `tei.field=stage`, `tei.type` |
 | `castList`, `castGroup`, `castItem` | lists and items |
-| `note` | footnote, `Marker` from `@n`, `tei.type`, `tei.place`; inside a `p` or `l` its text is joined to the block's after a line break |
+| `note` | footnote, `Marker` from `@n`, `tei.type`, `tei.place`; inside a `p` or `l` it ends the block there (`split`) and text after it is a new block |
 | `pb`, `cb`, `milestone` | between blocks: a `note` of type `attribute` whose text is `@n` (`Attrs["attribute"]=n`, `tei.milestone=pb`); inside a `p`, `l`, `ab`, `head`, `stage`, `note`, `item` or `quote`: a record in the stored part (`custom_property`, name `pb`, `href` = `@n`, `tei.milestone`, `tei.facs`) at the pb's offset. Never block text |
 | `lb` | a space in the text (`lb@n` not read) |
 | `choice` | every alternative stays in the text, in the file's order (`teh the`); each of `sic`, `corr`, `orig`, `reg`, `abbr`, `expan` also gives a record in the stored part saying which it is (`tei.choice`) |
@@ -78,7 +78,8 @@ offset inside a block.
 
 ## Limits of the format met here
 
-- A `note` inside a `p` or `l` is joined to the block's text.
+- A `note` or `figure` inside a `p` or `l` ends the block there
+  (`split`): the line or paragraph is in two blocks, the note between.
 - A `pb` inside a block can be recorded only through a link record (its
   `href` is the page number); a key for "a record of an empty element's
   attribute" would say it plainly.

@@ -168,10 +168,18 @@ element so far) as well as those to come.
   another part) whose `Loc` begins at that text. Inside a cell or a value
   read for a rule, a part is read into it as before.
 - A `table` or `image` met inside an open paragraph-like `block` (a
-  patent's `p/tables/table`, `p/chemistry/img`) finishes that block the
-  same way and is a block of its own, in reading order; text after it
-  starts a new block. Inside a cell, a
-  heading or a value read for a rule it is read into it as before.
+  patent's `p/tables/table`, `p/chemistry/img`), or the element of a
+  rule with `"split": true` (JATS `p/fig`, DocBook `para/footnote`, TEI
+  `p/note`), finishes that block the same way and is read on its own, in
+  reading order; text after it starts a new block. Inside a cell, an
+  item, a heading or a value read for a rule it is read into it as
+  before. A label waiting as the marker of a block that has no text when
+  it is finished this way is that block's text.
+- So a block met inside a paragraph is read one of three ways, chosen by
+  its rule: by default it is a line of the paragraph; with `split` it
+  ends the paragraph there (content stays in file order); with
+  `out_of_line` (notes only: a footnote written inside its sentence) it
+  is a block made just before the paragraph, which goes on unbroken.
 - Inline styles and links become `Spans` when `Options.Spans` is set (in a
   block split into `Continued` pieces, each span is on the piece that
   holds it, and a span across the cut is in both, with each piece's
@@ -227,4 +235,5 @@ for; none changes what an existing key means.
 | `header` | `table` | A header row of fixed text: `"header": ["from", "to"]` (1 to 64 strings of at most 256 bytes). It is the profile's text, not the file's, so the table is `Origin: inferred` and carries `Attrs["header_source"]="profile"` (core prescribes nothing for text a file does not hold; this is the library's choice). It is the table's first row and counts in `HeaderRows`. On a `row` or `cell`, `header` keeps its meaning (a test) |
 | `namespace_aliases` | profile | Phase 3 (Akoma Ntoso): one schema published under several namespaces (AKN 3.0, its draft `3.0/CSD03`, `akomantoso.org/2.0`). `"namespace_aliases": {"http://www.akomantoso.org/2.0": "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"}`: an element in an alias namespace is matched by the rules as if it were in the target namespace. Attributes are not affected; the target may not itself be an alias; at most 64. The `match` entries still name each namespace the profile is chosen for |
 | `out_of_line` | `block`, `note` | Phase 3 (Akoma Ntoso `authorialNote`, Formex `NOTE`, CLML `Footnote`): a note written inside the sentence it annotates. `"out_of_line": true`: met inside an open paragraph, heading or item, the element is a block of its own instead of a line of that block, made where it ends, so it comes just before the block it stands in (made at its end); that block goes on after it with the rest of its text and keeps a waiting `label`. Its `Loc` covers its element, inside the span of the block it stands in, whose text is the span's minus the note. In a cell, or a value read for a rule, it stays inline as before |
+| `split` | `block`, `note`, `list`, `transparent` | Phase 3 integration (JATS `fig`, `table-wrap`, `fn`; DocBook `footnote`, `programlisting`, admonitions; TEI `note`, `figure`): `"split": true`: met inside an open paragraph-like block, the element ends that block there, as a table or image does, and is read by its rule as if it stood outside; text after it, still in the paragraph's element, starts a new block (not `Continued`, with the paragraph's anchor). In a cell, an item, a heading or a value read for a rule it is read into it as before. A rule has `split` or `out_of_line`, not both |
 | (label inside a block) | `label` | Phase 3 (AKN `num` in a `quotedStructure` inside a paragraph, `num` in a table cell): a label met inside a paragraph or item that already has text, a marker or a waiting label, or inside a cell, is read as text of that block, after a space. It was the block's marker only if it had none, and was dropped otherwise. A label as the first thing in a block is its marker as before. An `out_of_line` note inside a label is a block of its own as inside a paragraph |

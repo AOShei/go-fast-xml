@@ -21,8 +21,8 @@ func TestDocbookFixture(t *testing.T) {
 heading1:The Book ^b1
 paragraph:About it. ^b1
 heading2:First ^ch1
-paragraph:See , site, bold and x.
-Note text. #p1
+paragraph:See , site, bold and x. #p1
+footnote:Note text. #fn1
 heading3:Section ^s1
 list_item1:One ^s1
 list_item1(1.):Step ^s1
@@ -56,11 +56,11 @@ note:first use
 	if p := bs[3]; len(p.Spans) != 3 || p.Spans[0].Href != "https://example.org" || p.Spans[1].Style != gofastcore.StyleBold {
 		t.Errorf("spans %+v", p.Spans)
 	}
-	if bs[10].Attrs["db.admonition"] != "note" || bs[11].Attrs["language"] != "go" || bs[13].Image.ID != "a.png" ||
-		bs[18].Attrs[AttrAttribute] != "href" || bs[19].Attrs[gofastcore.AttrNoteType] != "comment" {
+	if bs[11].Attrs["db.admonition"] != "note" || bs[12].Attrs["language"] != "go" || bs[14].Image.ID != "a.png" ||
+		bs[19].Attrs[AttrAttribute] != "href" || bs[20].Attrs[gofastcore.AttrNoteType] != "comment" {
 		t.Errorf("blocks %s", dump(doc))
 	}
-	if tb := bs[15].Table; tb == nil || mustJSON(tb.Rows) != `[["H1","H2"],["a","b"]]` || tb.HeaderRows != 1 {
+	if tb := bs[16].Table; tb == nil || mustJSON(tb.Rows) != `[["H1","H2"],["a","b"]]` || tb.HeaderRows != 1 {
 		t.Errorf("table %+v", tb)
 	}
 	st := doc.Parts[1].Blocks
