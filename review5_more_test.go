@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -163,7 +162,7 @@ func TestReview5DraftIncludeLinks(t *testing.T) {
 	if err := os.Symlink("real.xsd", filepath.Join(dir, "link.xsd")); err != nil {
 		t.Skip("no symbolic link:", err)
 	}
-	fifo := syscall.Mkfifo(filepath.Join(dir, "pipe"), 0o600) == nil
+	fifo := mkfifo(filepath.Join(dir, "pipe")) == nil
 	if fifo {
 		if err := os.Symlink("pipe", filepath.Join(dir, "pipe.xsd")); err != nil {
 			t.Fatal(err)
