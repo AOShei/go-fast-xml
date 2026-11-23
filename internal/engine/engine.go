@@ -461,9 +461,11 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 		e.startInline(f, el)
 		return
 	}
-	if rule.As == profile.AsPart && e.cur != nil && e.breakOpen(el.Start) {
-		// The open block is finished; the part is read on its own, and
-		// what follows it in the block starts a new block.
+	if e.cur != nil && (rule.As == profile.AsPart ||
+		(rule.As == profile.AsTable || rule.As == profile.AsImage) && e.cur.kind == skBlock) && e.breakOpen(el.Start) {
+		// The open block is finished; the part (or a table or image met
+		// inside a paragraph-like block) is read on its own, and what
+		// follows it in the block starts a new block.
 		f.prevCur, e.cur, f.suspended = e.cur, nil, true
 		e.flushStray()
 		e.startRule(f, el)

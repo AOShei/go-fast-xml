@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE ep-patent-document PUBLIC "-//EPO//EP PATENT DOCUMENT 1.5//EN" "ep-patent-document-v1-5.dtd">
+<ep-patent-document id="EP99000001B1" file="EP99000001NWB1.xml" lang="en" country="EP" doc-number="1000001" kind="B1" date-publ="20030212" status="n" dtd-version="ep-patent-document-v1-5">
+<SDOBI lang="en"><B000><eptags><B007EP>DIM350 (Ver 2.1 Jan 2001)</B007EP></eptags></B000><B100><B110>1000001</B110><B120><B121>EUROPEAN PATENT SPECIFICATION</B121></B120><B130>B1</B130><B140><date>20030212</date></B140><B190>EP</B190></B100><B200><B210>99000001.1</B210><B220><date>19991108</date></B220><B250>nl</B250><B260>en</B260></B200><B400><B450><date>20030212</date><bnum>200307</bnum></B450></B400><B500><B510EP><classification-ipcr sequence="1"><text>B28B   5/02        20060101AFI20051220BHEP</text></classification-ipcr></B510EP><B540><B541>de</B541><B542>Vorrichtung</B542><B541>en</B541><B542>Apparatus</B542></B540><B560><B561><text>EP-A- 0 680 812</text></B561><B562><text>SMITH: "Bricks", 1993</text></B562></B560></B500><B700><B720><B721><snm>Kosman, Wim</snm><adr><str>Bredeweg 9</str><city>Groesbeek</city><ctry>NL</ctry></adr></B721><B721><snm>Jansen, Piet</snm><adr><str>Dorpstraat 1</str><city>Nijmegen</city><ctry>NL</ctry></adr></B721></B720></B700><B800><B840><ctry>AT</ctry><ctry>BE</ctry></B840></B800></SDOBI><!-- EPO <DP n="1"> -->
+<description id="desc" lang="en">
+<heading id="h0001">FIELD</heading>
+<p id="p0001" num="0001">The invention comprises:
+<ol id="ol0001" compact="compact" ol-style="">
+<li>(i) a frame;</li>
+<li>(ii) a stop.</li>
+</ol></p>
+</description>
+<claims id="claims01" lang="en">
+<claim id="c-en-01-0001" num="0001">
+<claim-text>Apparatus <b>characterized in that</b> it has a frame.</claim-text></claim>
+</claims>
+<drawings id="draw" lang="en">
+<figure id="f0001" num="1"><img id="if0001" file="imgf0001.tif" wi="161" he="196" img-content="drawing" img-format="tif"/></figure>
+</drawings>
+</ep-patent-document>
