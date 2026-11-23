@@ -31,6 +31,9 @@ func (b *Builder) Reset() {
 // Len returns the bytes of text held, not counting white space at the end.
 func (b *Builder) Len() int { return len(b.buf) }
 
+// Size returns the bytes held, white space at the end included.
+func (b *Builder) Size() int { return len(b.buf) + len(b.pending) }
+
 // Lead and Trail report that the text appended began or ended with white
 // space, which trimming removed.
 func (b *Builder) Lead() bool  { return b.lead }

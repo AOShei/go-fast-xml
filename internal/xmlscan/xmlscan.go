@@ -656,9 +656,14 @@ func (s *Scanner) charData() scanStatus {
 		default:
 			// The window is full of text. Hand over what can be cut
 			// cleanly and carry on; text need not fit in the window.
-			if n = safeCut(b); n == 0 {
+			if n = cutText(b); n == 0 {
 				return needMore
 			}
+		}
+	}
+	if n > MaxChunk {
+		if m := cutText(b[:n]); m > 0 {
+			n = m
 		}
 	}
 	raw := b[:n]
@@ -770,6 +775,17 @@ func (s *Scanner) entityRef(raw []byte, start int64) (scanStatus, bool) {
 	return skipped, true
 }
 
+// cutText returns how much of the text b to hand over as one token: at
+// most MaxChunk bytes, cut after white space where there is some, else
+// as much as safeCut allows.
+func cutText(b []byte) int {
+	n := min(len(b), MaxChunk)
+	if m := safeCut(b[:afterSpace(b, n)]); m > 0 {
+		return m
+	}
+	return safeCut(b)
+}
+
 // safeCut returns how much of b can be delivered as a text chunk without
 // splitting a UTF-8 sequence, an entity reference or a CR LF pair.
 func safeCut(b []byte) int {
@@ -817,11 +833,23 @@ func safeCut(b []byte) int {
 	return n
 }
 
-// cutPoint returns how much of a full window of comment or CDATA b can
-// be delivered, keeping back a possible partial terminator, CR LF pair or
-// UTF-8 sequence.
-func cutPoint(b []byte) int {
-	n := len(b) - 2
+// MaxChunk bounds the text of one Text or Comment token read from the
+// input: longer character data, CDATA sections and comments come in
+// pieces, cut at white space where there is some. A consumer that puts
+// block boundaries only between tokens then has a source offset for
+// each.
+const MaxChunk = 64 << 10
+
+// chunkEnd returns where to end a piece of comment or CDATA content b at
+// most n bytes long: before a possible partial terminator at the end of
+// b, after the last white space if there is some, and never inside a CR
+// LF pair or a UTF-8 sequence.
+func chunkEnd(b []byte, n int) int {
+	n = min(n, len(b)-2)
+	if n <= 0 {
+		return 0
+	}
+	n = afterSpace(b, n)
 	if n > 0 && b[n-1] == '\r' {
 		n--
 	}
@@ -831,75 +859,71 @@ func cutPoint(b []byte) int {
 	return n
 }
 
-// comment delivers the content of a comment, in chunks if it is larger
-// than the window.
-func (s *Scanner) comment() scanStatus {
+// afterSpace returns the offset just after the last white space other
+// than CR in b[:n], or n if there is none.
+func afterSpace(b []byte, n int) int {
+	for i := n - 1; i > 0; i-- {
+		if c := b[i]; c == ' ' || c == '\n' || c == '\t' {
+			return i + 1
+		}
+	}
+	return n
+}
+
+// section finds the next piece of a comment or CDATA section ending in
+// term. It returns the piece's length, how much input it takes, whether
+// it is the last piece, and false when more input is needed.
+func (s *Scanner) section(term []byte) (n, used int, final, ok bool) {
 	b := s.buf[s.pos:s.end]
-	if i := bytes.Index(b, []byte("-->")); i >= 0 {
-		s.text = s.normalizeLines(b[:i])
-		s.pos += i + 3
-		s.mode = modeNormal
-		s.final, s.kind = true, Comment
-		s.tokStart, s.tokEnd = s.constructStart, s.hereEnd()
-		return emitted
+	i := bytes.Index(b, term)
+	switch {
+	case i >= 0 && i <= MaxChunk:
+		return i, i + len(term), true, true
+	case i < 0 && s.eof && len(b) <= MaxChunk:
+		s.Stats.Repairs++ // not terminated: what there is is the content
+		return len(b), len(b), true, true
+	case i < 0 && !s.eof && (s.pos > 0 || s.end < len(s.buf)):
+		return 0, 0, false, false // there is room to look further
 	}
-	if s.eof {
-		s.Stats.Repairs++ // not terminated: what there is is the comment
-		s.text = s.normalizeLines(b)
-		s.pos = s.end
-		s.mode = modeNormal
-		s.final, s.kind = true, Comment
-		s.tokStart, s.tokEnd = s.constructStart, s.hereEnd()
-		return emitted
-	}
-	if s.pos > 0 || s.end < len(s.buf) {
+	n = chunkEnd(b, MaxChunk)
+	return n, n, false, n > 0
+}
+
+// comment delivers the content of a comment, in pieces of at most
+// MaxChunk bytes, each with its own span.
+func (s *Scanner) comment() scanStatus {
+	n, used, final, ok := s.section([]byte("-->"))
+	if !ok {
 		return needMore
 	}
-	n := cutPoint(b)
-	if n <= 0 {
-		return needMore
+	s.text = s.normalizeLines(s.buf[s.pos : s.pos+n])
+	s.pos += used
+	if final {
+		s.mode = modeNormal
 	}
-	s.text = s.normalizeLines(b[:n])
-	s.pos += n
-	s.final, s.kind = false, Comment
+	s.final, s.kind = final, Comment
 	s.tokStart, s.tokEnd = s.constructStart, s.hereEnd()
+	s.constructStart = s.tokEnd
 	return emitted
 }
 
-// cdata delivers the content of a CDATA section as text, in chunks if it
-// is larger than the window.
+// cdata delivers the content of a CDATA section as text, in pieces of at
+// most MaxChunk bytes. The first piece's span starts at "<![CDATA[".
 func (s *Scanner) cdata() scanStatus {
-	b := s.buf[s.pos:s.end]
-	start := s.here()
-	if i := bytes.Index(b, []byte("]]>")); i >= 0 {
-		s.text = s.normalizeLines(b[:i])
-		s.pos += i + 3
-		s.mode = modeNormal
-		if i == 0 {
-			return skipped
-		}
-		s.tokStart, s.tokEnd = start, s.hereEnd()
-		s.kind = Text
-		return emitted
-	}
-	if s.eof {
-		s.Stats.Repairs++
-		s.text = s.normalizeLines(b)
-		s.pos = s.end
-		s.mode = modeNormal
-		s.tokStart, s.tokEnd = start, s.hereEnd()
-		s.kind = Text
-		return emitted
-	}
-	if s.pos > 0 || s.end < len(s.buf) {
+	n, used, final, ok := s.section([]byte("]]>"))
+	if !ok {
 		return needMore
 	}
-	n := cutPoint(b)
-	if n <= 0 {
-		return needMore
+	s.text = s.normalizeLines(s.buf[s.pos : s.pos+n])
+	s.pos += used
+	if final {
+		s.mode = modeNormal
 	}
-	s.text = s.normalizeLines(b[:n])
-	s.pos += n
+	start := s.constructStart
+	s.constructStart = s.hereEnd()
+	if n == 0 {
+		return skipped
+	}
 	s.tokStart, s.tokEnd = start, s.hereEnd()
 	s.kind = Text
 	return emitted
@@ -948,6 +972,7 @@ func (s *Scanner) markup() scanStatus {
 			s.mode = modeComment
 			return skipped
 		case bytes.HasPrefix(b, cdataOpen):
+			s.constructStart = s.here()
 			s.pos += len(cdataOpen)
 			s.mode = modeCDATA
 			return skipped

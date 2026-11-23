@@ -148,6 +148,7 @@ type Generic struct {
 	paths   map[string]string
 	scratch []byte
 	peak    int // the longest the queue has been, for tests
+	taken   []item
 }
 
 // New returns a generic consumer writing to out.
@@ -180,6 +181,9 @@ func (g *Generic) StartElement(r *xmlread.Reader, e *xmlread.Element) {
 		g.after = g.attrNotes(len(g.stack), g.after)
 		if o := g.frameAt(g.owner); o.anchor == "" && o.pieces == 0 {
 			o.anchor = f.id // the identifier of an element in the block
+		}
+		if len(g.after) > MaxPendingBlocks {
+			g.cutOwner(e.Start) // the notes waiting for the block are bounded too
 		}
 		return
 	}
@@ -238,10 +242,34 @@ func (g *Generic) Text(r *xmlread.Reader, t []byte, start, end int64) {
 		}
 		g.becomeText(d, start)
 	}
+	if g.b.Size() > 0 && g.b.Size()+len(t) > MaxBlockBytes {
+		// The block is cut where this token starts, so each piece has
+		// the source span of its own text.
+		g.cutOwner(start)
+	}
 	g.b.Append(t, preserve)
 	if g.b.Len() > MaxBlockBytes {
-		g.splitOwner(start)
+		g.splitOwner(start) // a token longer than a block: not from the scanner's input
 	}
+}
+
+// cutOwner gives the owner's text so far as a piece ending at offset at,
+// with the notes and comments that follow it, and writes out everything
+// before it. White space at the cut is dropped, as at a block's ends.
+func (g *Generic) cutOwner(at int64) {
+	f := g.frameAt(g.owner)
+	g.out.Splits++
+	if text := g.b.String(); text != "" {
+		g.enqueue(item{block: g.paragraph(f, text, at)})
+		f.pieces++
+	}
+	g.b.Reset()
+	g.pieceAt = at
+	for _, b := range g.after {
+		g.enqueue(item{block: b})
+	}
+	g.after = g.after[:0]
+	g.flush(true)
 }
 
 func spaceOnly(t []byte) bool {
@@ -269,14 +297,24 @@ func (g *Generic) becomeText(d int, at int64) {
 	}
 	f.state, f.start = textual, f.el.Start
 	g.pieceAt = f.start
-	for _, it := range g.queue[f.qStart:] {
+	// The waiting items leave the queue first: taking them in may cut the
+	// block, which writes the queue out.
+	g.taken = append(g.taken[:0], g.queue[f.qStart:]...)
+	for _, it := range g.taken {
 		g.qSize -= len(it.block.Text) + gofastcore.BlockCost
+	}
+	clear(g.queue[f.qStart:])
+	g.queue = g.queue[:f.qStart]
+	for _, it := range g.taken {
 		switch {
 		case it.space && it.block.Text != "":
 			g.b.Append([]byte(it.block.Text), true)
 		case it.space:
 			g.b.Space()
 		case it.para:
+			if g.b.Size() > 0 && g.b.Size()+len(it.block.Text)+2 > MaxBlockBytes {
+				g.cutOwner(it.block.Loc.Offset)
+			}
 			if it.lead {
 				g.b.Space()
 			}
@@ -291,8 +329,7 @@ func (g *Generic) becomeText(d int, at int64) {
 			g.after = append(g.after, it.block)
 		}
 	}
-	clear(g.queue[f.qStart:])
-	g.queue = g.queue[:f.qStart]
+	clear(g.taken)
 }
 
 // emitOwner ends the owner's block at offset end and queues it with the
@@ -357,9 +394,17 @@ func (g *Generic) Comment(r *xmlread.Reader, t []byte, final bool, start, end in
 		}
 		g.cb.Reset()
 	}
+	if g.cb.Size() > 0 && g.cb.Size()+len(t) > MaxBlockBytes {
+		// A long comment is cut between the scanner's pieces, each of
+		// which has its own span.
+		g.comment(g.cb.String(), start)
+		g.cb.Reset()
+		g.comStart = start
+	}
 	g.cb.Append(t, true)
 	for g.cb.Len() > MaxBlockBytes {
-		g.comment(g.cb.Split(MaxBlockBytes), end)
+		g.comment(g.cb.Split(MaxBlockBytes), end) // a piece longer than a block: not from the scanner's input
+		g.comStart = end
 	}
 	if final {
 		g.comment(g.cb.String(), end)
@@ -376,6 +421,9 @@ func (g *Generic) comment(text string, end int64) {
 		Attrs: map[string]string{gofastcore.AttrStored: gofastcore.StoredMarkupComment},
 		Loc:   gofastcore.Location{Offset: g.comStart, Length: max(end-g.comStart, 0)}}
 	g.comParts++
+	if g.comInner && g.owner > 0 && len(g.after) >= MaxPendingBlocks {
+		g.cutOwner(g.comStart)
+	}
 	if g.comInner && g.owner > 0 {
 		g.after = append(g.after, b)
 		return
