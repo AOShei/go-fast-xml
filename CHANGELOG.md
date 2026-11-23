@@ -9,6 +9,9 @@
   stops with `limit.exceeded` before its rows are padded (20,000 empty
   rows under one 1,024-column row no longer allocate 1.2 GB).
 - Repeated values of one `Metadata.Extra` key are joined in linear time.
+- Text after a block, list or item read as lines of the paragraph (or
+  item, or cell) it stands in starts a new line: `<p>lead<list>...</list>
+  tail</p>` no longer runs the last item into "tail".
 
 ### Phase 4: drafting a profile from an XSD
 

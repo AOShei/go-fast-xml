@@ -48,6 +48,30 @@ func TestReview5TableWidthGrowsLate(t *testing.T) {
 	}
 }
 
+// Text after a nested block starts a line, an inline element's included;
+// a nested block at the end of its paragraph leaves no break behind, and
+// white space between two nested lists gives one break.
+func TestReview5NestedBlockTailMore(t *testing.T) {
+	for src, want := range map[string]string{
+		`<r><p>lead<ul><li>one</li></ul><b>bold</b> tail</p></r>`:            "lead\none\nbold tail",
+		`<r><p>lead<ul><li>one</li></ul> </p></r>`:                           "lead\none",
+		`<r><p>a<ul><li>x</li></ul> <ul><li>y</li></ul> b</p></r>`:           "a\nx\ny\nb",
+		`<r><ul><li><p>inner</p>after</li></ul></r>`:                         "inner\nafter",
+		`<r><rt><tr><td>c<p>para</p>tail</td></tr></rt></r>`:                 "c\npara\ntail",
+		`<r><p>lead<ol><li>one</li><li>two</li></ol>tail</p><p>next</p></r>`: "lead\n1. one\n2. two\ntail",
+	} {
+		doc := r5Extract(t, r5Prof, src, nil)
+		b := doc.Parts[0].Blocks[0]
+		got := b.Text
+		if b.Table != nil {
+			got = b.Table.Rows[0][0]
+		}
+		if got != want {
+			t.Errorf("%s: text %q, want %q", src, got, want)
+		}
+	}
+}
+
 // Values of one Extra key are joined in order, and the joined value stops
 // growing at MaxValueBytes.
 func TestReview5ExtraJoinOrder(t *testing.T) {

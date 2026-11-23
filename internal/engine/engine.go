@@ -209,6 +209,10 @@ type frame struct {
 	// spaced: the sink of an inline "space" rule, given a space when the
 	// element ends.
 	spaced *sink
+	// broken: the sink a block, list or item was read into as lines; a
+	// line break is owed after the element ends, written before the next
+	// text (none at the block's end: white space there is dropped).
+	broken *sink
 
 	val    string
 	hasVal bool
@@ -865,6 +869,7 @@ func (e *Engine) nested(f *frame, el *xmlread.Element) bool {
 		case profile.AsBlock:
 			if !s.done && s.b.Len() == 0 && r.Value == nil {
 				f.role = roleInline
+				f.broken = s
 				e.applyOwn(f)
 				return true
 			}
@@ -896,14 +901,17 @@ func (e *Engine) nested(f *frame, el *xmlread.Element) bool {
 				s.b.Break()
 			}
 			s.fresh = false
+			f.broken = s
 			return true
 		case profile.AsList:
 			f.role = roleInline
 			f.ordered = e.test(r.Ordered)
 			f.counter = 0
+			f.broken = s
 			return true
 		case profile.AsItem:
 			f.role = roleInline
+			f.broken = s
 			s.b.Break()
 			if p := e.parent(); p != nil {
 				m := ""
@@ -1754,6 +1762,9 @@ func (e *Engine) EndElement(r *xmlread.Reader, el *xmlread.Element, start, end i
 	}
 	if f.spaced != nil && f.spaced == e.active() {
 		f.spaced.b.Space()
+	}
+	if f.broken != nil && f.broken == e.active() {
+		f.broken.b.Break()
 	}
 	if f.held != nil {
 		e.addHeld(f.held)
