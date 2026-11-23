@@ -17,6 +17,46 @@ Service-Public dev batch through `ExtractFile`, one thread: 1,296 to
 - Values the text conventions leave unchanged are not copied.
 - `BenchmarkBatch` (the whole batch, with user CPU), `TestOutputDigests`.
 
+### Phase 5: fixes after review
+
+- A table is charged core's cell cost for every cell of its padded grid
+  as its rows end and as it widens; one the text budget cannot take
+  stops with `limit.exceeded` before its rows are padded (20,000 empty
+  rows under one 1,024-column row no longer allocate 1.2 GB).
+- Repeated values of one `Metadata.Extra` key are joined in linear time.
+- Text after a block, list or item read as lines of the paragraph (or
+  item, or cell) it stands in starts a new line: `<p>lead<list>...</list>
+  tail</p>` no longer runs the last item into "tail".
+- An unclosed comment, processing instruction or literal in a DOCTYPE's
+  internal subset ends at the subset's `]>` (else at the end of the
+  declaration's window, the token limit), with `input.repaired`; the
+  document after it is read instead of refused as `ErrMalformed`.
+- A paragraph over `MaxBlockBytes` is cut at the last white space already
+  read, not where an inline tag starts in the middle of a word (profile
+  and generic reading); only a run with no white space is cut where it
+  stands.
+- Choosing a rule under ancestors with long tested attribute values no
+  longer costs time in proportion to those values for every element.
+- `-draft-profile`: a schema file (entry or include) is opened only when
+  `os.Stat` finds a regular file, so an include naming a FIFO no longer
+  hangs; symbolic links are followed; the context is consulted before
+  each file.
+- In an ordered list, a label first in an item is its marker in place of
+  the list's generated number, as `PROFILE_FORMAT.md` says.
+- A column span (`namest`/`nameend`, `spanname`, `colspan`) over a column
+  a cell from a row above still holds is clipped there; no two merges of
+  a table share a cell (checked when the table is made, and in the fuzz
+  targets).
+- The attribute notes of unmapped elements inside a block are bounded at
+  `MaxPendingBlocks` as in generic reading: past it, the block's text so
+  far is given as a piece and the notes follow (`limit.exceeded`).
+  Token tests (`[@a~='t']`) split an element's value once, not once per
+  rule.
+- `Extractor.Charset` and the command's `-charset NAME`: the encoding
+  given from outside the file is used whatever it declares or its bytes
+  suggest; a byte order mark still wins (as in go-fast-html); an unknown
+  label is `ErrUnsupported` before reading.
+
 ### Phase 4: drafting a profile from an XSD
 
 - `gofastxml -draft-profile schema.xsd [-o draft.json]` and

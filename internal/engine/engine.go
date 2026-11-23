@@ -85,11 +85,12 @@ type sink struct {
 	end      int64
 	pieces   int
 	pieceAt  int64
-	done     bool // an item has its text
-	fresh    bool // a line was just started (an item's marker written)
-	auto     bool // the marker is an ordered list's number, not from the file
-	verbatim bool // white space kept as written (code)
-	restart  bool // a part broke the block: the next text starts a block
+	word     generic.WordMark // where the last word starts
+	done     bool             // an item has its text
+	fresh    bool             // a line was just started (an item's marker written)
+	auto     bool             // the marker is an ordered list's number, not from the file
+	verbatim bool             // white space kept as written (code)
+	restart  bool             // a part broke the block: the next text starts a block
 	// structure captures
 	structure bool
 	sb        []byte
@@ -101,6 +102,7 @@ type sink struct {
 func (s *sink) reset(kind sinkKind, start int64) {
 	s.kind, s.start, s.end, s.pieces, s.pieceAt, s.done, s.restart = kind, start, start, 0, start, false, false
 	s.b.Reset()
+	s.word.OK = false
 	s.spans, s.after, s.marker = s.spans[:0], nil, ""
 	s.structure, s.sb, s.levels, s.cut, s.href = false, s.sb[:0], s.levels[:0], false, ""
 	s.fresh, s.auto, s.verbatim = false, false, false
@@ -209,6 +211,12 @@ type frame struct {
 	// spaced: the sink of an inline "space" rule, given a space when the
 	// element ends.
 	spaced *sink
+	// broken: the sink a block, list or item was read into as lines; a
+	// line break is owed after the element ends, written before the next
+	// text (none at the block's end: white space there is dropped).
+	broken *sink
+	// tokens: the token sets of the element's values that rules tested.
+	tokens map[profile.QName]map[string]bool
 
 	val    string
 	hasVal bool
@@ -240,6 +248,12 @@ type Engine struct {
 	opts Options
 	// Meta collects the metadata the rules give.
 	Meta gofastcore.Metadata
+	// extra collects the values of each Metadata.Extra key, joined as
+	// they come and written to Meta.Extra once, at Finish.
+	extra map[string]*strings.Builder
+	// wordCut: a piece is being cut while reading (cutSink), at the last
+	// white space held rather than where the next token starts.
+	wordCut bool
 
 	parts  []*gofastcore.Part
 	stored *gofastcore.Part
@@ -267,7 +281,10 @@ type Engine struct {
 	clamped, mathml                  int
 	// Counts for the whole reading.
 	ValuesCut, ColumnsCut, SpansCut, TextCut, PartsCut int
-	Controls, Invalid                                  int
+	// PendingCut counts blocks cut because more than MaxPendingBlocks
+	// attribute notes waited for them.
+	PendingCut        int
+	Controls, Invalid int
 
 	com      generic.Builder
 	inCom    bool
@@ -322,6 +339,22 @@ func (e *Engine) Attr(i int, q profile.QName) (string, bool) {
 	return "", false
 }
 
+// HasToken implements profile.TokenPath: an element's tested value is
+// split into its tokens once, the first time a rule tests it.
+func (e *Engine) HasToken(i int, q profile.QName, tok string) bool {
+	f := &e.frames[len(e.frames)-1-i]
+	set, ok := f.tokens[q]
+	if !ok {
+		v, _ := e.Attr(i, q)
+		set = profile.Tokens(v)
+		if f.tokens == nil {
+			f.tokens = map[profile.QName]map[string]bool{}
+		}
+		f.tokens[q] = set
+	}
+	return set[tok]
+}
+
 func (e *Engine) getSink(kind sinkKind, start int64) *sink {
 	var s *sink
 	if n := len(e.free); n > 0 {
@@ -355,7 +388,12 @@ func (e *Engine) active() *sink {
 func (e *Engine) lookup() *profile.Rule {
 	key := e.keybuf[:0]
 	n := min(len(e.frames), e.p.MaxSteps())
+	// The key holds tested attribute values of up to 128 bytes; a longer
+	// one makes the element's rule be looked up afresh, without building
+	// the rest of the key, so that the cost per element does not grow
+	// with the values its ancestors hold.
 	cacheable := true
+keyLoop:
 	for i := range n {
 		q := e.Name(i)
 		key = append(key, q.URI...)
@@ -366,6 +404,7 @@ func (e *Engine) lookup() *profile.Rule {
 			if v, ok := e.Attr(i, t); ok {
 				if len(v) > 128 {
 					cacheable = false
+					break keyLoop
 				}
 				key = append(key, t.Local...)
 				key = append(key, 1)
@@ -539,7 +578,9 @@ func (e *Engine) inLabel() bool {
 // as text of the block: when the block has text or a marker already, or a
 // label is waiting for it, the label's text cannot be its marker.
 func (e *Engine) labelInline(s *sink) bool {
-	return s.b.Len() > 0 || s.marker != "" || e.label != nil
+	// An ordered list's generated number (auto) gives way to the file's
+	// label: a label first in such an item is its marker.
+	return s.b.Len() > 0 || s.marker != "" && !s.auto || e.label != nil
 }
 
 // count adds one to name in m, within MaxNamesCounted names.
@@ -694,6 +735,22 @@ func (e *Engine) startUnmapped(f *frame, el *xmlread.Element) {
 		// follow it as notes.
 		f.role = roleInline
 		s.after = e.attrNotes(el, s.after)
+		if len(s.after) > generic.MaxPendingBlocks {
+			// The notes waiting for the block are bounded, as in
+			// generic reading: the block's text so far is given as a
+			// piece (when the sink makes a block) and the notes follow.
+			e.PendingCut++
+			e.wordCut = true
+			if e.givePiece(s, el.Start) {
+				e.out.Splits++
+			}
+			e.wordCut = false
+			after := s.after
+			s.after = nil
+			for _, b := range after {
+				e.add(b, e.sinkFrame(s), false)
+			}
+		}
 		return
 	}
 	f.role = roleContainer
@@ -862,6 +919,7 @@ func (e *Engine) nested(f *frame, el *xmlread.Element) bool {
 		case profile.AsBlock:
 			if !s.done && s.b.Len() == 0 && r.Value == nil {
 				f.role = roleInline
+				f.broken = s
 				e.applyOwn(f)
 				return true
 			}
@@ -893,14 +951,17 @@ func (e *Engine) nested(f *frame, el *xmlread.Element) bool {
 				s.b.Break()
 			}
 			s.fresh = false
+			f.broken = s
 			return true
 		case profile.AsList:
 			f.role = roleInline
 			f.ordered = e.test(r.Ordered)
 			f.counter = 0
+			f.broken = s
 			return true
 		case profile.AsItem:
 			f.role = roleInline
+			f.broken = s
 			s.b.Break()
 			if p := e.parent(); p != nil {
 				m := ""
@@ -1025,7 +1086,7 @@ func (e *Engine) startRule(f *frame, el *xmlread.Element) {
 		f.inItem = false
 		f.ordered = e.test(r.Ordered)
 	case profile.AsTable:
-		f.table = newTable(r.Model, el.Start)
+		f.table = newTable(e, r.Model)
 		if len(r.HeaderText) > 0 {
 			e.headerRow(f.table, r.HeaderText)
 		}
@@ -1134,20 +1195,36 @@ func (e *Engine) setExtra(k, v, join string) {
 	if v == "" {
 		return
 	}
-	if e.Meta.Extra == nil {
-		e.Meta.Extra = map[string]string{}
+	if e.extra == nil {
+		e.extra = map[string]*strings.Builder{}
 	}
-	if old, ok := e.Meta.Extra[k]; ok && old != "" {
+	b := e.extra[k]
+	if b == nil {
+		b = &strings.Builder{}
+		e.extra[k] = b
+	}
+	if b.Len() > 0 {
 		if join == "" {
 			join = "\n"
 		}
-		if len(old)+len(join)+len(v) > generic.MaxValueBytes {
+		if b.Len()+len(join)+len(v) > generic.MaxValueBytes {
 			e.ValuesCut++
 			return
 		}
-		v = old + join + v
+		b.WriteString(join)
 	}
-	e.Meta.Extra[k] = v
+	b.WriteString(v)
+}
+
+// flushExtra writes the collected Metadata.Extra values, once each.
+func (e *Engine) flushExtra() {
+	for k, b := range e.extra {
+		if e.Meta.Extra == nil {
+			e.Meta.Extra = map[string]string{}
+		}
+		e.Meta.Extra[k] = b.String()
+	}
+	e.extra = nil
 }
 
 // applyOwn gives a nested element's own attrs to the block it joins.
@@ -1494,7 +1571,9 @@ func (e *Engine) Text(r *xmlread.Reader, t []byte, start, end int64) {
 	if s.restart && !spaceOnly(t) {
 		s.restart, s.pieceAt = false, start
 	}
+	pos0, trail := s.b.Pos(), s.b.Trail()
 	s.b.Append(t, preserve)
+	s.word.Note(&s.b, t, start, end, pos0, trail, e.out.UTF8)
 	s.end = max(s.end, end)
 	if !spaceOnly(t) {
 		s.fresh = false
@@ -1517,7 +1596,10 @@ func spaceOnly(t []byte) bool {
 // far is given as a piece and the rest continues it; a value or a cell is
 // cut there.
 func (e *Engine) cutSink(s *sink, at int64) {
-	if !e.givePiece(s, at) {
+	e.wordCut = true
+	ok := e.givePiece(s, at)
+	e.wordCut = false
+	if !ok {
 		if !s.cut {
 			s.cut = true
 			e.TextCut++
@@ -1527,16 +1609,20 @@ func (e *Engine) cutSink(s *sink, at int64) {
 	e.out.Splits++
 }
 
+// sinkFrame returns the frame whose element opened s, or nil.
+func (e *Engine) sinkFrame(s *sink) *frame {
+	for i := len(e.frames) - 1; i >= 0; i-- {
+		if e.frames[i].sink == s {
+			return &e.frames[i]
+		}
+	}
+	return nil
+}
+
 // givePiece gives a block's text so far as a block of its own, when the
 // sink is one that makes a block; it reports whether it did.
 func (e *Engine) givePiece(s *sink, at int64) bool {
-	var f *frame
-	for i := len(e.frames) - 1; i >= 0; i-- {
-		if e.frames[i].sink == s {
-			f = &e.frames[i]
-			break
-		}
-	}
+	f := e.sinkFrame(s)
 	switch {
 	case s.kind == skStray:
 		f = &e.frames[min(e.strayAt, len(e.frames)-1)]
@@ -1588,19 +1674,31 @@ func (e *Engine) breakOpen(at int64) bool {
 func (e *Engine) piece(s *sink, f *frame, kind gofastcore.Kind, origin gofastcore.Origin, at int64) {
 	for s.b.Len() > generic.MaxBlockBytes || s.b.Size() > 0 {
 		var text string
-		took, all := 0, false
+		took, all, kept, end := 0, false, false, at
 		if s.b.Len() > generic.MaxBlockBytes {
 			text, took = s.b.SplitAt(generic.MaxBlockBytes)
+			s.word.OK = false
+		} else if e.wordCut && s.word.OK {
+			// Cut while reading: at the last white space held, the word
+			// after it kept for the text that continues it, which starts
+			// where the word does.
+			text, took, kept = s.b.SplitWord(s.word.Pos)
+			all = !kept
+			if kept {
+				end = s.word.At
+			}
+			s.word.OK = false
 		} else {
 			text, all = s.b.String(), true
 			took = len(text)
 			s.b.Reset()
+			s.word.OK = false
 		}
 		if text == "" {
 			break
 		}
 		b := gofastcore.Block{Kind: kind, Origin: origin, Text: text, Marker: s.marker, Continued: s.pieces > 0,
-			Loc: gofastcore.Location{Offset: s.pieceAt, Length: max(at-s.pieceAt, 0)}}
+			Loc: gofastcore.Location{Offset: s.pieceAt, Length: max(end-s.pieceAt, 0)}}
 		b.Spans = e.cutSpans(s, len(text), took, all)
 		if origin == gofastcore.OriginInferred {
 			b.Attrs = map[string]string{generic.AttrElement: e.pathTo(f)}
@@ -1618,7 +1716,10 @@ func (e *Engine) piece(s *sink, f *frame, kind gofastcore.Kind, origin gofastcor
 		}
 		s.marker = ""
 		s.pieces++
-		s.pieceAt = at
+		s.pieceAt = end
+		if kept {
+			break
+		}
 	}
 	if s.b.Size() == 0 {
 		s.spans = s.spans[:0]
@@ -1735,6 +1836,9 @@ func (e *Engine) EndElement(r *xmlread.Reader, el *xmlread.Element, start, end i
 	}
 	if f.spaced != nil && f.spaced == e.active() {
 		f.spaced.b.Space()
+	}
+	if f.broken != nil && f.broken == e.active() {
+		f.broken.b.Break()
 	}
 	if f.held != nil {
 		e.addHeld(f.held)
@@ -1999,8 +2103,10 @@ func (e *Engine) endRule(f *frame, end int64) blockRef {
 			break
 		}
 		if o := e.cur; o != nil && o.kind != skCapture && o.kind != skStray {
-			if o.marker == "" {
-				o.marker = text
+			if o.marker == "" || o.auto {
+				// The file's label is the marker; an ordered list's
+				// generated number gives way to it.
+				o.marker, o.auto = text, false
 			}
 			break
 		}
@@ -2255,6 +2361,7 @@ func (e *Engine) Finish(end int64) {
 	}
 	e.flushStray()
 	e.flushLabel()
+	e.flushExtra()
 }
 
 // Counts returns the control characters removed and invalid bytes met in

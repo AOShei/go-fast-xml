@@ -995,7 +995,15 @@ func (s *Scanner) markup() scanStatus {
 			s.mode = modeCDATA
 			return skipped
 		case len(b) >= len(doctypeOpen) && bytes.EqualFold(b[:len(doctypeOpen)], doctypeOpen):
-			n, repaired := doctypeEnd(b)
+			// final: no more input will come into view, at the end of
+			// the input or with the window at the token limit. The
+			// declaration's own window is the token limit.
+			final := s.eof || len(b) >= s.maxToken
+			win := b
+			if final {
+				win = b[:min(len(b), s.maxToken)]
+			}
+			n, repaired := doctypeEnd(win, final)
 			if n < 0 {
 				return needMore
 			}
@@ -1026,8 +1034,24 @@ func (s *Scanner) markup() scanStatus {
 // holds no '<': one that runs into a '<' lacks its closing quote, and the
 // declaration ends at the first '>' after the quote, or else before the
 // '<'; repaired reports that.
-func doctypeEnd(b []byte) (n int, repaired bool) {
+//
+// Inside the internal subset, a comment, processing instruction or
+// literal that is not closed in b when final (no more input will come)
+// ends at the subset's "]>" after it when there is one, else at the end
+// of b; repaired reports that too, and the document after it is read.
+func doctypeEnd(b []byte, final bool) (n int, repaired bool) {
 	depth := 0
+	unclosed := func(i int) (int, bool) {
+		if !final {
+			return -1, false
+		}
+		if depth > 0 {
+			if j := bytes.Index(b[i:], []byte("]>")); j >= 0 {
+				return i + j + 2, true
+			}
+		}
+		return len(b), true
+	}
 	for i := len(doctypeOpen); i < len(b); i++ {
 		switch c := b[i]; c {
 		case '"', '\'':
@@ -1045,23 +1069,23 @@ func doctypeEnd(b []byte) (n int, repaired bool) {
 				}
 			}
 			if j < 0 {
-				return -1, false
+				return unclosed(i)
 			}
 			i += j + 1
 		case '<':
 			if rest := b[i:]; len(rest) < len(commentOpen) && bytes.HasPrefix(commentOpen, rest) {
-				return -1, false // what follows decides: see more first
+				return unclosed(i) // what follows decides: see more first
 			}
 			if bytes.HasPrefix(b[i:], commentOpen) {
 				j := bytes.Index(b[i+4:], []byte("-->"))
 				if j < 0 {
-					return -1, false
+					return unclosed(i)
 				}
 				i += 4 + j + 2
 			} else if i+1 < len(b) && b[i+1] == '?' {
 				j := bytes.Index(b[i+2:], []byte("?>"))
 				if j < 0 {
-					return -1, false
+					return unclosed(i)
 				}
 				i += 2 + j + 1
 			} else if depth == 0 {

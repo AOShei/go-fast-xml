@@ -90,6 +90,25 @@ func TestLongTagSmallReads(t *testing.T) {
 	}
 }
 
+// Phase 5: an unclosed comment in the internal subset with no "]>" after
+// it ends at the end of the DOCTYPE's bounded window (the token limit),
+// counted as a repair, and the element after the window is read.
+func TestDoctypeUnclosedCommentAtWindow(t *testing.T) {
+	src := `<!DOCTYPE r [ <!-- ` + strings.Repeat("x", 8000) + `<r>Hello</r>`
+	s := New(strings.NewReader(src), &Options{MaxTokenBytes: 4096})
+	var doctype, start bool
+	for k := s.Next(); k != EOF; k = s.Next() {
+		doctype = doctype || k == Doctype
+		start = start || k == Start && string(s.Local()) == "r"
+	}
+	if s.Err() != nil {
+		t.Fatal(s.Err())
+	}
+	if !doctype || !start || s.Stats.Repairs == 0 {
+		t.Errorf("doctype %v, element r %v, repairs %d", doctype, start, s.Stats.Repairs)
+	}
+}
+
 // Finding 5: constructs passed over without a token still give the
 // caller the chance to stop.
 func TestInterruptWhileSkipping(t *testing.T) {

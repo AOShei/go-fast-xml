@@ -57,6 +57,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		profName   = flags.String("profile", "", "read with this profile: the name of a built-in one, a profile file (JSON, see PROFILE_FORMAT.md), or none for generic reading; by default the profile whose root element the file has, else generic reading")
 		profiles   = flags.Bool("profiles", false, "list the built-in profiles and exit")
 		spans      = flags.Bool("spans", false, "give inline formatting and links as spans (in JSON)")
+		cs         = flags.String("charset", "", "the encoding of every input, as a MIME charset label gives it (windows-1251, shift_jis), used whatever the XML declaration names; a byte order mark overrides it. A label naming no encoding decoded here is an error")
 		draftFrom  = flags.String("draft-profile", "", "read this XML Schema (XSD) and write a draft profile for a person to finish (to -o or standard output), then exit; includes and imports are read from disk only, nothing is fetched")
 	)
 	// The render flags shared by every go-fast command (COMMAND_FLAGS.md).
@@ -90,7 +91,14 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if *draftFrom != "" {
 		return draftProfile(ctx, *draftFrom, *output, *quiet, stdout, stderr)
 	}
-	extractor := &gofastxml.Extractor{}
+	extractor := &gofastxml.Extractor{Charset: *cs}
+	if *cs != "" {
+		// An unknown label is refused before any file is read: Extract
+		// checks Charset before it looks at its input.
+		if _, err := extractor.Extract(ctx, nil, 0, nil); errors.Is(err, gofastcore.ErrUnsupported) {
+			return fail("-charset %q names no encoding this library decodes", *cs)
+		}
+	}
 	switch name := *profName; {
 	case name == "", name == gofastxml.ProfileNone, gofastxml.BuiltinProfile(name) != nil:
 		extractor.Profile = name

@@ -162,7 +162,19 @@ func LoadBytes(ctx context.Context, name string, data []byte, lim Limits) (*Set,
 	return s, s.load(name, "", 0)
 }
 
+// readFile reads a schema document from disk. It is opened only when
+// os.Stat finds a regular file: a FIFO, a device or a directory is never
+// opened (opening a FIFO waits for a writer). Symbolic links are followed
+// (schemas are often linked into a catalog); what they lead to must be a
+// regular file. The file opened must be the one examined.
 func readFile(path string, max int64) ([]byte, error) {
+	pre, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !pre.Mode().IsRegular() {
+		return nil, fmt.Errorf("%s is not a regular file", path)
+	}
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -172,7 +184,7 @@ func readFile(path string, max int64) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !st.Mode().IsRegular() {
+	if !st.Mode().IsRegular() || !os.SameFile(pre, st) {
 		return nil, fmt.Errorf("%s is not a regular file", path)
 	}
 	if st.Size() > max {
@@ -199,6 +211,9 @@ func (s *Set) load(path, chameleon string, depth int) error {
 	if len(s.Docs) >= s.lim.MaxFiles {
 		s.problem(Problem{Kind: LimitCut, Location: path, Msg: fmt.Sprintf("more than %d schema documents; the rest are not read", s.lim.MaxFiles)})
 		return ErrLimit
+	}
+	if err := s.ctx.Err(); err != nil {
+		return err
 	}
 	data, err := s.read(path, s.lim.MaxBytes-s.Bytes)
 	if errors.Is(err, ErrLimit) {

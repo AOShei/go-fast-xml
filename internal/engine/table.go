@@ -39,8 +39,14 @@ type table struct {
 	nextCol  int
 	inHead   bool
 	cut      bool
-	// cost is what the cells hold so far, against the text budget.
+	// cost is what the table's block will cost the text budget so far:
+	// the text of its cells, and core's cell cost for every cell of the
+	// grid it will be, each row padded to the widest (ncols). It grows as
+	// rows end and as the width grows, so that a table the budget cannot
+	// take stops before its grid is padded (over).
 	cost int64
+	over bool
+	e    *Engine
 	// fromProfile: the header row is the profile's fixed text. attrNames
 	// are the attributes rows were made from, in order of first use.
 	fromProfile bool
@@ -77,15 +83,34 @@ func (e *Engine) headerRow(t *table, text []string) {
 // tableCost stops reading when the cells held so far are more than the
 // text budget has left: a row made from attributes holds more than its
 // element's bytes.
-func (e *Engine) tableCost(t *table) {
-	if t.cost > e.out.Budget.Left() {
-		e.out.Budget.Exhaust()
-		e.out.Stopped = true
+func (e *Engine) tableCost(t *table) { t.check() }
+
+// check stops reading (limit.exceeded through the spent budget) when the
+// table's block would cost more than the text budget has left.
+func (t *table) check() {
+	if t.over || t.e == nil {
+		return
+	}
+	if t.cost > t.e.out.Budget.Left() {
+		t.over = true
+		t.e.out.Budget.Exhaust()
+		t.e.out.Stopped = true
 	}
 }
 
-func newTable(model string, start int64) *table {
-	return &table{model: model}
+// widen records that the table is now n columns wide: every row already
+// held will be padded to n.
+func (t *table) widen(n int) {
+	if n <= t.ncols {
+		return
+	}
+	t.cost += int64(n-t.ncols) * int64(len(t.rows)) * gofastcore.CellCost
+	t.ncols = n
+	t.check()
+}
+
+func newTable(e *Engine, model string) *table {
+	return &table{model: model, e: e}
 }
 
 // tableOf returns the table of the innermost open table element.
@@ -136,6 +161,15 @@ func (t *table) place(e *Engine, at, cs, rs int) {
 	}
 	cs = min(max(cs, 1), MaxTableColumns)
 	rs = min(max(rs, 1), MaxRowSpan)
+	// A span (namest/nameend, spanname, colspan) over a column a cell
+	// from a row above still holds is clipped at that column: no cell is
+	// in two merges.
+	for c := t.col + 1; c < t.col+cs && c < len(t.occ); c++ {
+		if t.occupied(c) {
+			cs = c - t.col
+			break
+		}
+	}
 	t.cs, t.rs = cs, rs
 	if t.col+cs > MaxTableColumns {
 		if !t.cut {
@@ -157,7 +191,7 @@ func (t *table) endCell(text, href string) {
 		t.occ = append(t.occ, -1)
 	}
 	t.row[t.col] = text
-	t.cost += int64(gofastcore.CellCost + len(text))
+	t.cost += int64(len(text))
 	r := len(t.rows)
 	for c := t.col; c < t.col+t.cs; c++ {
 		t.occ[c] = r + t.rs - 1
@@ -169,8 +203,8 @@ func (t *table) endCell(text, href string) {
 		t.cells = append(t.cells, gofastcore.CellDetail{Row: r, Col: t.col, Href: href})
 	}
 	t.col += t.cs
-	t.ncols = max(t.ncols, t.col)
 	t.cs = 0
+	t.widen(t.col)
 }
 
 func (t *table) endRow() {
@@ -178,6 +212,9 @@ func (t *table) endRow() {
 		return
 	}
 	t.inRow = false
+	if t.over {
+		return
+	}
 	if !t.rowHead {
 		if t.rowCells > 0 && t.rowAllHeadCells && !t.body {
 			t.header++
@@ -190,14 +227,20 @@ func (t *table) endRow() {
 			t.row = append(t.row, "")
 		}
 	}
-	t.ncols = max(t.ncols, len(t.row))
+	t.widen(len(t.row))
+	t.cost += int64(t.ncols) * gofastcore.CellCost
+	t.check()
+	if t.over {
+		return
+	}
 	t.rows = append(t.rows, append([]string(nil), t.row...))
 }
 
-// block returns the table's block; ok is false for a table with no cells.
+// block returns the table's block; ok is false for a table with no cells,
+// and for one the text budget cannot take (reading has stopped).
 func (t *table) block(e *Engine, start, end int64) (gofastcore.Block, bool) {
 	t.endRow()
-	if len(t.rows) == 0 || t.ncols == 0 {
+	if t.over || e.out.Stopped || len(t.rows) == 0 || t.ncols == 0 {
 		return gofastcore.Block{}, false
 	}
 	for i, r := range t.rows {
@@ -215,6 +258,7 @@ func (t *table) block(e *Engine, start, end int64) (gofastcore.Block, bool) {
 			merges = append(merges, m)
 		}
 	}
+	merges = disjoint(merges, n, t.ncols)
 	tb := &gofastcore.Table{Rows: t.rows, HeaderRows: min(t.header, n), Merges: merges}
 	if e.opts.Spans {
 		tb.Cells = t.cells
@@ -234,6 +278,39 @@ func (t *table) block(e *Engine, start, end int64) (gofastcore.Block, bool) {
 		b.Attrs[generic.AttrAttribute] = strings.Join(t.attrNames, " ")
 	}
 	return b, true
+}
+
+// disjoint returns the merges with none sharing a cell with one before it:
+// placing clips spans at occupied columns, and this check makes sure. A
+// merge that would share a cell is left out (its cells stay plain).
+func disjoint(merges []gofastcore.Merge, rows, cols int) []gofastcore.Merge {
+	if len(merges) < 2 {
+		return merges
+	}
+	taken := make([]uint64, (rows*cols+63)/64)
+	out := merges[:0]
+	for _, m := range merges {
+		free := true
+		for r := m.Row; r < m.Row+m.RowSpan && free; r++ {
+			for c := m.Col; c < m.Col+m.ColSpan; c++ {
+				if i := r*cols + c; taken[i/64]&(1<<(i%64)) != 0 {
+					free = false
+					break
+				}
+			}
+		}
+		if !free {
+			continue
+		}
+		for r := m.Row; r < m.Row+m.RowSpan; r++ {
+			for c := m.Col; c < m.Col+m.ColSpan; c++ {
+				i := r*cols + c
+				taken[i/64] |= 1 << (i % 64)
+			}
+		}
+		out = append(out, m)
+	}
+	return out
 }
 
 // calsTable returns the innermost open CALS table when the element just

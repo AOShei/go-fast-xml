@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/AOShei/go-fast-core"
+	"github.com/AOShei/go-fast-xml/internal/charset"
 	"github.com/AOShei/go-fast-xml/internal/engine"
 	"github.com/AOShei/go-fast-xml/internal/generic"
 	"github.com/AOShei/go-fast-xml/internal/xmlenc"
@@ -124,6 +125,27 @@ type Extractor struct {
 	// built-in ones, whatever the root element; ProfileNone ("none")
 	// forces generic reading. Empty means choose by the root element.
 	Profile string
+	// Charset is the character encoding of the input, given from outside
+	// it, as a label such as the charset parameter of a MIME Content-Type
+	// gives it ("windows-1251", "shift_jis"). It is used whatever the XML
+	// declaration names or the bytes suggest; a byte order mark still
+	// overrides it, as with go-fast-html's Charset. A label that names no
+	// encoding this library decodes is an error (ErrUnsupported) before
+	// anything is read. Empty means none.
+	Charset string
+}
+
+// charset returns the encoding Charset names; given is false when it is
+// empty.
+func (e *Extractor) charset() (enc charset.Encoding, given bool, err error) {
+	if e.Charset == "" {
+		return enc, false, nil
+	}
+	enc, ok := charset.Lookup(e.Charset)
+	if !ok {
+		return enc, false, fmt.Errorf("gofastxml: Extractor.Charset %q names no encoding this library decodes: %w", e.Charset, gofastcore.ErrUnsupported)
+	}
+	return enc, true, nil
 }
 
 var _ gofastcore.Extractor = (*Extractor)(nil)
@@ -199,6 +221,10 @@ func (e *Extractor) extract(ctx context.Context, r io.ReaderAt, size int64, opts
 	if opts != nil {
 		o = *opts
 	}
+	override, given, err := e.charset()
+	if err != nil {
+		return nil, err
+	}
 	if r == nil {
 		return nil, fmt.Errorf("gofastxml: no input to read: %w", gofastcore.ErrMalformed)
 	}
@@ -224,7 +250,12 @@ func (e *Extractor) extract(ctx context.Context, r io.ReaderAt, size int64, opts
 			return nil, fmt.Errorf("gofastxml: reading the input: %w", err)
 		}
 	}
-	enc, err := xmlenc.Sniff(sample)
+	var enc xmlenc.Result
+	if given {
+		enc, err = xmlenc.SniffAs(sample, override)
+	} else {
+		enc, err = xmlenc.Sniff(sample)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("gofastxml: %w: %w", err, gofastcore.ErrUnsupported)
 	}
@@ -264,7 +295,7 @@ func (e *Extractor) extract(ctx context.Context, r io.ReaderAt, size int64, opts
 	doc := gofastcore.New("xml")
 	doc.Source.Name, doc.Source.Size, doc.Source.MIME = o.Name, size, "application/xml"
 	part := &gofastcore.Part{Kind: gofastcore.PartBody, Number: 1}
-	out := &generic.Out{Part: part, Budget: text, Hint: generic.BlocksHint(size)}
+	out := &generic.Out{Part: part, Budget: text, Hint: generic.BlocksHint(size), UTF8: enc.UTF8}
 	g := generic.New(out, generic.Options{NoAttributes: e.Attributes == AttributesNone})
 	d := &dispatch{x: e, out: out, g: g, h: g, forced: forced, none: none,
 		opts: engineOptions(&o)}
@@ -372,6 +403,9 @@ func engineWarnings(part *gofastcore.Part, e *engine.Engine) {
 	}
 	if e.TextCut > 0 {
 		limit(fmt.Sprintf("%s (table cells, values, labels) longer than %d bytes cut", plural(e.TextCut, "text", "texts"), MaxBlockBytes))
+	}
+	if e.PendingCut > 0 {
+		limit(fmt.Sprintf("%d times more than %d attribute notes waited for the block they stand in; the block's text so far was given as a piece and the notes after it", e.PendingCut, generic.MaxPendingBlocks))
 	}
 	if e.SpansCut > 0 {
 		limit(fmt.Sprintf("%s past 100000 in one block left out", plural(e.SpansCut, "span", "spans")))

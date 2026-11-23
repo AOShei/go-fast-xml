@@ -135,6 +135,9 @@ func FuzzProfile(f *testing.F) {
 		if err := doc.Validate(); err != nil {
 			t.Fatalf("invalid: %v", err)
 		}
+		if bad := sharedMergeCell(doc); bad != "" {
+			t.Fatal(bad)
+		}
 	})
 }
 
