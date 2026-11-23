@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:ukm="http://www.legislation.gov.uk/namespaces/metadata">
+<act name="sample" contains="originalVersion">
+<meta>
+<identification source="#ed">
+<FRBRWork><FRBRthis value="/akn/xx/act/2026/1/!main"/><FRBRuri value="/akn/xx/act/2026/1"/><FRBRdate date="2026-01-02" name="enacted"/><FRBRauthor href="#parl"/><FRBRcountry value="xx"/><FRBRnumber value="1"/></FRBRWork>
+<FRBRExpression><FRBRthis value="/akn/xx/act/2026/1/eng@/!main"/><FRBRuri value="/akn/xx/act/2026/1/eng@"/><FRBRdate date="2026-01-02" name="enacted"/><FRBRauthor href="#parl"/><FRBRlanguage language="eng"/></FRBRExpression>
+<FRBRManifestation><FRBRthis value="/akn/xx/act/2026/1/eng@/!main.xml"/><FRBRuri value="/akn/xx/act/2026/1/eng@.akn"/><FRBRdate date="2026-01-03" name="markup"/><FRBRauthor href="#ed"/></FRBRManifestation>
+</identification>
+<references source="#ed"><TLCOrganization eId="parl" href="/ontology/organization/xx/parliament" showAs="Parliament"/><TLCPerson eId="ed" href="/ontology/person/xx/editor" showAs="Editor"/></references>
+<proprietary source="#ed"><dc:title>The Sample Act 2026</dc:title><ukm:Year Value="2026"/></proprietary>
+</meta>
+<preface><p class="title"><docTitle>The Sample Act 2026</docTitle></p></preface>
+<preamble><formula name="enactingText"><p>Be it enacted by <ref href="/ontology/organization/xx/parliament">Parliament</ref>:</p></formula></preamble>
+<body>
+<part eId="part_1"><num>Part 1</num><heading>General</heading>
+<article eId="art_1"><num>1.</num><heading>Definitions</heading>
+<paragraph eId="art_1__para_1"><num>(1)</num><content><p>In this Act<authorialNote marker="1" eId="art_1__note_1"><p>As amended in 2026.</p></authorialNote> the following terms apply.</p></content></paragraph>
+<paragraph eId="art_1__para_2"><num>(2)</num><intro><p>The terms are:</p></intro>
+<blockList eId="art_1__para_2__list_1"><item eId="art_1__para_2__list_1__item_a"><num>(a)</num><p><term refersTo="#apple">apple</term>, and</p></item><item eId="art_1__para_2__list_1__item_b"><num>(b)</num><p><i>pear</i>.</p></item></blockList></paragraph>
+</article>
+<article eId="art_2"><num>2.</num><heading>Rates</heading>
+<paragraph eId="art_2__para_1"><content><table eId="art_2__table_1"><tr><th>Rate</th><th>Value</th></tr><tr><td colspan="2">none</td></tr></table>
+<p>The sum is:</p><foreign><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi><mo>+</mo><mn>1</mn></math></foreign>
+<p><img src="figure1.png" alt="A figure"/></p></content></paragraph>
+</article>
+</part>
+</body>
+<conclusions><p>Signed by <signature><person refersTo="#ed">the Editor</person></signature>.</p></conclusions>
+<attachments><attachment eId="att_1"><doc name="schedule"><mainBody><paragraph eId="att_1__para_1"><content><p>Schedule text.</p></content></paragraph></mainBody></doc></attachment></attachments>
+</act>
+</akomaNtoso>
