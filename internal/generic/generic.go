@@ -44,6 +44,9 @@ const (
 	// an undecided ancestor (see the package comment).
 	MaxPendingBytes  = 4 << 20
 	MaxPendingBlocks = 8192
+	// MaxLangBytes bounds the root's xml:lang taken for the document's
+	// language; a longer one is an attribute note.
+	MaxLangBytes = 64
 )
 
 // Keys of Block.Attrs this library writes.
@@ -470,7 +473,9 @@ func (g *Generic) path(d int) string {
 	return p
 }
 
-// cutString cuts s to at most n bytes at a character boundary.
+// CutString cuts s to at most n bytes at a character boundary.
+func CutString(s string, n int) string { return cutString(s, n) }
+
 func cutString(s string, n int) string {
 	if len(s) <= n {
 		return s
@@ -507,7 +512,7 @@ func Skipped(e *xmlread.Element, a *xmlread.Attr) bool {
 	case xmlscan.XMLNSNamespace:
 		return true
 	case xmlscan.XMLNamespace:
-		return a.Local == "space" || a.Local == "lang" && e.Depth == 1
+		return a.Local == "space" || a.Local == "lang" && e.Depth == 1 && len(strings.TrimSpace(a.Value)) <= MaxLangBytes
 	case xmlread.NamespaceXSI:
 		return e.Depth == 1 && (a.Local == "schemaLocation" || a.Local == "noNamespaceSchemaLocation")
 	}

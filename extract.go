@@ -182,6 +182,9 @@ func (e *Extractor) Extract(ctx context.Context, r io.ReaderAt, size int64, opts
 	if r == nil {
 		return nil, fmt.Errorf("gofastxml: no input to read: %w", gofastcore.ErrMalformed)
 	}
+	if size < 0 {
+		return nil, fmt.Errorf("gofastxml: input size %d is negative: %w", size, gofastcore.ErrMalformed)
+	}
 	if limit := gofastcore.ResolveLimit(o.Limits.MaxInputBytes, DefaultMaxInputBytes); size > limit {
 		return nil, fmt.Errorf("gofastxml: input is %d bytes, limit is %d: %w", size, limit, gofastcore.ErrLimitExceeded)
 	}
@@ -213,7 +216,7 @@ func (e *Extractor) Extract(ctx context.Context, r io.ReaderAt, size int64, opts
 	expansion = min(expansion, max(decode.Left(), 0))
 
 	dec := xmlenc.NewReader(io.NewSectionReader(r, int64(enc.Skip), size-int64(enc.Skip)), enc)
-	scan := xmlscan.Options{ExpansionLimit: expansion}
+	scan := xmlscan.Options{ExpansionLimit: expansion, MaxTokenBytes: tagBytes, BufferSize: min(xmlscan.DefaultBufferSize, tagBytes)}
 	if enc.UTF8 {
 		scan.BaseOffset = int64(enc.Skip)
 	}
@@ -234,13 +237,16 @@ func (e *Extractor) Extract(ctx context.Context, r io.ReaderAt, size int64, opts
 	decode.Take(stats.Expanded)
 	rep := &rd.Report
 	if rep.Elements == 0 {
-		if runErr != nil && !errors.Is(runErr, xmlscan.ErrTokenTooLarge) {
+		if errors.Is(runErr, xmlscan.ErrTokenTooLarge) {
+			return nil, fmt.Errorf("gofastxml: %s before any element was read: %w", tooLarge(runErr), gofastcore.ErrLimitExceeded)
+		}
+		if runErr != nil {
 			return nil, fmt.Errorf("gofastxml: reading the input: %w", runErr)
 		}
 		return nil, fmt.Errorf("gofastxml: the input has no XML element: %w", gofastcore.ErrMalformed)
 	}
 
-	metadata(doc, rep, enc)
+	metadata(doc, rep, enc, out)
 	docWarnings(doc, rep, enc, dec, stats)
 	partWarnings(&part, g, out, rep, dec, stats, runErr, rd.Offset(), size)
 	part.Finish()
@@ -248,13 +254,25 @@ func (e *Extractor) Extract(ctx context.Context, r io.ReaderAt, size int64, opts
 	return doc, nil
 }
 
-func metadata(doc *gofastcore.Document, rep *xmlread.Report, enc xmlenc.Result) {
+// tagBytes is MaxTagBytes; tests lower it.
+var tagBytes = MaxTagBytes
+
+// tooLarge says what was larger than MaxTagBytes.
+func tooLarge(err error) string {
+	if errors.Is(err, xmlscan.ErrReferenceTooLarge) {
+		return fmt.Sprintf("a character reference is larger than %d bytes", tagBytes)
+	}
+	return fmt.Sprintf("a tag, processing instruction or document type declaration is larger than %d bytes", tagBytes)
+}
+
+func metadata(doc *gofastcore.Document, rep *xmlread.Report, enc xmlenc.Result, out *generic.Out) {
 	var clean generic.Builder
 	extra := map[string]string{}
 	set := func(k, v string) {
 		if v = strings.TrimSpace(v); v != "" {
 			if len(v) > MaxValueBytes {
-				v = v[:MaxValueBytes]
+				v = generic.CutString(v, MaxValueBytes)
+				out.ValuesCut++
 			}
 			extra[k] = generic.CleanName(strings.ToValidUTF8(v, "�"), &clean)
 		}
@@ -270,7 +288,7 @@ func metadata(doc *gofastcore.Document, rep *xmlread.Report, enc xmlenc.Result) 
 	}
 	set(ExtraEncoding, enc.Name())
 	doc.Metadata.Extra = extra
-	if lang := strings.TrimSpace(rep.RootLang); lang != "" && len(lang) <= 64 {
+	if lang := strings.TrimSpace(rep.RootLang); lang != "" && len(lang) <= generic.MaxLangBytes {
 		doc.Metadata.Language = generic.CleanName(strings.ToValidUTF8(lang, "�"), &clean)
 	}
 }
@@ -348,7 +366,7 @@ func partWarnings(part *gofastcore.Part, g *generic.Generic, out *generic.Out, r
 	case out.Stopped:
 		limit(fmt.Sprintf("the text budget (Limits.MaxTextBytes) was spent; reading stopped with about %d bytes of input left unread", max(size-at, 0)))
 	case errors.Is(runErr, xmlscan.ErrTokenTooLarge):
-		limit(fmt.Sprintf("a tag, processing instruction or document type declaration is larger than %d bytes; reading stopped there with about %d bytes of input left unread", MaxTagBytes, max(size-at, 0)))
+		limit(fmt.Sprintf("%s; reading stopped there with about %d bytes of input left unread", tooLarge(runErr), max(size-at, 0)))
 	case runErr != nil:
 		part.Warn(gofastcore.SeverityError, gofastcore.WarnPartFailed, fmt.Sprintf("reading stopped: %v", runErr))
 	}

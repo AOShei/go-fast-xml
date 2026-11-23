@@ -91,6 +91,10 @@ const (
 // the document type declaration is larger than Options.MaxTokenBytes.
 var ErrTokenTooLarge = errors.New("xmlscan: a tag is larger than the token limit")
 
+// ErrReferenceTooLarge is the ErrTokenTooLarge of a character reference
+// longer than the token limit (leading zeros); errors.Is matches both.
+var ErrReferenceTooLarge = fmt.Errorf("%w: a character reference", ErrTokenTooLarge)
+
 // Resolution says how a general entity reference is read.
 type Resolution uint8
 
@@ -441,7 +445,13 @@ func (s *Scanner) more() bool {
 	}
 	if s.end == len(s.buf) {
 		if len(s.buf) >= s.maxToken {
-			s.fail(fmt.Errorf("%w (%d bytes) at byte %d", ErrTokenTooLarge, s.maxToken, s.here()))
+			err := ErrTokenTooLarge
+			if s.mode == modeNormal && s.end > 0 && s.buf[0] != '<' {
+				// Text that cannot be cut: a character reference
+				// with more digits than the window holds.
+				err = ErrReferenceTooLarge
+			}
+			s.fail(fmt.Errorf("%w (%d bytes) at byte %d", err, s.maxToken, s.here()))
 			return false
 		}
 		grown := make([]byte, min(2*len(s.buf), s.maxToken))
