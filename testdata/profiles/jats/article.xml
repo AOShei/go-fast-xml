@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE article PUBLIC "-//NLM//DTD JATS (Z39.96) Journal Publishing DTD v1.2 20190208//EN" "JATS-journalpublishing1.dtd">
+<article xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:mml="http://www.w3.org/1998/Math/MathML" article-type="research-article" dtd-version="1.2" xml:lang="en">
+<front>
+<journal-meta><journal-id journal-id-type="nlm-ta">J Test</journal-id><journal-title-group><journal-title>Journal of Tests</journal-title></journal-title-group><issn pub-type="epub">1234-5678</issn><publisher><publisher-name>Test Press</publisher-name></publisher></journal-meta>
+<article-meta>
+<article-id pub-id-type="doi">10.1234/test.1</article-id><article-id pub-id-type="pmid">999</article-id>
+<article-categories><subj-group subj-group-type="heading"><subject>Biology</subject></subj-group></article-categories>
+<title-group><article-title>A study of <italic>tests</italic></article-title></title-group>
+<contrib-group><contrib contrib-type="author" id="c1"><name><surname>Krusche</surname><given-names>Adele</given-names></name><xref ref-type="aff" rid="aff1">1</xref></contrib></contrib-group>
+<aff id="aff1"><label>1</label><institution>University of Tests</institution>, <country>UK</country></aff>
+<pub-date pub-type="epub"><day>18</day><month>12</month><year>2012</year></pub-date><volume>2</volume><fpage>993</fpage>
+<permissions><copyright-statement>© 2012 The Authors</copyright-statement><license xlink:href="https://creativecommons.org/licenses/by/4.0/"><license-p>CC BY 4.0</license-p></license></permissions>
+<abstract><title>Abstract</title><p>We test.</p></abstract>
+<kwd-group><kwd>testing</kwd><kwd>profiles</kwd></kwd-group>
+</article-meta>
+</front>
+<body>
+<sec id="s1"><label>1.</label><title>Introduction</title>
+<p id="p1">See <xref ref-type="bibr" rid="r1">[1]</xref> and <ext-link ext-link-type="uri" xlink:href="https://example.org">the site</ext-link>, <bold>bold</bold> H<sub>2</sub>O.<fn id="fn1"><label>a</label><p>A footnote.</p></fn></p>
+<list list-type="order"><list-item><p>First</p></list-item><list-item><p>Second</p></list-item></list>
+<def-list><def-item><term>API</term><def><p>Interface.</p></def></def-item></def-list>
+<disp-formula id="e1"><label>(1)</label><mml:math><mml:mi>x</mml:mi><mml:mo>=</mml:mo><mml:mn>2</mml:mn></mml:math></disp-formula>
+<sec id="s1.1"><title>Sub</title><p>Inline <inline-formula><mml:math><mml:mi>y</mml:mi></mml:math></inline-formula> math.</p></sec>
+</sec>
+<fig id="f1"><label>Figure 1.</label><caption><title>Fig title.</title><p>Fig text.</p></caption><graphic xlink:href="fig1.tif"/></fig>
+<table-wrap id="t1"><label>Table 1.</label><caption><p>Tab cap.</p></caption><table><thead><tr><th>H1</th><th>H2</th></tr></thead><tbody><tr><td colspan="2">wide</td></tr></tbody></table><table-wrap-foot><fn id="tfn1"><p>Table note.</p></fn></table-wrap-foot></table-wrap>
+<table-wrap id="t2"><label>Key table</label><table><tr><td>a</td></tr></table></table-wrap>
+<supplementary-material id="sm1" xlink:href="data.xlsx"><label>Data S1</label><caption><p>Raw data.</p></caption></supplementary-material>
+</body>
+<back>
+<ack><title>Acknowledgements</title><p>Thanks.</p></ack>
+<ref-list><title>References</title><ref id="r1"><label>1</label><element-citation publication-type="journal"><person-group person-group-type="author"><name><surname>Smith</surname><given-names>J</given-names></name><etal/></person-group><year>2010</year><article-title>On tests</article-title><source>Nature</source><volume>1</volume><fpage>2</fpage><pub-id pub-id-type="doi">10.1/x</pub-id></element-citation></ref></ref-list>
+</back>
+</article>
