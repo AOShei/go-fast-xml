@@ -57,6 +57,20 @@ func TestProfileOutOfLine(t *testing.T) {
 	if c := bs[2].Table.Rows[0][0]; c != "In\ninline" {
 		t.Errorf("cell %q", c)
 	}
+	// A label met inside a block that has text, a marker or a waiting
+	// label, or inside a cell, is text of the block (it was dropped);
+	// a note in a label is out of line too.
+	src = `<doc><sec><num>(b)</num><p>Insert<sec><num>(4)</num><p>new text</p></sec></p>` +
+		`<num>c.<fn n="3">Note.</fn></num><p>After.</p>` +
+		`<t><tr><td><num>1.</num> cell</td></tr></t></sec></doc>`
+	doc, err = (&Extractor{Profiles: []*Profile{mustLoad(t, prof)}}).Extract(context.Background(), strings.NewReader(src), int64(len(src)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantBrief(t, doc, "paragraph((b)):Insert (4)\nnew text\nfootnote(3):Note.\nparagraph(c.):After.\ntable:\n")
+	if c := blocks(doc)[3].Table.Rows[0][0]; c != "1. cell" {
+		t.Errorf("cell %q", c)
+	}
 	bad := head("ool", `{"root": "doc"}`) + `"rules": [{"match": "x", "as": "heading", "level": 1, "out_of_line": true}]}`
 	if _, err := LoadProfile(strings.NewReader(bad)); err == nil {
 		t.Error("out_of_line on a heading loaded")
