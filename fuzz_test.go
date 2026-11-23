@@ -3,6 +3,7 @@ package gofastxml
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -32,6 +33,20 @@ func FuzzExtract(f *testing.F) {
 		}
 		opts := &gofastcore.Options{Limits: gofastcore.Limits{MaxTextBytes: 1 << 20, MaxDecodedBytes: 1 << 16}}
 		doc, err := x.Extract(context.Background(), bytes.NewReader(data), int64(len(data)), opts)
+		if !noAttrs {
+			// ExtractBytes reads the bytes in place: it gives the same
+			// document and leaves them as they were.
+			kept := bytes.Clone(data)
+			doc2, err2 := ExtractBytes(context.Background(), data, opts)
+			if !bytes.Equal(kept, data) {
+				t.Fatal("ExtractBytes changed its input")
+			}
+			j1, _ := json.Marshal(doc)
+			j2, _ := json.Marshal(doc2)
+			if (err == nil) != (err2 == nil) || !bytes.Equal(j1, j2) {
+				t.Fatalf("ExtractBytes differs from Extract: %v / %v", err, err2)
+			}
+		}
 		if err != nil {
 			if !errors.Is(err, gofastcore.ErrMalformed) && !errors.Is(err, gofastcore.ErrUnsupported) {
 				t.Fatalf("error %v", err)
@@ -119,6 +134,9 @@ func FuzzProfile(f *testing.F) {
 		}
 		if err := doc.Validate(); err != nil {
 			t.Fatalf("invalid: %v", err)
+		}
+		if bad := sharedMergeCell(doc); bad != "" {
+			t.Fatal(bad)
 		}
 	})
 }

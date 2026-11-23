@@ -367,7 +367,14 @@ func jatsCiteCheck(src []byte, doc *gofastcore.Document, gapKey ...string) strin
 				b.Attrs = map[string]string{AttrAttribute: "checked"}
 				continue
 			}
-			if t := strings.TrimSpace(cellMarkerRE.ReplaceAllString(b.Text, "$1")); t != "" {
+			// A generated item number at a line's start is not in the
+			// source; a number the file wrote there is (text after a
+			// list nested in a paragraph starts a line): strip only
+			// when the text as it stands is not in its span.
+			l := b.Loc
+			asIs := l.Offset >= 0 && l.Length > 0 && l.Offset+l.Length <= int64(len(src)) &&
+				strings.Contains(noSpace(stripMarkup(string(src[l.Offset:l.Offset+l.Length]))), noSpace(gofastcore.ExpandLigatures(b.Text)))
+			if t := strings.TrimSpace(cellMarkerRE.ReplaceAllString(b.Text, "$1")); t != "" && !asIs {
 				b.Text = t
 			}
 		}

@@ -20,6 +20,7 @@ package generic
 
 import (
 	"bytes"
+	"slices"
 	"strings"
 
 	"github.com/AOShei/go-fast-core"
@@ -77,6 +78,11 @@ type Out struct {
 	NamesCut, PathsCut, ValuesCut int
 	// Splits counts texts split into Continued blocks.
 	Splits int
+	// Hint is the room for blocks the part is given when its first block
+	// is added (see BlocksHint); zero lets the part grow from nothing.
+	Hint int
+	// UTF8: the file is UTF-8, its bytes the text's (see WordMark).
+	UTF8 bool
 }
 
 // Add appends b, taking BlockCost, its text and its element path from the
@@ -89,9 +95,46 @@ func (o *Out) Add(b gofastcore.Block) bool {
 		o.Stopped = true
 		return false
 	}
-	o.Part.Blocks = append(o.Part.Blocks, b)
+	o.Append(b)
 	return true
 }
+
+// Append appends b to the part, its cost already taken. The first block
+// of the document gives the part Hint blocks of room.
+func (o *Out) Append(b gofastcore.Block) {
+	if o.Hint > 0 && o.Part.Blocks == nil && o.Part.Kind != gofastcore.PartStored {
+		o.Part.Blocks = make([]gofastcore.Block, 0, o.Hint)
+		o.Hint = 0
+	}
+	o.Part.Blocks = append(o.Part.Blocks, b)
+}
+
+// Reserve makes room for n more blocks in the part at once.
+func (o *Out) Reserve(n int) {
+	if len(o.Part.Blocks)+n <= cap(o.Part.Blocks) {
+		return
+	}
+	if o.Part.Blocks == nil && o.Part.Kind != gofastcore.PartStored {
+		n = max(n, o.Hint)
+		o.Hint = 0
+	}
+	o.Part.Blocks = slices.Grow(o.Part.Blocks, n)
+}
+
+// BlocksHint is the room for blocks given to a document of size bytes
+// before its first block: one block per BlockHintBytes of input, at most
+// MaxBlocksHint.
+func BlocksHint(size int64) int {
+	return int(min(size/BlockHintBytes, MaxBlocksHint))
+}
+
+// BlockHintBytes and MaxBlocksHint size BlocksHint. Service-Public files
+// make a block for every 126 to 419 bytes of input with the profile (1st
+// to 95th percentile), every 43 to 89 bytes generically.
+const (
+	BlockHintBytes = 128
+	MaxBlocksHint  = 4096
+)
 
 // Options are the generic reader's settings.
 type Options struct {
@@ -140,6 +183,7 @@ type Generic struct {
 	b       Builder
 	after   []gofastcore.Block // notes and comments that follow the owner's block
 	pieceAt int64              // where the next piece of the owner's block starts
+	word    WordMark           // where the owner's last word starts
 
 	cb       Builder // a comment
 	inCom    bool
@@ -249,7 +293,9 @@ func (g *Generic) Text(r *xmlread.Reader, t []byte, start, end int64) {
 		// the source span of its own text.
 		g.cutOwner(start)
 	}
+	pos0, trail := g.b.Pos(), g.b.Trail()
 	g.b.Append(t, preserve)
+	g.word.Note(&g.b, t, start, end, pos0, trail, g.out.UTF8)
 	if g.b.Len() > MaxBlockBytes {
 		g.splitOwner(start) // a token longer than a block: not from the scanner's input
 	}
@@ -261,17 +307,65 @@ func (g *Generic) Text(r *xmlread.Reader, t []byte, start, end int64) {
 func (g *Generic) cutOwner(at int64) {
 	f := g.frameAt(g.owner)
 	g.out.Splits++
-	if text := g.b.String(); text != "" {
-		g.enqueue(item{block: g.paragraph(f, text, at)})
+	// Cut at the last white space already held, where the word after it
+	// starts in the file is known: that word is kept whole for the next
+	// piece, which starts where it does.
+	pos := -1
+	if g.word.OK {
+		pos = g.word.Pos
+	}
+	end := at
+	text, _, kept := g.b.SplitWord(pos)
+	if kept {
+		end = g.word.At
+	}
+	g.word.OK = false
+	if text != "" {
+		g.enqueue(item{block: g.paragraph(f, text, end)})
 		f.pieces++
 	}
-	g.b.Reset()
-	g.pieceAt = at
+	g.pieceAt = end
 	for _, b := range g.after {
 		g.enqueue(item{block: b})
 	}
 	g.after = g.after[:0]
 	g.flush(true)
+}
+
+// WordMark records where the last word of a text being built starts: in
+// the file (At) and in the text (Pos), when both are known (OK). A long
+// text cut while reading is cut there, so that no word is cut in two
+// and each piece's span holds its text.
+type WordMark struct {
+	At  int64
+	Pos int
+	OK  bool
+}
+
+// Note updates m for the text t, at [start,end) in the file, just
+// appended to b; pos0 and trail are b.Pos() and b.Trail() before the
+// append. utf8: the file's bytes are the text's, so that a token as long
+// as its span holds no reference and no line end changed.
+func (m *WordMark) Note(b *Builder, t []byte, start, end int64, pos0 int, trail, utf8 bool) {
+	i := bytes.LastIndexAny(t, " \t\n\r")
+	if i < 0 {
+		if pos0 == 0 || trail { // the word starts with this token
+			*m = WordMark{At: start, Pos: pos0, OK: true}
+		}
+		return
+	}
+	tail := len(t) - i - 1
+	exact := int64(len(t)) == end-start && (utf8 || isASCII(t))
+	*m = WordMark{At: end - int64(tail), Pos: b.Len() - tail, OK: exact}
+}
+
+func isASCII(t []byte) bool {
+	for _, c := range t {
+		if c >= 0x80 {
+			return false
+		}
+	}
+	return true
 }
 
 func spaceOnly(t []byte) bool {
@@ -289,6 +383,7 @@ func (g *Generic) becomeText(d int, at int64) {
 	f := g.frameAt(d)
 	g.owner = d
 	g.b.Reset()
+	g.word.OK = false
 	g.after = g.after[:0]
 	f.pieces = 0
 	f.anchor = f.id
@@ -347,6 +442,7 @@ func (g *Generic) emitOwner(end int64) {
 	}
 	g.after = g.after[:0]
 	g.b.Reset()
+	g.word.OK = false
 	if g.owner == 0 {
 		g.doc.state = container
 	}
@@ -372,6 +468,7 @@ func (g *Generic) splitOwner(at int64) {
 	f := g.frameAt(g.owner)
 	for g.b.Len() > MaxBlockBytes {
 		piece := g.b.Split(MaxBlockBytes)
+		g.word.OK = false
 		g.out.Splits++
 		if piece != "" {
 			g.enqueue(item{block: g.paragraph(f, piece, at)})
@@ -476,6 +573,7 @@ func (g *Generic) flush(force bool) {
 	if n == 0 {
 		return
 	}
+	g.out.Reserve(n)
 	for i := range n {
 		if g.queue[i].space {
 			continue
@@ -627,12 +725,10 @@ func (g *Generic) attrNotes(d int, dst []gofastcore.Block) []gofastcore.Block {
 			v = cutString(v, MaxValueBytes)
 			g.out.ValuesCut++
 		}
-		tmp.Reset()
-		tmp.Append([]byte(v), false)
+		text := Clean(v, false, &tmp)
 		g.out.Clean.Controls += tmp.Controls
 		g.out.Clean.Invalid += tmp.Invalid
 		tmp.Controls, tmp.Invalid = 0, 0
-		text := tmp.String()
 		if text == "" {
 			continue
 		}
