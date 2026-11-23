@@ -58,8 +58,8 @@ type kidRule struct {
 	parent *xsd.Decl // the parent in the selector; nil: the suggestion's own element
 	bare   bool      // the child's name alone (an XHTML tr, under thead, tbody or table)
 	as     string
-	keys  []kv
-	why   string
+	keys   []kv
+	why    string
 }
 
 // Input is what the draft is made from.
