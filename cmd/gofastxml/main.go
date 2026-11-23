@@ -57,6 +57,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		profName   = flags.String("profile", "", "read with this profile: the name of a built-in one, a profile file (JSON, see PROFILE_FORMAT.md), or none for generic reading; by default the profile whose root element the file has, else generic reading")
 		profiles   = flags.Bool("profiles", false, "list the built-in profiles and exit")
 		spans      = flags.Bool("spans", false, "give inline formatting and links as spans (in JSON)")
+		draftFrom  = flags.String("draft-profile", "", "read this XML Schema (XSD) and write a draft profile for a person to finish (to -o or standard output), then exit; includes and imports are read from disk only, nothing is fetched")
 	)
 	// The render flags shared by every go-fast command (COMMAND_FLAGS.md).
 	renderFlags := gofastcore.AddRenderFlags(flags)
@@ -85,6 +86,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stdout, "%s\t%s\n", p.Name(), p.Title())
 		}
 		return 0
+	}
+	if *draftFrom != "" {
+		return draftProfile(ctx, *draftFrom, *output, *quiet, stdout, stderr)
 	}
 	extractor := &gofastxml.Extractor{}
 	switch name := *profName; {
@@ -248,6 +252,33 @@ func remarks(doc *gofastcore.Document) string {
 		}
 	}
 	return "warnings: " + strings.Join(codes, ", ")
+}
+
+// draftProfile is -draft-profile: the draft goes to -o or stdout, what
+// was not read to stderr.
+func draftProfile(ctx context.Context, schema, output string, quiet bool, stdout, stderr io.Writer) int {
+	d, err := gofastxml.DraftProfile(ctx, schema)
+	if err != nil {
+		fmt.Fprintf(stderr, "gofastxml: %v\n", err)
+		return 1
+	}
+	for _, w := range d.Warnings {
+		fmt.Fprintf(stderr, "gofastxml: %s: %s: %s\n", schema, w.Code, w.Message)
+	}
+	if output != "" {
+		if err := os.WriteFile(output, d.JSON, 0o644); err != nil {
+			fmt.Fprintf(stderr, "gofastxml: %v\n", err)
+			return 1
+		}
+	} else if _, err := stdout.Write(d.JSON); err != nil {
+		fmt.Fprintf(stderr, "gofastxml: %v\n", err)
+		return 1
+	}
+	if !quiet {
+		fmt.Fprintf(stderr, "gofastxml: %s: draft profile from %d schema %s; every rule is marked \"review\": true and must be checked and unmarked before the profile loads\n",
+			schema, len(d.Files), map[bool]string{true: "document", false: "documents"}[len(d.Files) == 1])
+	}
+	return 0
 }
 
 // moduleVersion is the version this command was built from.
