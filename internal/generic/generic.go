@@ -1,5 +1,5 @@
 // Package generic builds blocks from XML with no knowledge of its schema
-// (XML_PLAN.md section 3), and holds the part writer every consumer of
+// (README, "How XML maps without a profile"), and holds the part writer every consumer of
 // element events shares.
 //
 // An element that directly contains character data other than white
