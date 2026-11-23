@@ -126,6 +126,68 @@ func byCount(m map[string]int) string {
 	return b.String()
 }
 
+// spSample is a small synthetic fiche with the shapes of decisions S1 to
+// S7.
+const spSample = `<?xml version="1.0" encoding="UTF-8"?><Publication xmlns:dc="http://purl.org/dc/elements/1.1/" ID="F1" type="Fiche" spUrl="https://example.org/F1">` +
+	`<dc:title>Titre de la fiche</dc:title><dc:description>Resume.</dc:description><dc:date>modified 2026-11-03</dc:date>` +
+	`<FilDAriane><Niveau ID="A">Accueil</Niveau><Niveau ID="B">Famille</Niveau></FilDAriane>` +
+	`<Texte><Chapitre ID="C1"><Titre><Paragraphe>Chapitre un</Paragraphe></Titre>` +
+	`<ANoter><Titre>A noter</Titre><Paragraphe>Voir <LienInterne LienPublication="F2" type="Fiche" audience="Particuliers" commentaireLien="Autre fiche">ceci</LienInterne>.</Paragraphe></ANoter>` +
+	`<BlocCas affichage="radio"><Cas><Titre>Cas A</Titre><TitreRiche><Paragraphe>Cas A</Paragraphe></TitreRiche><Condition><estVrai var="T1"/></Condition><Paragraphe>Dans le cas A.</Paragraphe></Cas></BlocCas>` +
+	`</Chapitre></Texte><Reference type="Texte de reference" URL="https://legifrance.example" ID="R1"><Titre>Code civil</Titre></Reference></Publication>`
+
+// TestServicePublicDecisions checks S1 to S7 on spSample, from several
+// goroutines at once (a profile is shared by concurrent Extract calls).
+func TestServicePublicDecisions(t *testing.T) {
+	check := func() string {
+		doc, err := ExtractBytes(context.Background(), []byte(spSample), &gofastcore.Options{Spans: true})
+		if err != nil {
+			return err.Error()
+		}
+		if err := doc.Validate(); err != nil {
+			return err.Error()
+		}
+		m := doc.Metadata
+		if m.Title != "Titre de la fiche" || m.Extra["dc:date"] != "modified 2026-11-03" || !m.Modified.IsZero() ||
+			m.Extra["description"] != "Resume." || m.Extra["sp.id"] != "F1" || m.Extra["sp.url"] != "https://example.org/F1" ||
+			m.Extra["sp.breadcrumb"] != "Accueil > Famille" || m.Extra[ExtraProfile] != "service-public" {
+			return fmt.Sprintf("metadata %+v", m)
+		}
+		got := brief(blocks(doc))
+		want := "heading1:Titre de la fiche\nheading2:Chapitre un\nparagraph(A noter):Voir ceci.\nheading3:Cas A\nparagraph:Dans le cas A.\nlist_item1:Code civil\n"
+		if got != want {
+			return "blocks:\n" + got
+		}
+		bs := blocks(doc)
+		if bs[2].Attrs["sp.box"] != "ANoter" || bs[2].Attrs[AttrAnchorParent] != "C1" || bs[2].Spans[0].Href != "F2" {
+			return fmt.Sprintf("box %+v", bs[2])
+		}
+		if bs[3].Attrs["sp.condition"] != "estVrai(var=T1)" || bs[4].Attrs["sp.case_group"] != "radio" || bs[3].Attrs["sp.title_plain"] != "" {
+			return fmt.Sprintf("case %+v", bs[3].Attrs)
+		}
+		if bs[5].Attrs["sp.group"] != "Reference" || bs[5].Loc.Anchor != "R1" || bs[5].Attrs["sp.url"] != "https://legifrance.example" {
+			return fmt.Sprintf("reference %+v", bs[5])
+		}
+		st := doc.Parts[len(doc.Parts)-1]
+		if st.Kind != gofastcore.PartStored || st.Blocks[0].Text != "Autre fiche" || st.Blocks[0].Attrs["sp.audience"] != "Particuliers" {
+			return "stored " + dump(doc)
+		}
+		if bad := citeCheck([]byte(spSample), doc); bad != "" {
+			return bad
+		}
+		return ""
+	}
+	errs := make(chan string, 8)
+	for range 8 {
+		go func() { errs <- check() }()
+	}
+	for range 8 {
+		if e := <-errs; e != "" {
+			t.Fatal(e)
+		}
+	}
+}
+
 // spOracleSkip lists the elements whose character data is not block or
 // cell text in the body, by design, as "parent/name" or "name" (any
 // parent); the root's own children are "/name". The oracle leaves their
