@@ -119,7 +119,7 @@ func (c *jatsOracleCase) skipped(stack []string) (string, bool) {
 		}
 		ok := true
 		for i := range n {
-			if steps[n-1-i] != stack[len(stack)-1-i] {
+			if s := steps[n-1-i]; s != "*" && s != stack[len(stack)-1-i] {
 				ok = false
 				break
 			}
@@ -138,6 +138,21 @@ func (c *jatsOracleCase) sourceText(data []byte, used map[string]bool) (string, 
 	d := xml.NewDecoder(bytes.NewReader(data))
 	d.Strict = false
 	d.Entity = xml.HTMLEntity
+	d.CharsetReader = func(label string, r io.Reader) (io.Reader, error) {
+		// ISO-8859-1 only, the one other encoding in the dev sets.
+		if l := strings.ToLower(label); l != "iso-8859-1" && l != "latin1" {
+			return nil, fmt.Errorf("charset %s", label)
+		}
+		b, err := io.ReadAll(r)
+		if err != nil {
+			return nil, err
+		}
+		u := make([]rune, len(b))
+		for i, c := range b {
+			u[i] = rune(c)
+		}
+		return strings.NewReader(string(u)), nil
+	}
 	var stack []string
 	skip := 0
 	var b strings.Builder
@@ -297,6 +312,12 @@ func (c *jatsOracleCase) oracles(t *testing.T) {
 			// both sides without numbers followed by a full stop.
 			got, src = jatsNumberRE.ReplaceAllString(got, ""), jatsNumberRE.ReplaceAllString(src, "")
 		}
+		if got != src && jatsEntityRE.MatchString(src) && jatsInOrder(got, jatsEntityRE.Split(src, -1)) {
+			// Entities the oracle's reader cannot expand (declared in the
+			// DTD or the internal subset): the text between them is in the
+			// document in order.
+			got = src
+		}
 		if got != src && fails < 10 {
 			fails++
 			i := 0
@@ -305,7 +326,7 @@ func (c *jatsOracleCase) oracles(t *testing.T) {
 			}
 			t.Errorf("%s: (a) text differs at byte %d:\n doc:  %q\n file: %q", filepath.Base(path), i, around(got, i), around(src, i))
 		}
-		if bad := jatsCiteCheck(data, doc, c.gap...); bad != "" && fails < 10 {
+		if bad := c.cite(data, doc); bad != "" && fails < 10 {
 			fails++
 			t.Errorf("%s: (b) %s", filepath.Base(path), around(bad, 0))
 		}
@@ -349,6 +370,75 @@ func jatsCiteCheck(src []byte, doc *gofastcore.Document, gapKey ...string) strin
 	return citeCheck(src, &c)
 }
 
+// jatsEntityRE is a reference to an entity other than XML's five.
+var jatsEntityRE = regexp.MustCompile(`&(?:[A-Za-z_][\w.-]*);`)
+
+// jatsInOrder reports whether the pieces are in s in order.
+func jatsInOrder(s string, pieces []string) bool {
+	for _, p := range pieces {
+		if strings.Contains(p, "&amp;") || strings.Contains(p, "&lt;") {
+			p = strings.NewReplacer("&amp;", "&", "&lt;", "<", "&gt;", ">", "&quot;", `"`, "&apos;", "'").Replace(p)
+		}
+		i := strings.Index(s, p)
+		if i < 0 {
+			return false
+		}
+		s = s[i+len(p):]
+	}
+	return true
+}
+
+// cite is jatsCiteCheck, and for a block it rejects, two further readings
+// of its span: without the elements the case's exceptions name (an index
+// term inside a paragraph), and, when the span refers to entities the
+// file declares, with the text between the references in the block in
+// order.
+func (c *jatsOracleCase) cite(src []byte, doc *gofastcore.Document) string {
+	for {
+		bad := jatsCiteCheck(src, doc, c.gap...)
+		if bad == "" {
+			return ""
+		}
+		var pi, bi int
+		if _, err := fmt.Sscanf(bad, "block %d", &bi); err != nil {
+			return bad
+		}
+		// Find the part: citeCheck numbers blocks within their part.
+		found := false
+		for p := range doc.Parts {
+			if bi < len(doc.Parts[p].Blocks) {
+				b := &doc.Parts[p].Blocks[bi]
+				if l := b.Loc; citable(b) && l.Offset >= 0 && l.Offset+l.Length <= int64(len(src)) && strings.Contains(bad, strconv.Quote(b.Text)) {
+					pi, found = p, true
+					break
+				}
+			}
+		}
+		if !found {
+			return bad
+		}
+		b := &doc.Parts[pi].Blocks[bi]
+		span := src[b.Loc.Offset : b.Loc.Offset+b.Loc.Length]
+		text := noSpace(gofastcore.ExpandLigatures(strings.TrimSpace(cellMarkerRE.ReplaceAllString(b.Text, "$1"))))
+		ok := false
+		if s, err := c.sourceText(span, map[string]bool{}); err == nil {
+			s, text := jatsNumberRE.ReplaceAllString(s, ""), jatsNumberRE.ReplaceAllString(text, "")
+			ok = strings.Contains(s, text) || jatsEntityRE.MatchString(s) && jatsInOrder(text, jatsEntityRE.Split(s, -1))
+		}
+		// An undeclared entity is kept as written: the raw span holds it.
+		ok = ok || strings.Contains(noSpace(stripMarkup(strings.ReplaceAll(string(span), "&", "&amp;"))), text)
+		if !ok {
+			return bad
+		}
+		// Accepted: check the rest of the document without it.
+		cp := *doc
+		cp.Parts = append([]gofastcore.Part(nil), doc.Parts...)
+		cp.Parts[pi].Blocks = append([]gofastcore.Block(nil), doc.Parts[pi].Blocks...)
+		cp.Parts[pi].Blocks[bi].Attrs = map[string]string{AttrAttribute: "checked"}
+		doc = &cp
+	}
+}
+
 // jatsSubsequence reports whether s is a subsequence of t, byte by byte.
 func jatsSubsequence(s, t string) bool {
 	for i := 0; i < len(t) && len(s) > 0; i++ {
@@ -386,7 +476,7 @@ func jatsExtractFixture(t *testing.T, name, profile string) (*gofastcore.Documen
 func jatsBriefAll(doc *gofastcore.Document) string {
 	var b strings.Builder
 	for _, p := range doc.Parts {
-		fmt.Fprintf(&b, "# %s %s\n", p.Kind, p.Name)
+		b.WriteString(strings.TrimSpace(fmt.Sprintf("# %s %s", p.Kind, p.Name)) + "\n")
 		for _, x := range p.Blocks {
 			b.WriteString(strings.TrimSuffix(brief([]gofastcore.Block{x}), "\n"))
 			if x.Loc.Anchor != "" {

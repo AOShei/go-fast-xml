@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<book xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xi="http://www.w3.org/2001/XInclude" version="5.0" xml:id="b1">
+<info><title>The Book</title><subtitle>A test</subtitle><author><personname><firstname>Norman</firstname><surname>Walsh</surname></personname></author><pubdate>2010</pubdate><keywordset><keyword>docbook</keyword></keywordset><abstract><para>About it.</para></abstract></info>
+<chapter xml:id="ch1"><title>First</title>
+<para xml:id="p1">See <xref linkend="s1"/>, <link xlink:href="https://example.org">site</link>, <emphasis role="bold">bold</emphasis> and <code>x</code>.<indexterm><primary>first</primary><secondary>use</secondary></indexterm><footnote xml:id="fn1"><para>Note text.</para></footnote></para>
+<section xml:id="s1"><title>Section</title>
+<itemizedlist><listitem><para>One</para></listitem></itemizedlist>
+<orderedlist><listitem><para>Step</para></listitem></orderedlist>
+<variablelist><varlistentry><term>Term</term><listitem><para>Definition.</para></listitem></varlistentry></variablelist>
+<note><title>Careful</title><para>Noted.</para></note>
+<programlisting language="go">fmt.Println("hi")</programlisting>
+<figure xml:id="f1"><title>Fig</title><mediaobject><imageobject><imagedata fileref="a.png"/></imageobject><textobject><phrase>Alt words</phrase></textobject></mediaobject></figure>
+<informaltable><tgroup cols="2"><thead><row><entry>H1</entry><entry>H2</entry></row></thead><tbody><row><entry>a</entry><entry>b</entry></row></tbody></tgroup></informaltable>
+<table><caption>HTML</caption><tr><td>c</td></tr></table>
+<xi:include href="other.xml"/>
+<remark>Check this.</remark>
+</section>
+</chapter>
+<bibliography><biblioentry xml:id="bib1"><abbrev>W10</abbrev><authorgroup><author><personname>N. Walsh</personname></author></authorgroup><title>DocBook</title><pubdate>2010</pubdate></biblioentry></bibliography>
+</book>
