@@ -270,6 +270,7 @@ type Scanner struct {
 	bindNames  []byte
 	slots      map[string]int32 // prefix -> index in heads
 	heads      []int32          // per prefix: its innermost binding, or -1
+	freeSlots  []int32          // slots of heads no prefix in scope uses
 	scratch    []byte           // decoded text of the current token
 	attrBuf    []byte           // decoded attribute values of the current token
 	attrNested [][]byte         // entities being expanded in an attribute value
@@ -1226,9 +1227,14 @@ func (s *Scanner) push(name []byte, colon int, declares bool) {
 			if s.slots == nil {
 				s.slots = map[string]int32{}
 			}
-			slot = int32(len(s.heads))
+			if n := len(s.freeSlots); n > 0 {
+				slot = s.freeSlots[n-1]
+				s.freeSlots = s.freeSlots[:n-1]
+			} else {
+				slot = int32(len(s.heads))
+				s.heads = append(s.heads, -1)
+			}
 			s.slots[string(prefix)] = slot
-			s.heads = append(s.heads, -1)
 		}
 		start := int32(len(s.bindNames))
 		s.bindNames = append(s.bindNames, prefix...)
@@ -1314,7 +1320,14 @@ func (s *Scanner) pop() {
 		s.bind = bindEnded
 	}
 	for i := len(s.binds) - 1; i >= int(e.bindMark); i-- {
-		s.heads[s.binds[i].slot] = s.binds[i].prev // what this element shadowed is visible again
+		b := &s.binds[i]
+		s.heads[b.slot] = b.prev // what this element shadowed is visible again
+		if b.prev < 0 {
+			// The prefix is out of scope: its slot is free again, so the
+			// table holds only the prefixes of the open elements.
+			delete(s.slots, string(s.bindNames[b.start:b.end]))
+			s.freeSlots = append(s.freeSlots, b.slot)
+		}
 	}
 	s.binds = s.binds[:e.bindMark]
 	s.bindNames = s.bindNames[:e.bindBytes]
