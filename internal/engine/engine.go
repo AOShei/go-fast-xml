@@ -287,6 +287,8 @@ type Engine struct {
 	clamped, mathml                  int
 	// Counts for the whole reading.
 	ValuesCut, ColumnsCut, SpansCut, TextCut, PartsCut int
+	// RowSpanCut counts cells whose row span was cut to MaxRowSpan.
+	RowSpanCut int
 	// PendingCut counts blocks cut because more than MaxPendingBlocks
 	// attribute notes waited for them.
 	PendingCut        int

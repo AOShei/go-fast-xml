@@ -405,6 +405,9 @@ func engineWarnings(part *gofastcore.Part, e *engine.Engine) {
 	if e.TextCut > 0 {
 		limit(fmt.Sprintf("%s (table cells, values, labels) longer than %d bytes cut", plural(e.TextCut, "text", "texts"), MaxBlockBytes))
 	}
+	if e.RowSpanCut > 0 {
+		limit(fmt.Sprintf("%s spanning more than %d rows cut to that span", plural(e.RowSpanCut, "cell", "cells"), engine.MaxRowSpan))
+	}
 	if e.SpansCut > 0 {
 		limit(fmt.Sprintf("%s past 100000 in one block left out", plural(e.SpansCut, "span", "spans")))
 	}

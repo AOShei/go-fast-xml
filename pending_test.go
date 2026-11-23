@@ -65,6 +65,18 @@ func TestPendingCutGeneric(t *testing.T) {
 	if w := pendingWarning(doc); w != "" {
 		t.Errorf("under the bound: %s", w)
 	}
+	// A row span past MaxRowSpan is cut, and limit.exceeded says so.
+	prof := head("rs", `{"root": "d"}`) + `"rules": [
+		{"match": "T", "as": "table"}, {"match": "R", "as": "row"},
+		{"match": "C", "as": "cell", "rowspan": "rs"}]}`
+	rs := extractWith(t, prof, `<d><T><R><C rs="100000">a</C><C>b</C></R><R><C>c</C></R></T></d>`, nil)
+	found := false
+	for _, w := range rs.AllWarnings() {
+		found = found || w.Code == gofastcore.WarnLimitExceeded && strings.Contains(w.Message, "spanning more than 65535 rows")
+	}
+	if !found {
+		t.Errorf("row span: no limit.exceeded: %+v", rs.AllWarnings())
+	}
 	// The engine's cut gives the same message.
 	eng := r5Extract(t, r5Prof, "<r><p>lead "+strings.Repeat(`<x a="v">w </x>`, n)+"end</p></r>", nil)
 	if pendingWarning(eng) == "" {

@@ -10,17 +10,19 @@ if err != nil { ... }
 fmt.Println(doc.Text())
 ```
 
-**Status: in development (phase 2 of `XML_PLAN.md`).** A document whose schema has a **profile** is read with it: the profile maps the schema's elements onto headings, paragraphs, lists, tables, links and metadata (see [Profiles](#profiles)). One profile is built in, Service-Public.fr (DILA, Publication 3.5). Any other XML document is read generically: its text in document order, as inferred paragraphs.
+A document whose schema has a **profile** is read with it: the profile maps the schema's elements onto headings, paragraphs, lists, tables, links, notes and metadata (see [Profiles](#profiles)). Twelve profiles are built in: Akoma Ntoso, HL7 CDA, CLML (legislation.gov.uk), DITA, DocBook, Formex (EUR-Lex), JATS, Légifrance, patents (USPTO and EPO), S1000D, Service-Public.fr and TEI. A profile is a JSON file, so other schemas can be given one without code, and `-draft-profile` drafts one from an XSD. Any other XML document is read generically: its text in document order, as inferred paragraphs, with its attributes and comments as notes.
 
 The document is read as a stream, never as a tree: besides the document it returns, memory is bounded by the fixed bounds below (one tag, one block, the blocks waiting for an undecided element, the namespace declarations in scope), not by the file. For input not read as UTF-8, the map back to the file's bytes adds 16 bytes per 32 KiB of input. A generated 200 MiB document of small elements is read with a peak heap of about 1 MiB (`TestLargeStream`).
 
 ## API
 
 - `Extract(ctx, r io.ReaderAt, size, opts)`, `ExtractFile(ctx, path, opts)`, `ExtractBytes(ctx, data, opts)`.
-- `Extractor{Attributes}` implements `gofastcore.Extractor`; its zero value is ready and safe for concurrent use. `Formats()` is `xml`, and `Source.Format` is `xml`, `Source.MIME` `application/xml`.
+- `Extractor{Attributes, Profiles, Profile, Charset}` implements `gofastcore.Extractor`; its zero value is ready and safe for concurrent use. `Formats()` is `xml`, and `Source.Format` is `xml`, `Source.MIME` `application/xml`.
 - `Attributes`: `AttributesNotes` (the default) makes each attribute a note (below); `AttributesNone` leaves attribute notes out, for data-style XML where attributes are keys and codes. Leaving them out raises no warning. It applies to generic reading.
 - `Extractor.Profiles []*Profile`: profiles tried, in order, before the built-in ones. `Extractor.Profile string`: force the profile of that name (from `Profiles` or built in) whatever the root element; `ProfileNone` (`"none"`) forces generic reading; an unknown name is an error.
 - `LoadProfile(io.Reader) (*Profile, error)` reads and validates a profile; `BuiltinProfiles()` lists the built-in ones in the order they are tried, `BuiltinProfile(name)` returns one. A `Profile` (`Name()`, `Title()`) is immutable and safe for concurrent `Extract` calls.
+- `Extractor.Charset`: the encoding of the input given from outside the file (see [Encodings](#encodings)).
+- `DraftProfile(ctx, path) (*Draft, error)` drafts a profile from an XSD (see [Drafting a profile](#drafting-a-profile-from-an-xsd)).
 
 ## Command
 
@@ -30,6 +32,7 @@ The document is read as a stream, never as a tree: besides the document it retur
 gofastxml [flags] file-or-directory...
   -format json|markdown|text  -attributes=false  -o file  -quiet  -version
   -profile NAME|FILE|none  -profiles  -spans  -charset NAME
+  -draft-profile schema.xsd
   -furniture  -stored[=kinds]  -part-markers  -children  -exclude-display[=reasons]
   -max-input-bytes N  -max-decoded-bytes N  -max-text-bytes N
 ```
@@ -38,17 +41,17 @@ A directory stands for the files in it and below it whose names end in `.xml` (i
 
 The render flags are the series' shared ones (`COMMAND_FLAGS.md`), defined by core's `AddRenderFlags`, and affect Markdown and text only; JSON always has everything. This library writes one stored kind, `markup_comment` (the file's comments), so `-stored=markup_comment` puts comments in the text.
 
-`-profile` takes the name of a built-in profile, a profile file, or `none`; `-profiles` lists the built-in profiles (name and title); `-spans` sets `Options.Spans` (inline styles and links in the JSON).
+`-profile` takes the name of a built-in profile, a profile file, or `none`; `-profiles` lists the built-in profiles (name and title); `-spans` sets `Options.Spans` (inline styles and links in the JSON); `-charset` sets `Extractor.Charset` for every input; `-attributes=false` sets `AttributesNone`; `-max-input-bytes`, `-max-decoded-bytes` and `-max-text-bytes` set core's limits (0 the default, -1 no limit); `-quiet` says nothing about files that were read; `-version` prints the version. `-draft-profile schema.xsd` writes a draft profile (to `-o` or standard output) and reads no document.
 
 ## Profiles
 
 A profile is a JSON file that says what a schema's elements mean. How to write one: [PROFILE_FORMAT.md](PROFILE_FORMAT.md).
 
-**How one is chosen.** When the root element starts, the profiles of `Extractor.Profiles` are tried in order, then the built-in ones; the first whose `match` the root meets (local name, namespace, optionally a DOCTYPE public identifier prefix and attribute tests) is used, else the document is read generically. `Extractor.Profile` / `-profile` forces one, or `none`. `Metadata.Extra["xml.profile"]` names the profile used; it is absent for generic reading.
+**How one is chosen.** When the root element starts, the profiles of `Extractor.Profiles` are tried in order, then the built-in ones in the order `BuiltinProfiles()` and `gofastxml -profiles` list them (by name: `akn`, `cda`, `clml`, `dita`, `docbook`, `formex`, `jats`, `legifrance`, `patent`, `s1000d`, `service-public`, `tei`); the first whose `match` the root meets (local name, namespace, optionally a DOCTYPE public identifier prefix and attribute tests) is used, else the document is read generically. `Extractor.Profile` / `-profile` forces one, or `none`. `Metadata.Extra["xml.profile"]` names the profile used; it is absent for generic reading.
 
 **What a profile gives.** Blocks of every kind core has for text (headings with levels from nesting, paragraphs, quotes, code, captions, footnotes, formulas, notes, list items with depth and `Marker`, tables in the rows or CALS model with header rows and merges, images), inline styles and links as `Spans` with `Options.Spans`, metadata, parts, and the stored part. Blocks a rule makes are `native`; what the profile does not map is read generically (`inferred`) and counted. A profile only chooses how the file's text is cut and labelled: it cannot add words, drop text or evaluate a condition.
 
-**How to cite a block.** Every block has `Loc.Offset` and `Loc.Length`, the bytes of the element it was made from in the file, from its start tag to its end tag (a heading: its title element; a table: the table element; an item: the item element; stray text: the text). A table also says where each row came from: `Table.RowLocs` has one location per row, the row element's bytes and its anchor if the profile gives rows one (empty for a header row the profile supplies), so a single row can be cited. `Loc.Anchor` is the identifier the source gives the block (the rule's `anchor`, else `xml:id`); a block without one carries the nearest enclosing identified element's in `Attrs["anchor_parent"]` (`AttrAnchorParent`), so a citation can say "fiche F1199, chapter X" without offsets. The document itself is cited by `Source.Name` and, for Service-Public, `Metadata.Extra["sp.id"]` and `["sp.url"]`. Text moved out of the body (metadata, `Attrs` values, the stored part) has no offsets of its own; a block whose text is an attribute's value says so in `Attrs["attribute"]`. Tests check, for every block of every Service-Public dev file, that its text is in the source at its offsets.
+**How to cite a block.** Every block has `Loc.Offset` and `Loc.Length`, the bytes of the element it was made from in the file, from its start tag to its end tag (a heading: its title element; a table: the table element; an item: the item element; stray text: the text). A table also says where each row came from: `Table.RowLocs` has one location per row, the row element's bytes and its anchor if the profile gives rows one (empty for a header row the profile supplies), so a single row can be cited. `Loc.Anchor` is the identifier the source gives the block (the rule's `anchor`, else `xml:id`); a block without one carries the nearest enclosing identified element's in `Attrs["anchor_parent"]` (`AttrAnchorParent`), so a citation can say "fiche F1199, chapter X" without offsets. The document itself is cited by `Source.Name` and the identifiers each profile copies to `Metadata.Extra` (below). Text moved out of the body (metadata, `Attrs` values, the stored part) has no offsets of its own; a block whose text is an attribute's value says so in `Attrs["attribute"]`. An inline rule's `value` (TEI `pb@n`, Formex `QUOT.START@CODE`) is written in the block's text where its element stands: that text is in the block's span as the attribute, not as character data. Tests check, for every block of every dev file of every profile's corpus, that its text is in the source at its offsets, and that every row location lies inside its table and starts at a tag.
 
 **Warnings of profile reading** (all `info`, on the last part, names with counts, at most 100 names listed):
 
@@ -60,7 +63,55 @@ A profile is a JSON file that says what a schema's elements mean. How to write o
 
 Core's `structure.heading_level_clamped` (headings nested deeper than 6), `input.unread_content` (MathML in a formula rule, kept as plain text) and `limit.exceeded` (below) are raised as core defines them.
 
-### Service-Public (`service-public`)
+### The built-in profiles
+
+Each built-in profile has a full note in `profiles/<name>.md`: the mapping table, the `Extra` and `Attrs` keys, how to cite, what is left to generic reading and the versions tested. The sections below summarise them; the note is where the mapping is written down. Every profile's own keys carry its prefix, so they cannot collide with core's keys or another profile's. Every built-in profile reads all the text of its documents; what it has no rule for is read generically and counted in `xml.unmapped_elements`. Notes on each profile's dev set (unmapped elements and attributes) are in its note.
+
+#### Akoma Ntoso (`akn`)
+
+Selected by the root `akomaNtoso` in the namespace of Akoma Ntoso 3.0, its draft `3.0/CSD03`, or `akomantoso.org/2.0` (read with the 3.0 rules). Maps the document types, the hierarchy of legislation (parts, chapters, articles, paragraphs, points) with `num` as `Marker` and `heading` as heading, `authorialNote` as out-of-line footnotes, tables, quoted structures, the FRBR metadata of `meta` (`Extra` `akn.*`) and the `lifecycle`, `workflow` and `references` tables. Keys: `akn.*`. Cite: `Loc.Anchor` is `@eId` (or `@id` in 2.0), `anchor_parent` the enclosing provision's. Tested: 3.0 (legislation.gov.uk, Fedlex, OASIS examples), 3.0/CSD03 (Italian Senate), 2.0 (Bungeni); not tested: the 1.0 namespace and the `amendmentList`, `officialGazette`, `portion` and `statement` documents. [profiles/akn.md](profiles/akn.md)
+
+#### HL7 CDA (`cda`)
+
+Selected by the root `ClinicalDocument` in `urn:hl7-org:v3` (a `ClinicalDocument` with no namespace is read generically). Maps the header (patient, author, custodian, participants, dates, codes) to `Metadata` and `Extra` `cda.*`, sections with their titles, their `code` and `templateId` as attribute notes, narrative blocks (paragraphs, lists, tables, `content` styles, `linkHtml`), and `nonXMLBody`. Structured entries are read generically, every value an attribute note, recorded as written, never interpreted. Keys: `cda.*`. Cite: `Loc.Anchor` from `@ID`. Tested: CDA R2 with C-CDA R1.1 and R2.1 templates, structured and unstructured; not tested: CDA R2.1 or R3, signature data. [profiles/cda.md](profiles/cda.md)
+
+#### CLML (`clml`)
+
+Selected by the root `Legislation` in the namespace `http://www.legislation.gov.uk/namespaces/legislation`. Maps primary and secondary prelims, the body's parts, chapters, cross-headings and provisions with `Pnumber` as `Marker`, footnotes out of line, tables (XHTML), schedules, explanatory notes and commentaries as parts (each `Commentary` a footnote), and the `ukm:` metadata. Keys: `clml.*`. Cite: `Loc.Anchor` from `@id` (`section-1`), `anchor_parent` the enclosing provision's. Tested: CLML schema 2.0, primary, secondary and EU retained legislation; not tested: `Image`/`Figure`, `Formula`, `Form`. [profiles/clml.md](profiles/clml.md)
+
+#### DITA (`dita`)
+
+Selected by the DITA topic and map roots with a DITA DOCTYPE public identifier or `ditaarch:DITAArchVersion`, and, with neither, by the root and the attribute DITA requires (rules go by element name: `@class` usually comes from DTD defaults, which are not read). Maps topics and their bodies, sections, steps, tables (CALS and `simpletable`), notes and maps (`topicref` items, their `href` as text when they have none). The filtering attributes on content (`platform`, `product`, `audience`, `otherprops`) are not read: they are counted in `xml.unmapped_attributes`, and nothing is filtered. Keys: `dita.*`. Cite: `Loc.Anchor` from `@id`. Tested: DITA 1.3 and DITA-OT documentation and tests; not tested: DITA 2.0, Lightweight DITA. [profiles/dita.md](profiles/dita.md)
+
+#### DocBook (`docbook`)
+
+Selected by DocBook 5 roots in `http://docbook.org/ns/docbook`, and DocBook 4 roots with no namespace and a DocBook DOCTYPE public identifier (or, with none, a few roots no other schema uses). Maps books, chapters and sections, `para`, lists, CALS and HTML tables, admonitions, figures and examples, `programlisting` as code, footnotes (split from their paragraph), glossaries, `refentry`, and `info` metadata. An `imageobject`'s `condition` is recorded in `Attrs["db.condition"]`, never evaluated. Keys: `db.*`. Cite: `Loc.Anchor` from `xml:id` (or `id` in DocBook 4). Tested: DocBook 5.0 to 5.2 and 4.1.2 to 4.5; not tested: SGML DocBook, `assembly`. `profiles/docbook.json` is generated by a test (`go test -run TestDocbookGenerated -docbook.update`). [profiles/docbook.md](profiles/docbook.md)
+
+#### Formex (`formex`)
+
+Selected by the Formex 4 roots in no namespace (`ACT`, `ANNEX`, `DOC`, `PUBLICATION`, `CONS.ACT`, `CONS.ANNEX`, `CONS.OTH`, `GENERAL`). Maps the bibliographic record (`BIB.INSTANCE`) to `Metadata` and `Extra` `fx.*`, the preamble, enacting terms and final part as parts, recitals, articles and paragraphs with their numbers as `Marker`, lists, tables, notes out of line, and the quotation marks `QUOT.START`/`QUOT.END` written from their `CODE`. Keys: `fx.*`. Cite: `Loc.Anchor` from `IDENTIFIER` (`001.002`), notes from `NOTE.ID`; the Official Journal reference in `Extra`. Tested: Formex 05.20 to 05.59; not tested: consolidated texts, `GENERAL`, Formex 6. [profiles/formex.md](profiles/formex.md)
+
+#### JATS (`jats`)
+
+Selected by the root `article` with a NLM or NISO DOCTYPE public identifier or an `article-type` or `dtd-version` attribute, and by `pmc-articleset`. Maps `front` (title, authors, affiliations, dates, identifiers, abstract) to `Metadata` and `Extra` `jats.*`, `body` sections, paragraphs, lists, figures and tables (`table-wrap`, split from their paragraph), formulas, `back` (references one item each, footnotes, acknowledgements). Keys: `jats.*`. Cite: `Loc.Anchor` from `@id`; the DOI and PMID in `Extra`. Tested: JATS 1.1 Archiving, NLM 3.0, PMC article sets; not tested: JATS 1.2 to 1.4 Authoring, BITS. [profiles/jats.md](profiles/jats.md)
+
+#### Légifrance (`legifrance`)
+
+Selected by the LEGI and JORF roots in no namespace (`ARTICLE`, `TEXTE_VERSION`, `SECTION_TA`, `TEXTELR`, `JO`, `CONTENEUR`). Maps the metadata blocks (identifiers, dates, status, NOR) to `Metadata` and `Extra` `lf.*`, the title as heading 1, the article text (XHTML-like content with `br` as line breaks, and tables), and versions, links and structures as one paragraph each with their ids in `Attrs`. Keys: `lf.*`. Cite: the `ID` (`LEGIARTI...`) in `Extra`; sections of a `JO` summary by `Loc.Anchor` from `@id`. Tested: LEGI and JORF exports; not tested: `CONTENEUR`, `TEXTEKALI`, CNIL, JADE. [profiles/legifrance.md](profiles/legifrance.md)
+
+#### Patents (`patent`)
+
+Selected by the roots `us-patent-grant`, `us-patent-application`, `patent-application-publication`, `ep-patent-document`, `wo-patent-document`, `patent-document`. Maps the bibliographic data (numbers, dates, classifications, parties, citations) to `Metadata` and `Extra` `pat.*`, the abstract, description (headings, numbered paragraphs with `@num`), claims (one list item per claim, `claim-ref` as links), tables, chemistry, formulas and drawings (images; no file is loaded). Keys: `pat.*`. Cite: `Loc.Anchor` from `@id`, claims from `@num`. Tested: USPTO grant v4.0 to v4.3, application v4.3, pap-v16, EPO v1.1 to v1.5.1; not tested: USPTO v4.4 and later, WIPO ST.36 documents other than the EPO's, ST.96. [profiles/patent.md](profiles/patent.md)
+
+#### S1000D (`s1000d`)
+
+Selected by the roots `dmodule`, `pm` and `dml` in no namespace. Maps the identification and status section to `Metadata` and `Extra` `s1000d.*`, descriptive content (levelled paragraphs, lists, tables, figures, warnings and cautions), procedures (steps), publication module entries and data management list entries. Applicability references (`applicRefId`) are recorded in `Attrs["s1000d.applic_ref"]`, never evaluated. Keys: `s1000d.*`. Cite: `Loc.Anchor` from `@id`; the data module code in `Extra`. Tested: issues 4.1 and 4.2; not tested: issues 4.0, 5.0 and 6, fault isolation, IPD, process, wiring. [profiles/s1000d.md](profiles/s1000d.md)
+
+#### TEI (`tei`)
+
+Selected by the root `TEI` or `teiCorpus` in the TEI P5 namespace (P4 and older are read generically). Maps the `teiHeader` to `Metadata` and `Extra` `tei.*`, divisions with their heads, paragraphs, verse lines (one block each), speeches with their speakers as `Marker`, stage directions, notes, lists, tables, figures, dictionary entries, and editorial markup (`choice`, `app`, `add`, `del`) with every alternative in the text in file order and a stored record saying which it is. Page and line numbers inside a block (`pb@n`, `milestone@n`) are written in place. Keys: `tei.*`. Cite: `Loc.Anchor` from `xml:id`, and `tei.divN_n` and `tei.n` for the canonical reference. Tested: TEI P5 samples (ELTeC, Folger, DraCor, Perseus, papyri.info, Bodleian, FreeDict); not tested: `facsimile`, P4. [profiles/tei.md](profiles/tei.md)
+
+#### Service-Public (`service-public`)
 
 For the XML of Service-Public.fr published by DILA (schema Publication 3.5): the roots `Publication` (fiches F, dossiers and themes N, guided searches) and `ServiceComplementaire` (R: forms, online services, model letters, simulators, definitions), and the index files `Arborescence`, `Menu`, `Redirections`, `DatesModImp`, `CentresDeContact`. Conditions are recorded, never evaluated: every case of every condition is extracted, in file order.
 
@@ -95,7 +146,7 @@ For the XML of Service-Public.fr published by DILA (schema Publication 3.5): the
 
 On the public corpus (Service-Public, 4,194 dev and 1,362 held-out files), every element has a rule: `xml.unmapped_elements` is empty on both sets. The only unmapped attributes on dev are `Colonne@largeur` and `Colonne@type` (3,558 each, column layout); held-out has 2,728 unmapped attributes in all.
 
-The `sp.*` keys are the profile's own (decision S9), so they cannot collide with core's keys.
+Keys: `sp.*`. Tested: Publication schema 3.5 (the dev and held-out sets above); not tested: earlier schema versions.
 
 ## Drafting a profile from an XSD
 
@@ -132,10 +183,10 @@ One part of kind `body`, number 1.
 
 - **Text elements.** An element that directly contains character data other than white space is a text element. It gives one `paragraph` block, `Origin: inferred`, whose text is its own character data with that of all its descendants, in document order. CDATA sections and entity replacements are character data.
 - **Containers.** An element that holds only elements (and white space) is a container and gives no block of its own.
-- **Inline elements.** A text element inside another text element is part of the outer block: `<p>Hello <b>world</b></p>` is one paragraph, `Hello world`. This holds also when the outer element's own text comes after its children (`<p><b>Bold</b> tail</p>`): the children's blocks are taken into it. To keep memory bounded, blocks wait for such a decision only up to 4 MiB or 8,192 blocks; past that, the open elements still undecided are taken for containers, and one that has text after that point gives a block from there on. Nothing is lost either way; only where block boundaries fall differs.
+- **Inline elements.** A text element inside another text element is part of the outer block: `<p>Hello <b>world</b></p>` is one paragraph, `Hello world`. This holds also when the outer element's own text comes after its children (`<p><b>Bold</b> tail</p>`): the children's blocks are taken into it. To keep memory bounded, blocks wait for such a decision only up to 4 MiB or 8,192 blocks; past that, the open elements still undecided are taken for containers, and one that has text after that point gives a block from there on, with `limit.exceeded`. Nothing is lost either way; only where block boundaries fall differs.
 - **White space.** Runs of XML white space (space, tab, line feed, carriage return) collapse to one space, and the text is trimmed. Under `xml:space="preserve"` the white space is kept as written, line breaks as `\n` and tabs included, and only the ends are trimmed; `xml:space="default"` turns it off again for a subtree. Other space characters (a no-break space) are content and kept, though not at the ends of a block.
 - **`Attrs["element"]`** on each block made from an element is the path of element names from the root as written in the file, prefixes included, joined with `/` (`Publication/Texte/Paragraphe`), so a consumer can tell `<name>` from `<address>`.
-- **Nothing is guessed from names.** No headings, lists, tables or titles are inferred from element names. That is what profiles will be for.
+- **Nothing is guessed from names.** No headings, lists, tables or titles are inferred from element names; a profile says what names mean.
 - **Text outside the root element** (which a well-formed file does not have) is a paragraph of its own with no `element` path.
 - **Locations.** Every block has `Loc.Offset` and `Loc.Length`: for a paragraph the element's span from its start tag to its end tag, for an attribute note its element's start tag, for a comment the comment. Offsets are bytes of the file, in every encoding (a byte order mark included): for a file not in UTF-8 the decoder keeps a checkpoint per 32 KiB and the offsets are mapped back after reading, re-reading only the stretches they fall in. A block read from an entity's replacement has the location of the reference. A paragraph or comment split by the block bound has the span of each piece's text; the pieces are in order and do not overlap. `Loc.Anchor` is the block's element's `xml:id`, else its `id`, else that of an element inside it.
 - **Ligatures** U+FB00 to U+FB06 are written as their letters; other characters are kept as the file has them, invisible ones included.
@@ -195,13 +246,13 @@ Processing instructions other than the XML declaration and `xml-stylesheet` are 
 
 | Code | Severity | Where | What happened |
 |---|---|---|---|
-| `limit.exceeded` | error | part | a bound cut the output; the message says which and how much |
+| `limit.exceeded` | error | part; document for `Limits.MaxParts` | a bound cut the output; the message says which and how much |
 | `text.unmapped_glyphs` | warning | part | byte sequences not valid in the encoding were written as U+FFFD |
 | `text.control_characters_removed` | info | part | control characters other than tab and line feed were removed |
 | `text.encoding_detected` | warning | document | no encoding declared, not UTF-8; read in the encoding named |
 | `input.repaired` | warning | document | damaged markup read leniently, with the count |
 | `input.external_reference` | warning | document | one per kind of reference a conforming processor would load, with the count; nothing was loaded |
-| `input.unread_content` | warning | document | processing instructions, with the count |
+| `input.unread_content` | warning | document; part | processing instructions, with the count (document); MathML in a profile's formula rule, kept as plain text, with the count (part) |
 | `xml.entities_assumed` | info | part | undeclared entities read as the HTML 4 character entities of those names, with the count |
 | `xml.entity_undeclared` | warning | part | undeclared entities kept as written, with the count |
 | `part.no_text` | warning | part | the document has no block |
@@ -211,6 +262,8 @@ Processing instructions other than the XML declaration and `xml-stylesheet` are 
 | `xml.skipped_elements` | info | part | profile reading: elements left out by a user profile's `skip` rules |
 | `structure.heading_level_clamped` | info | part | profile reading: headings nested deeper than 6 have level 6 and their level in `Attrs["level"]` |
 
+Part warnings are on the last part. `DraftProfile` returns its own warnings in `Draft.Warnings`: `input.external_reference` (warning; schema parts not read because they are not on disk) and `limit.exceeded` (error; a bound on schema reading cut the draft). No other code is raised.
+
 ## Errors
 
 `ErrMalformed` (no element, or a negative size), `ErrUnsupported` (an encoding not read), `ErrLimitExceeded` (larger than `Limits.MaxInputBytes`, or a tag over `MaxTagBytes` before any element), `ErrNoPartsSelected` (`Options.Parts` excludes part 1), and the context's error when it is cancelled.
@@ -219,7 +272,7 @@ Processing instructions other than the XML declaration and `xml-stylesheet` are 
 
 Core's limits: `Limits.MaxInputBytes` (default 4 GiB, `ErrLimitExceeded`); `Limits.MaxDecodedBytes` (default 1 GiB), which here bounds entity expansion; `Limits.MaxTextBytes` (default 256 MiB): every block takes `BlockCost` plus its text plus its `element` path from it, and when it is spent the part is cut there with `limit.exceeded` saying how much input was left unread.
 
-Fixed bounds of this library, exported as constants. Each cut is `limit.exceeded` (error) on the part, once per bound with a count:
+Fixed bounds of this library; those named are exported constants. Each cut is `limit.exceeded` (error) on the part, once per bound with a count:
 
 | Bound | Value | What happens past it |
 |---|---|---|
@@ -232,10 +285,14 @@ Fixed bounds of this library, exported as constants. Each cut is `limit.exceeded
 | (namespace declarations) | 16 MiB in scope | a declaration past it is not read |
 | `MaxBlockBytes` | 1 MiB | a longer text or comment is split into blocks marked `Continued`, between the pieces text is read in (at most 64 KiB each, cut after white space where there is some); white space at a cut is dropped, as at the ends of any block; no warning is raised |
 | `MaxEntityDepth`, `EntityExpansionBase`, `EntityExpansionRatio` | 16; 1 MiB + 8 × input | see [Entities](#entities-and-document-type-declarations) |
+| blocks waiting for a block | 8,192 blocks or 4 MiB | notes (attribute notes, comments) waiting for the block they stand in: the block's text so far is given as a piece and the notes follow; blocks waiting for an element not yet known to be a text element: see [generic reading](#how-xml-maps-without-a-profile) |
 | table columns (profiles) | 1,024 | cells past it are left out |
 | rows one cell spans (profiles) | 65,535 | the span is cut |
+| spans in one block (profiles) | 100,000 | later spans are left out (the text stays) |
 | a cell, label or value read from a child (profiles) | 1 MiB (`MaxBlockBytes`) | the text is cut there |
 | parts started by `part` rules | 100,000, and `Limits.MaxParts` | the content stays in the last part; parts past `Limits.MaxParts` are left out |
+
+The `xml.unmapped_*` and `xml.skipped_elements` warnings list at most 100 names, and count at most 1,000 distinct names, the rest together; this bounds the warning's message, not the output, and raises nothing.
 
 With a profile, a block takes from `Limits.MaxTextBytes` its text, its `Marker`, its `Attrs` keys and values, its span addresses and, for a table, `CellCost` plus the text of each cell; a value a child gives later (`Attrs`, an image's alt text) is taken when it comes. The records of links in the stored part count the same way.
 
@@ -243,18 +300,29 @@ The context is checked every 1,024 tokens, and every 1,024 constructs passed ove
 
 ## What the file declares
 
-Generic reading reports no `Display` reason: XML in general has no declaration of display that holds whatever the schema. Nothing about visibility is judged: no colour, size, position or overlap is looked at, and characters are kept as the file has them. Unshown data (comments, attributes) is read as data, never run or followed.
+XML itself declares nothing about display: whether an element is shown is up to each schema and its stylesheet. Generic reading therefore sets no `Display` reason. A profile may name a schema's switch that declares content not shown (`display`: an attribute and its values, giving `hidden` or `no_ink`, PROFILE_FORMAT.md section 3); the built-in profiles have no such rule, so no block read with them carries a `Display` reason. Conditions (Service-Public `Condition`, S1000D applicability, DocBook `condition`) are recorded, never evaluated, and every case is extracted.
+
+Nothing about visibility is judged: no colour, size, position or overlap is looked at, and characters are kept as the file has them, invisible ones included. Unshown data (comments, attributes, stored data, metadata) is read as data, never run, evaluated or followed, and bounded by the limits.
+
+## Nothing fetched or run
+
+No external DTD subset, external entity, parameter entity, schema (`xsi:schemaLocation`), stylesheet (`xml-stylesheet`) or XInclude `include` is read, fetched or applied; the four kinds a conforming processor would load are reported with `input.external_reference` (below), and schema locations are recorded in `Metadata.Extra`. No XSLT, script or query in a document is run. A profile is data: nothing in it is run. `-draft-profile` (`DraftProfile`) follows `xs:include`, `xs:import` and `xs:redefine` on disk only, never a URL ([Drafting a profile](#drafting-a-profile-from-an-xsd)).
 
 ## Not read
 
-- **Profiles** other than Service-Public (JATS, DocBook, TEI, DITA, Akoma Ntoso, ...): later phases of `XML_PLAN.md`.
-- XSD validation, DTD validation, default attribute values from a DTD, XSLT.
-- Processing instructions as text.
-- External anything (see above).
+- **Validation.** Documents are not validated against an XSD, a DTD or any other schema; default attribute values a DTD declares are not applied (so DITA's `@class` is usually absent).
+- **XInclude.** An `xi:include` is not resolved: its `href` stays as text or an attribute note, with `input.external_reference`.
+- **XSLT.** `xml-stylesheet` instructions are reported with `input.external_reference`, not applied; no stylesheet is run.
+- **XBRL facts.** No profile reads XBRL: an instance is read generically, each fact's text a paragraph and its `contextRef`, `unitRef` and `decimals` attribute notes; contexts, units and the taxonomy are not interpreted.
+- **Drafting from RELAX NG or a DTD.** `-draft-profile` reads XSD 1.0 only.
+- **MathML** is kept as plain text, not converted (with `input.unread_content` where a profile's formula rule reads it).
+- **Processing instructions** as text, and external anything (see [Nothing fetched or run](#nothing-fetched-or-run)).
 
 ## Tests
 
-`go test ./...` runs everything; `-short` skips the large worst cases (a million attributes, a 64 MiB text node, a 200 MiB generated stream, a 17 MiB tag). An oracle test compares the character data with `encoding/xml`'s on 500 generated documents. `TestCorpus` reads `GOFAST_CORPUS` or `../.testdata/corpus` and runs every file of `dev/xml*/` and `heldout/xml*/` (counts only for held-out files); it skips when the corpus is absent. Fuzz targets: `FuzzExtract` and `FuzzProfile` (a profile with every rule kind) (.), `FuzzLoad` and `FuzzSelector` (`internal/profile`), `FuzzScanner` (`internal/xmlscan`), `FuzzParse` (`internal/dtd`).
+`go test ./...` runs everything; `-short` skips the large worst cases (a million attributes, a 64 MiB text node, a 200 MiB generated stream, a 17 MiB tag). An oracle test compares the character data with `encoding/xml`'s on 500 generated documents. `TestCorpus` reads `GOFAST_CORPUS` or `../.testdata/corpus` and runs every file of `dev/xml*/` and `heldout/xml*/` (counts only for held-out files); it skips when the corpus is absent. Fuzz targets: `FuzzExtract` and `FuzzProfile` (a profile with every rule kind) (.), `FuzzLoad` and `FuzzSelector` (`internal/profile`), `FuzzLoad` (`internal/xsd`), `FuzzDraft` (`internal/draft`), `FuzzScanner` (`internal/xmlscan`), `FuzzParse` (`internal/dtd`), `FuzzCharset` and `FuzzDoubleByte` (`internal/charset`).
+
+Each built-in profile has a corpus test (`Test<Profile>Corpus`: every dev and held-out file, aggregate counts only for held-out) and an oracle test (`Test<Profile>Oracles`) over its dev files: the body's text in order is the file's character data in order, apart from the listed exceptions (metadata, attribute-borne text such as TEI `pb@n` and Formex `QUOT.START@CODE`), each of which must be met in the dev set; and every block's text is in the source at its offsets. `TestCorpusRowLocs` checks every row location of every table of every dev file of the XML corpora.
 
 Profiles: `TestProfile*` read small synthetic documents with one synthetic profile per shape of the format (headings by nesting, dispatch on attributes, CALS and rows tables with spans, labels, out-of-line footnotes, marks from conditions, parts, metadata, links, images, values from attributes); each checks `Validate` and that every block's text is at its offsets. `TestServicePublicCorpus` reads every Service-Public file of the dev and held-out sets (aggregate counts only for held-out) and fails on a panic, an error, a `Validate` failure or a file not read with the profile; it logs the unmapped elements and attributes. `TestServicePublicOracles` checks every dev file against two oracles: the body's block and cell text, in order, is the file's character data in order (white space aside) apart from a listed set of elements (metadata, the `Titre` that `TitreRiche` repeats, values read into `Attrs`, image alt text), each of which must occur; and every block's text is in the source at its `Loc.Offset`/`Length`.
 
