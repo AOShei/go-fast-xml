@@ -65,7 +65,7 @@ func TestCommand(t *testing.T) {
 	}
 
 	out.Reset()
-	if code := run(context.Background(), []string{"-profiles"}, &out, &errs); code != 0 || !strings.HasPrefix(out.String(), "service-public\t") {
+	if code := run(context.Background(), []string{"-profiles"}, &out, &errs); code != 0 || !strings.Contains("\n"+out.String(), "\nservice-public\t") {
 		t.Errorf("-profiles: exit %d, %q", code, out.String())
 	}
 	prof := filepath.Join(dir, "p.json")
