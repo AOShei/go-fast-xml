@@ -333,6 +333,8 @@ type fileJSON struct {
 	Match            []matchJSON       `json:"match"`
 	HeadingBase      int               `json:"heading_base"`
 	Rules            []json.RawMessage `json:"rules"`
+	// Notes are for people (a draft's account of its schema); not read.
+	Notes json.RawMessage `json:"notes"`
 }
 
 type matchJSON struct {
@@ -547,6 +549,23 @@ func compileRule(raw json.RawMessage, i int, f *fileJSON, builtin bool) (*Rule, 
 	}
 	if r.Selector, err = ParseSelector(sel, f.Namespaces, f.DefaultNamespace); err != nil {
 		return nil, fmt.Errorf("%s: %v", where, err)
+	}
+	if v, ok := m["review"]; ok {
+		var b bool
+		if err := json.Unmarshal(v, &b); err != nil {
+			return nil, fmt.Errorf("%s: \"review\" must be true or false", where)
+		}
+		if b {
+			return nil, fmt.Errorf("%s: \"review\": true: this is a draft from -draft-profile, not a profile; review each rule and remove its \"review\" mark", where)
+		}
+		delete(m, "review")
+	}
+	if v, ok := m["note"]; ok {
+		var s string
+		if err := json.Unmarshal(v, &s); err != nil {
+			return nil, fmt.Errorf("%s: \"note\" must be a string", where)
+		}
+		delete(m, "note")
 	}
 	keys := make([]string, 0, len(m))
 	for k := range m {
