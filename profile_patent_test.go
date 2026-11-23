@@ -120,22 +120,19 @@ func patentRunCorpus(t *testing.T, format, profile string) {
 }
 
 // patentSkipped reports whether the element at the end of stack is in
-// skip, written "name" (any parent), "parent/name" or "/name" (a child of
-// the root).
+// skip, written as the end of its path ("name", "parent/name",
+// "a/b/name", up to four steps) or "/name" (a child of the root).
 func patentSkipped(skip map[string]string, stack []string) (string, bool) {
 	n := len(stack)
-	name := stack[n-1]
-	if _, ok := skip[name]; ok {
-		return name, true
-	}
-	if n >= 2 {
-		if _, ok := skip[stack[n-2]+"/"+name]; ok {
-			return stack[n-2] + "/" + name, true
+	for k := 1; k <= min(n, 4); k++ {
+		key := strings.Join(stack[n-k:], "/")
+		if _, ok := skip[key]; ok {
+			return key, true
 		}
 	}
 	if n == 2 {
-		if _, ok := skip["/"+name]; ok {
-			return "/" + name, true
+		if _, ok := skip["/"+stack[1]]; ok {
+			return "/" + stack[1], true
 		}
 	}
 	return "", false
