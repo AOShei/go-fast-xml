@@ -4,6 +4,13 @@
 
 ### Phase 2: profiles
 
+- Fixes after review: a row's `cells` from its element's attributes and
+  a table's fixed `header` (`Origin: inferred`,
+  `Attrs["header_source"]="profile"`); Service-Public `Redirections` read
+  as one table (no unmapped element on dev). Spans kept on each piece of
+  a split block. A `part` inside an open block finishes the block first.
+  A link's stored record has the link's text, its title in
+  `Attrs["title"]` (Service-Public: `sp.comment`).
 - Profiles (`PROFILE_FORMAT.md`): JSON files mapping a schema's elements
   to the model. Loader (`internal/profile`) with strict JSON, validation
   whose errors name the rule, selectors compiled once and indexed by the
