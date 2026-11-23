@@ -182,6 +182,13 @@ func headingChild(d *xsd.Decl) *xsd.Decl {
 			return c.Decl
 		}
 	}
+	// A loose model (a repeated choice of num, heading, ...) makes every
+	// child repeat: the name alone then picks the title.
+	for _, c := range d.Children {
+		if texty(c.Decl) && titleName(c.Decl) && c.Decl != d {
+			return c.Decl
+		}
+	}
 	return nil
 }
 
