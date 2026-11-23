@@ -171,6 +171,9 @@ func (g *Generic) StartElement(r *xmlread.Reader, e *xmlread.Element) {
 	if g.owner > 0 {
 		f.state = inline
 		g.after = g.attrNotes(len(g.stack), g.after)
+		if o := g.frameAt(g.owner); o.anchor == "" && o.pieces == 0 {
+			o.anchor = g.anchorOf(e) // the identifier of an element in the block
+		}
 		return
 	}
 	n := len(g.queue)
