@@ -2,6 +2,42 @@
 
 ## Unreleased
 
+### Phase 2: profiles
+
+- Fixes after review: a row's `cells` from its element's attributes and
+  a table's fixed `header` (`Origin: inferred`,
+  `Attrs["header_source"]="profile"`); Service-Public `Redirections` read
+  as one table (no unmapped element on dev). Spans kept on each piece of
+  a split block. A `part` inside an open block finishes the block first.
+  A link's stored record has the link's text, its title in
+  `Attrs["title"]` (Service-Public: `sp.comment`).
+- Profiles (`PROFILE_FORMAT.md`): JSON files mapping a schema's elements
+  to the model. Loader (`internal/profile`) with strict JSON, validation
+  whose errors name the rule, selectors compiled once and indexed by the
+  last step's name; `LoadProfile`, `BuiltinProfiles`, `BuiltinProfile`,
+  `Extractor.Profiles`, `Extractor.Profile` (`ProfileNone`).
+- Rule engine (`internal/engine`): every rule kind of the format, value
+  sources (attribute, ancestor's attribute, child text, child outline),
+  marks, labels, `duplicate_of`, both table models (rows and CALS),
+  spans with `Options.Spans`, parts and the stored part, generic fallback
+  for unmapped elements; `Loc.Offset`/`Length` on every block,
+  `Loc.Anchor` and `Attrs["anchor_parent"]` for citing.
+- Keys added to the signed-off format, each for one decision of the
+  Service-Public mapping: `duplicate_of`/`key` (S4), `title` and `attrs`
+  on `inline` (S6), `extra` (root attributes), `join` (breadcrumb),
+  `value` on `block` and `note` (`RessourceWeb@URL`).
+- Built-in profile `service-public` (Publication 3.5, both roots and the
+  five index files).
+- Warnings `xml.unmapped_elements`, `xml.unmapped_attributes`,
+  `xml.skipped_elements` (info); `structure.heading_level_clamped`.
+- `Metadata.Extra["xml.profile"]` names the profile used.
+- Command: `-profile NAME|FILE|none`, `-profiles`, `-spans`.
+- Tests: one synthetic profile per shape, `FuzzProfile`, `FuzzLoad`,
+  `FuzzSelector`, the Service-Public corpus test and the two oracles over
+  every dev file, `BenchmarkServicePublic`.
+
+### Phase 1: reading
+
 - Streaming XML scanner (`internal/xmlscan`), adapted from go-fast-odf's:
   namespace URIs, token offsets, comments, processing instructions and the
   document type declaration as tokens, general entities expanded within a

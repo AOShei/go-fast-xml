@@ -49,6 +49,24 @@ func (b *Builder) Space() {
 	}
 }
 
+// Break appends a hard line break: the white space held before it becomes
+// one "\n". Like other white space it is dropped at the ends.
+func (b *Builder) Break() {
+	if !b.started {
+		b.lead, b.started = true, true
+	}
+	b.pending = append(b.pending[:0], '\n')
+}
+
+// Pos returns the offset in the text where the next character appended
+// will be, white space held before it included.
+func (b *Builder) Pos() int {
+	if len(b.buf) == 0 {
+		return 0
+	}
+	return len(b.buf) + len(b.pending)
+}
+
 func (b *Builder) text() {
 	if len(b.pending) > 0 {
 		if len(b.buf) > 0 {
@@ -135,10 +153,18 @@ func (b *Builder) String() string { return string(b.buf) }
 // space where there is some in the last part of the piece, else at a
 // character boundary, and keeps the rest.
 func (b *Builder) Split(limit int) string {
+	s, _ := b.SplitAt(limit)
+	return s
+}
+
+// SplitAt is Split that also returns how many bytes of the text the piece
+// took, white space at the cut included: the offset in the old text of
+// the rest's first byte.
+func (b *Builder) SplitAt(limit int) (string, int) {
 	if len(b.buf) <= limit {
 		s := string(b.buf)
 		b.buf = b.buf[:0]
-		return s
+		return s, len(s)
 	}
 	cut := -1
 	for i := limit; i > limit/2; i-- {
@@ -155,8 +181,9 @@ func (b *Builder) Split(limit int) string {
 	}
 	piece := string(bytes.TrimRightFunc(b.buf[:cut], unicode.IsSpace))
 	rest := bytes.TrimLeftFunc(b.buf[cut:], unicode.IsSpace)
+	took := len(b.buf) - len(rest)
 	b.buf = append(b.buf[:0], rest...)
-	return piece
+	return piece, took
 }
 
 // Clean returns s with the text conventions applied, white space

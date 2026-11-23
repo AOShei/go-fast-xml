@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/AOShei/go-fast-core"
+	"github.com/AOShei/go-fast-xml/internal/engine"
 	"github.com/AOShei/go-fast-xml/internal/generic"
 	"github.com/AOShei/go-fast-xml/internal/xmlenc"
 	"github.com/AOShei/go-fast-xml/internal/xmlread"
@@ -68,7 +69,9 @@ const (
 // Warning codes of this library. Of the codes shared by all go-fast
 // libraries it raises text.unmapped_glyphs, text.control_characters_removed,
 // text.encoding_detected, input.repaired, input.unread_content,
-// input.external_reference, limit.exceeded and part.no_text.
+// input.external_reference, limit.exceeded, part.no_text and, with a
+// profile, structure.heading_level_clamped. Profile reading adds
+// WarnUnmappedElements, WarnUnmappedAttributes and WarnSkippedElements.
 const (
 	// WarnEntitiesAssumed (info): references to entities the file does
 	// not declare, in a file with an external DTD subset, were read as
@@ -111,8 +114,15 @@ const (
 // Extractor extracts XML documents. The zero value is ready to use and
 // safe for concurrent use.
 type Extractor struct {
-	// Attributes says what becomes of attributes.
+	// Attributes says what becomes of attributes in generic reading.
 	Attributes Attributes
+	// Profiles are tried, in order, before the built-in profiles: the
+	// first whose "match" the root element meets is used.
+	Profiles []*Profile
+	// Profile forces the profile of that name, from Profiles or the
+	// built-in ones, whatever the root element; ProfileNone ("none")
+	// forces generic reading. Empty means choose by the root element.
+	Profile string
 }
 
 var _ gofastcore.Extractor = (*Extractor)(nil)
@@ -191,8 +201,9 @@ func (e *Extractor) Extract(ctx context.Context, r io.ReaderAt, size int64, opts
 	if limit := gofastcore.ResolveLimit(o.Limits.MaxInputBytes, DefaultMaxInputBytes); size > limit {
 		return nil, fmt.Errorf("gofastxml: input is %d bytes, limit is %d: %w", size, limit, gofastcore.ErrLimitExceeded)
 	}
-	if !o.Parts.Contains(1) {
-		return nil, fmt.Errorf("gofastxml: the document has one part: %w", gofastcore.ErrNoPartsSelected)
+	forced, none, err := e.forced()
+	if err != nil {
+		return nil, err
 	}
 	sample := make([]byte, min(size, xmlenc.SampleSize))
 	if n, err := r.ReadAt(sample, 0); n < len(sample) {
@@ -227,15 +238,17 @@ func (e *Extractor) Extract(ctx context.Context, r io.ReaderAt, size int64, opts
 
 	doc := gofastcore.New("xml")
 	doc.Source.Name, doc.Source.Size, doc.Source.MIME = o.Name, size, "application/xml"
-	part := gofastcore.Part{Kind: gofastcore.PartBody, Number: 1}
-	out := &generic.Out{Part: &part, Budget: text}
+	part := &gofastcore.Part{Kind: gofastcore.PartBody, Number: 1}
+	out := &generic.Out{Part: part, Budget: text}
 	g := generic.New(out, generic.Options{NoAttributes: e.Attributes == AttributesNone})
+	d := &dispatch{x: e, out: out, g: g, h: g, forced: forced, none: none,
+		opts: engineOptions(&o)}
 
-	runErr := rd.Run(g)
+	runErr := rd.Run(d)
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	g.Finish(rd.Offset())
+	d.Finish(rd.Offset())
 	stats := rd.Scanner().Stats
 	decode.Take(stats.Expanded)
 	rep := &rd.Report
@@ -249,30 +262,110 @@ func (e *Extractor) Extract(ctx context.Context, r io.ReaderAt, size int64, opts
 		return nil, fmt.Errorf("gofastxml: the input has no XML element: %w", gofastcore.ErrMalformed)
 	}
 
+	parts := []*gofastcore.Part{part}
+	if d.eng != nil {
+		parts = d.eng.Parts()
+		out.ValuesCut += d.eng.ValuesCut
+	}
 	metadata(doc, rep, enc, out)
+	if d.used != nil {
+		mergeMetadata(&doc.Metadata, &d.eng.Meta)
+		doc.Metadata.Extra[ExtraProfile] = d.used.Name()
+	}
 	docWarnings(doc, rep, enc, dec, stats)
 	at := rd.Offset()
+	last := parts[len(parts)-1]
+	if last.Kind == gofastcore.PartStored {
+		last = parts[len(parts)-2]
+	}
 	if !enc.UTF8 {
 		var err error
-		if at, err = sourceOffsets(&part, dec, r, enc.Skip, at); err != nil {
-			part.Warn(gofastcore.SeverityError, gofastcore.WarnPartFailed,
+		if at, err = sourceOffsets(parts, dec, r, enc.Skip, at); err != nil {
+			last.Warn(gofastcore.SeverityError, gofastcore.WarnPartFailed,
 				fmt.Sprintf("reading the input again to map locations to it failed (%v); locations are offsets in the text decoded to UTF-8", err))
 		}
 	}
-	partWarnings(&part, g, out, rep, dec, stats, runErr, at, size)
-	part.Finish()
-	doc.Parts = append(doc.Parts, part)
+	if d.eng != nil {
+		d.eng.PartWarnings(last)
+		engineWarnings(last, d.eng)
+	}
+	partWarnings(last, d, out, rep, dec, stats, runErr, at, size)
+	maxParts := gofastcore.ResolveLimit(int64(o.Limits.MaxParts), engine.MaxParts)
+	for _, p := range parts {
+		if p.Kind == gofastcore.PartStored && o.Parts != (gofastcore.PartRange{}) {
+			continue
+		}
+		if p.Kind != gofastcore.PartStored && !o.Parts.Contains(p.Number) {
+			continue
+		}
+		if p.Kind != gofastcore.PartStored && int64(len(doc.Parts)) >= maxParts {
+			doc.Warn(gofastcore.SeverityError, gofastcore.WarnLimitExceeded,
+				fmt.Sprintf("the document has more parts than Limits.MaxParts (%d); the parts after part %d were left out", maxParts, doc.Parts[len(doc.Parts)-1].Number))
+			continue
+		}
+		p.Finish()
+		doc.Parts = append(doc.Parts, *p)
+	}
+	if len(doc.Parts) == 0 {
+		return nil, fmt.Errorf("gofastxml: the document has %d parts, none selected: %w", len(parts), gofastcore.ErrNoPartsSelected)
+	}
 	return doc, nil
+}
+
+func engineOptions(o *gofastcore.Options) engine.Options {
+	return engine.Options{Spans: o.Spans, NoImages: o.Images == gofastcore.ImagesNone}
+}
+
+// mergeMetadata adds what a profile's rules gave to the metadata.
+func mergeMetadata(dst, src *gofastcore.Metadata) {
+	if src.Title != "" {
+		dst.Title = src.Title
+	}
+	dst.Authors = append(dst.Authors, src.Authors...)
+	dst.Keywords = append(dst.Keywords, src.Keywords...)
+	if src.Subject != "" {
+		dst.Subject = src.Subject
+	}
+	if src.Language != "" {
+		dst.Language = src.Language
+	}
+	if !src.Created.IsZero() {
+		dst.Created = src.Created
+	}
+	if !src.Modified.IsZero() {
+		dst.Modified = src.Modified
+	}
+	for k, v := range src.Extra {
+		dst.Extra[k] = v
+	}
+}
+
+func engineWarnings(part *gofastcore.Part, e *engine.Engine) {
+	limit := func(msg string) { part.Warn(gofastcore.SeverityError, gofastcore.WarnLimitExceeded, msg) }
+	if e.ColumnsCut > 0 {
+		limit(fmt.Sprintf("%s past %d columns cut", plural(e.ColumnsCut, "table", "tables"), engine.MaxTableColumns))
+	}
+	if e.TextCut > 0 {
+		limit(fmt.Sprintf("%s (table cells, values, labels) longer than %d bytes cut", plural(e.TextCut, "text", "texts"), MaxBlockBytes))
+	}
+	if e.SpansCut > 0 {
+		limit(fmt.Sprintf("%s past 100000 in one block left out", plural(e.SpansCut, "span", "spans")))
+	}
+	if e.PartsCut > 0 {
+		limit(fmt.Sprintf("%s past %d not started; their content is in the last part", plural(e.PartsCut, "part", "parts"), engine.MaxParts))
+	}
 }
 
 // sourceOffsets turns the locations of the blocks, and at, from offsets
 // in the decoded text into offsets in the file, for input not read as
 // UTF-8. The offsets are mapped in increasing order, in one pass over the
 // part of the input they reach.
-func sourceOffsets(part *gofastcore.Part, dec *xmlenc.Reader, r io.ReaderAt, skip int, at int64) (int64, error) {
-	offs := make([]int64, 0, 2*len(part.Blocks)+1)
-	for _, b := range part.Blocks {
-		offs = append(offs, b.Loc.Offset, b.Loc.Offset+b.Loc.Length)
+func sourceOffsets(parts []*gofastcore.Part, dec *xmlenc.Reader, r io.ReaderAt, skip int, at int64) (int64, error) {
+	var offs []int64
+	for _, part := range parts {
+		for _, b := range part.Blocks {
+			offs = append(offs, b.Loc.Offset, b.Loc.Offset+b.Loc.Length)
+		}
 	}
 	offs = append(offs, at)
 	slices.Sort(offs)
@@ -285,10 +378,12 @@ func sourceOffsets(part *gofastcore.Part, dec *xmlenc.Reader, r io.ReaderAt, ski
 		i, _ := slices.BinarySearch(offs, o)
 		return src[i] + int64(skip)
 	}
-	for i := range part.Blocks {
-		l := &part.Blocks[i].Loc
-		start, end := get(l.Offset), get(l.Offset+l.Length)
-		l.Offset, l.Length = start, end-start
+	for _, part := range parts {
+		for i := range part.Blocks {
+			l := &part.Blocks[i].Loc
+			start, end := get(l.Offset), get(l.Offset+l.Length)
+			l.Offset, l.Length = start, end-start
+		}
 	}
 	return get(at), nil
 }
@@ -361,7 +456,7 @@ func docWarnings(doc *gofastcore.Document, rep *xmlread.Report, enc xmlenc.Resul
 	}
 }
 
-func partWarnings(part *gofastcore.Part, g *generic.Generic, out *generic.Out, rep *xmlread.Report, dec *xmlenc.Reader, stats xmlscan.Stats, runErr error, at, size int64) {
+func partWarnings(part *gofastcore.Part, g interface{ Counts() (int, int) }, out *generic.Out, rep *xmlread.Report, dec *xmlenc.Reader, stats xmlscan.Stats, runErr error, at, size int64) {
 	if rep.Assumed > 0 {
 		part.Warn(gofastcore.SeverityInfo, WarnEntitiesAssumed,
 			fmt.Sprintf("%s to entities the file does not declare read as the characters the W3C entity list gives them; the file's external DTD subset was not loaded",

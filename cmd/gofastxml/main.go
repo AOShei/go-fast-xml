@@ -54,6 +54,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		maxText    = flags.Int64("max-text-bytes", 0, "bytes of text a document may hold (0: the default, 256 MiB; -1: no limit)")
 		quiet      = flags.Bool("quiet", false, "say nothing about files that were read; failures are still reported")
 		version    = flags.Bool("version", false, "print the version and exit")
+		profName   = flags.String("profile", "", "read with this profile: the name of a built-in one, a profile file (JSON, see PROFILE_FORMAT.md), or none for generic reading; by default the profile whose root element the file has, else generic reading")
+		profiles   = flags.Bool("profiles", false, "list the built-in profiles and exit")
+		spans      = flags.Bool("spans", false, "give inline formatting and links as spans (in JSON)")
 	)
 	// The render flags shared by every go-fast command (COMMAND_FLAGS.md).
 	renderFlags := gofastcore.AddRenderFlags(flags)
@@ -77,6 +80,28 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "gofastxml: "+format+"\n", args...)
 		return 2
 	}
+	if *profiles {
+		for _, p := range gofastxml.BuiltinProfiles() {
+			fmt.Fprintf(stdout, "%s\t%s\n", p.Name(), p.Title())
+		}
+		return 0
+	}
+	extractor := &gofastxml.Extractor{}
+	switch name := *profName; {
+	case name == "", name == gofastxml.ProfileNone, gofastxml.BuiltinProfile(name) != nil:
+		extractor.Profile = name
+	default:
+		f, err := os.Open(name)
+		if err != nil {
+			return fail("-profile %q is neither a built-in profile (see -profiles) nor a file: %v", name, err)
+		}
+		p, err := gofastxml.LoadProfile(f)
+		f.Close()
+		if err != nil {
+			return fail("%s: %v", name, err)
+		}
+		extractor.Profiles, extractor.Profile = []*gofastxml.Profile{p}, p.Name()
+	}
 	if flags.NArg() == 0 {
 		flags.Usage()
 		return 2
@@ -86,7 +111,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	}
 	var opts gofastcore.Options
 	opts.Limits.MaxInputBytes, opts.Limits.MaxDecodedBytes, opts.Limits.MaxTextBytes = *maxInput, *maxBytes, *maxText
-	extractor := &gofastxml.Extractor{}
+	opts.Spans = *spans
 	if !*attributes {
 		extractor.Attributes = gofastxml.AttributesNone
 	}
