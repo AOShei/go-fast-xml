@@ -141,6 +141,9 @@ type Options struct {
 	// BaseOffset is the offset of the first byte read, added to every
 	// offset the scanner reports.
 	BaseOffset int64
+	// Interrupt, if set, is called every 1,024 constructs Next passes
+	// over without making a token; an error it returns ends the scan.
+	Interrupt func() error
 }
 
 // Defaults for Options.
@@ -246,6 +249,8 @@ type Scanner struct {
 	expLeft   int64 // expansion bytes left; negative once a reference was refused
 	closing   int   // elements still to be closed by a recovered end tag
 	over      int   // open elements beyond maxDepth
+	interrupt func() error
+	skips     int // constructs passed over without a token
 
 	frames           []frame
 	refStart, refEnd int64 // the outermost reference being expanded
@@ -305,7 +310,7 @@ func (s *Scanner) configure(opts *Options) {
 	if opts == nil {
 		return
 	}
-	s.spaces, s.resolve, s.base = opts.Spaces, opts.Resolve, opts.BaseOffset
+	s.spaces, s.resolve, s.base, s.interrupt = opts.Spaces, opts.Resolve, opts.BaseOffset, opts.Interrupt
 	if opts.MaxDepth > 0 {
 		s.maxDepth = opts.MaxDepth
 	}
@@ -459,23 +464,33 @@ func (s *Scanner) more() bool {
 		copy(grown, s.buf[:s.end])
 		s.buf = grown
 	}
-	for range 64 {
+	// Fill the window: a construct that did not fit is parsed again from
+	// its start, so each call must at least double what it can see.
+	added := false
+	for idle := 0; s.end < len(s.buf); {
 		n, err := s.r.Read(s.buf[s.end:])
 		s.end += n
+		if n > 0 {
+			added, idle = true, 0
+		}
 		if err != nil {
 			s.eof = true
 			if err != io.EOF {
 				s.fail(err)
 				return false
 			}
-			return n > 0
+			return added
 		}
-		if n > 0 {
-			return true
+		if n == 0 {
+			if idle++; idle == 64 {
+				if !added {
+					s.fail(io.ErrNoProgress)
+				}
+				return added
+			}
 		}
 	}
-	s.fail(io.ErrNoProgress)
-	return false
+	return added
 }
 
 // Next advances to the next token and returns its kind.
@@ -559,7 +574,13 @@ func (s *Scanner) Next() Kind {
 				}
 			}
 		}
-		// skipped: go round again
+		// skipped: go round again, asking now and then whether to stop.
+		if s.skips++; s.skips&1023 == 0 && s.interrupt != nil {
+			if err := s.interrupt(); err != nil {
+				s.fail(err)
+				return EOF
+			}
+		}
 	}
 }
 

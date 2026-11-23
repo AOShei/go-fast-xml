@@ -47,6 +47,35 @@ func TestLongCharacterReference(t *testing.T) {
 	}
 }
 
+// cancelAt cancels a context once a read passes an offset, and records
+// how far reads went.
+type cancelAt struct {
+	r      *strings.Reader
+	at     int64
+	cancel func()
+	most   int64
+}
+
+func (c *cancelAt) ReadAt(p []byte, off int64) (int, error) {
+	if off > c.at {
+		c.cancel()
+	}
+	c.most = max(c.most, off+int64(len(p)))
+	return c.r.ReadAt(p, off)
+}
+
+// Finding 5: cancellation is honoured while input is passed over.
+func TestCancelWhileSkipping(t *testing.T) {
+	src := "<r>" + strings.Repeat("</x>", 4<<20) + "</r>"
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	r := &cancelAt{r: strings.NewReader(src), at: 1 << 20, cancel: cancel}
+	_, err := Extract(ctx, r, int64(len(src)), nil)
+	if !errors.Is(err, context.Canceled) || r.most > 4<<20 {
+		t.Errorf("err %v, read to %d of %d", err, r.most, len(src))
+	}
+}
+
 // Finding 11: metadata values are cut at a character boundary and
 // counted; an xml:lang too long for the language is a note.
 func TestMetadataCut(t *testing.T) {

@@ -139,7 +139,7 @@ type Reader struct {
 func New(ctx context.Context, r io.Reader, opts Options) *Reader {
 	rd := &Reader{names: map[string]string{}, ctx: ctx}
 	so := opts.Scan
-	so.Resolve = rd.resolve
+	so.Resolve, so.Interrupt = rd.resolve, ctx.Err
 	rd.s = xmlscan.New(r, &so)
 	return rd
 }
@@ -148,7 +148,7 @@ func New(ctx context.Context, r io.Reader, opts Options) *Reader {
 func NewBytes(ctx context.Context, data []byte, opts Options) *Reader {
 	rd := &Reader{names: map[string]string{}, ctx: ctx}
 	so := opts.Scan
-	so.Resolve = rd.resolve
+	so.Resolve, so.Interrupt = rd.resolve, ctx.Err
 	rd.s = xmlscan.NewBytes(data, &so)
 	return rd
 }
