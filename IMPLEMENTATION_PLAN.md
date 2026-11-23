@@ -23,7 +23,25 @@ This file tracks its phases (section 7) in this repository.
 | Encoding: BOM, XML declaration, UTF-8/16, windows-1252, `internal/charset` | done |
 | DOCTYPE internal subset, entities, external references | done |
 | Generic reader: blocks, attributes, comments, metadata; oracle test against `encoding/xml` | done |
-| Limits and worst cases | |
-| Command `cmd/gofastxml` | |
-| Fuzz targets | |
-| README | |
+| Limits and worst cases | done |
+| Command `cmd/gofastxml` | done |
+| Fuzz targets: `FuzzExtract`, `FuzzScanner`, `FuzzParse` | done |
+| README | done |
+
+Phase 1 is complete on `phase-1-reader`, awaiting review (phase 1r).
+
+### Seam for phase 2
+
+- `internal/xmlread.Reader.Run(h Handler)` drives any consumer. The
+  reader owns the element stack (`Element`: qualified name, local name,
+  namespace URI, attributes, `Preserve`, start-tag offsets, a `Data` slot
+  for the consumer), the DTD and entities, and the counts that become
+  warnings. `Element` values are reused after `EndElement`: a consumer
+  copies what it keeps.
+- `internal/generic.Generic` is one `Handler`. `generic.Out` is the part
+  writer (budget, counts of cuts) a profile consumer shares. A profile
+  consumer would implement `Handler` and pass the events of an element it
+  has no rule for, and of its subtree, to a `Generic` writing to the same
+  `Out`; `Generic.Finish` writes out what is pending.
+- `Extract` builds reader, `Out` and consumer separately; the consumer is
+  chosen in one place.

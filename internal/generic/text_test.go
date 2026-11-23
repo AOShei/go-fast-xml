@@ -5,6 +5,16 @@ import (
 	"testing"
 )
 
+// Characters written by their numbers, to keep them visible in the source.
+var (
+	nbsp = string(rune(0xA0))
+	nel  = string(rune(0x85))
+	c1   = string(rune(0x90))
+	ffi  = string(rune(0xFB03))
+	repl = string(rune(0xFFFD))
+	eAc  = string(rune(0xE9))
+)
+
 func TestBuilder(t *testing.T) {
 	for _, c := range []struct {
 		in       []string
@@ -14,10 +24,10 @@ func TestBuilder(t *testing.T) {
 		trail    bool
 	}{
 		{[]string{"  a \n\t b  ", " c "}, false, "a b c", true, true},
-		{[]string{" x  y "}, false, "x  y", true, true},
+		{[]string{nbsp + "x" + nbsp + " y" + nbsp}, false, "x" + nbsp + " y", true, true},
 		{[]string{"\n  line 1\n\tline 2  \n"}, true, "line 1\n\tline 2", true, true},
-		{[]string{"a\x00b\x1bc\u0085d\u0090e"}, false, "abc de", false, false},
-		{[]string{"ﬃx", "\xFFy"}, false, "ffix�y", false, false},
+		{[]string{"a\x00b\x1bc" + nel + "d" + c1 + "e"}, false, "abc de", false, false},
+		{[]string{ffi + "x", "\xFFy"}, false, "ffix" + repl + "y", false, false},
 	} {
 		var b Builder
 		for _, s := range c.in {
@@ -40,7 +50,7 @@ func TestSplit(t *testing.T) {
 		t.Errorf("pieces do not join back")
 	}
 	b.Reset()
-	b.Append([]byte(strings.Repeat("é", 50)), false)
+	b.Append([]byte(strings.Repeat(eAc, 50)), false)
 	if piece := b.Split(41); len(piece) != 40 {
 		t.Errorf("cut inside a character: %d", len(piece))
 	}

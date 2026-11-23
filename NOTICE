@@ -13,7 +13,8 @@ author, under the same MIT License:
   internal/charset (all files, gen/ and testdata/ included)
   internal/entity  (all files)
       Copied from go-fast-html (commit 88e03a0) with only the import path
-      changed. The provenance of their data tables, as go-fast-html's
+      changed; internal/charset/stream.go (a streaming DecodeChunk) is
+      written here. The provenance of their data tables, as go-fast-html's
       NOTICE gives it, follows.
 
 Data tables taken from specifications, as listed in go-fast-html's NOTICE:
