@@ -32,6 +32,11 @@
   a cell from a row above still holds is clipped there; no two merges of
   a table share a cell (checked when the table is made, and in the fuzz
   targets).
+- The attribute notes of unmapped elements inside a block are bounded at
+  `MaxPendingBlocks` as in generic reading: past it, the block's text so
+  far is given as a piece and the notes follow (`limit.exceeded`).
+  Token tests (`[@a~='t']`) split an element's value once, not once per
+  rule.
 
 ### Phase 4: drafting a profile from an XSD
 

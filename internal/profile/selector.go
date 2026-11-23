@@ -3,6 +3,7 @@ package profile
 import (
 	"fmt"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -56,6 +57,13 @@ type Path interface {
 	Len() int
 	Name(i int) QName
 	Attr(i int, name QName) (string, bool)
+}
+
+// TokenPath is a Path that answers token tests itself, splitting each
+// value once per element rather than once per test.
+type TokenPath interface {
+	Path
+	HasToken(i int, name QName, token string) bool
 }
 
 // MaxSelectorBytes bounds a selector's text, MaxSteps its steps.
@@ -261,7 +269,11 @@ func (st *Step) matches(p Path, i int) bool {
 				return false
 			}
 		case OpToken:
-			if !hasToken(v, t.Value) {
+			if tp, ok := p.(TokenPath); ok {
+				if !tp.HasToken(i, t.Name, t.Value) {
+					return false
+				}
+			} else if !HasToken(v, t.Value) {
 				return false
 			}
 		}
@@ -269,11 +281,34 @@ func (st *Step) matches(p Path, i int) bool {
 	return true
 }
 
-func hasToken(v, t string) bool {
-	for _, f := range strings.Fields(v) {
-		if f == t {
+// HasToken reports whether t is one of the white-space separated tokens
+// of v, without allocating.
+func HasToken(v, t string) bool {
+	for v != "" {
+		i := strings.IndexFunc(v, isNotSpace)
+		if i < 0 {
+			return false
+		}
+		v = v[i:]
+		j := strings.IndexFunc(v, unicode.IsSpace)
+		if j < 0 {
+			j = len(v)
+		}
+		if v[:j] == t {
 			return true
 		}
+		v = v[j:]
 	}
 	return false
+}
+
+func isNotSpace(r rune) bool { return !unicode.IsSpace(r) }
+
+// Tokens returns the set of white-space separated tokens of v.
+func Tokens(v string) map[string]bool {
+	set := map[string]bool{}
+	for _, f := range strings.Fields(v) {
+		set[f] = true
+	}
+	return set
 }

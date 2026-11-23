@@ -349,6 +349,9 @@ func engineWarnings(part *gofastcore.Part, e *engine.Engine) {
 	if e.TextCut > 0 {
 		limit(fmt.Sprintf("%s (table cells, values, labels) longer than %d bytes cut", plural(e.TextCut, "text", "texts"), MaxBlockBytes))
 	}
+	if e.PendingCut > 0 {
+		limit(fmt.Sprintf("%d times more than %d attribute notes waited for the block they stand in; the block's text so far was given as a piece and the notes after it", e.PendingCut, generic.MaxPendingBlocks))
+	}
 	if e.SpansCut > 0 {
 		limit(fmt.Sprintf("%s past 100000 in one block left out", plural(e.SpansCut, "span", "spans")))
 	}

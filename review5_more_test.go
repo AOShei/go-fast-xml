@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/AOShei/go-fast-core"
+	"github.com/AOShei/go-fast-xml/internal/generic"
 )
 
 func r5LimitHit(doc *gofastcore.Document) bool {
@@ -257,6 +258,64 @@ func TestReview5MergesDisjointRandom(t *testing.T) {
 		if bad := sharedMergeCell(doc); bad != "" {
 			t.Fatalf("%s: %s", sb.String(), bad)
 		}
+	}
+}
+
+// Finding 10 (suspected by the review): the attribute notes of unmapped
+// elements inside a block waited in the block's queue without a bound.
+// They are bounded at MaxPendingBlocks as in generic reading: the block
+// is given as a piece, the notes follow, limit.exceeded says so, and
+// nothing is lost.
+func TestReview5PendingNotesBounded(t *testing.T) {
+	n := generic.MaxPendingBlocks + 100
+	src := "<r><p>lead " + strings.Repeat(`<x a="v">w </x>`, n) + "end</p></r>"
+	doc := r5Extract(t, r5Prof, src, nil)
+	if !r5LimitHit(doc) {
+		t.Error("no limit.exceeded")
+	}
+	notes, words, firstNote := 0, 0, -1
+	for i, b := range doc.Parts[0].Blocks {
+		if b.Kind == gofastcore.KindNote {
+			notes++
+			if firstNote < 0 {
+				firstNote = i
+			}
+		} else {
+			words += strings.Count(b.Text, "w")
+		}
+	}
+	if notes != n || words != n {
+		t.Errorf("%d notes and %d words, want %d each", notes, words, n)
+	}
+	if firstNote != 1 {
+		t.Errorf("the first note is block %d; want 1, after the first piece", firstNote)
+	}
+}
+
+// Token tests split an element's value once, however many rules test it.
+func TestReview5TokenTestOnce(t *testing.T) {
+	var rules strings.Builder
+	for i := range 50 {
+		fmt.Fprintf(&rules, `{"match":"d[@c~='t%d']/p","as":"heading","level":2},`, i)
+	}
+	prof := `{"profile":"review5t","format":1,"match":[{"root":"r"}],"rules":[` + rules.String() + `
+ {"match":"r","as":"transparent"},{"match":"d","as":"transparent"},
+ {"match":"p","as":"block","kind":"paragraph"}]}`
+	doc := func(n int) string {
+		return `<r><d c="` + strings.Repeat("v ", 16*n) + ` t49">` + strings.Repeat("<p/>", n) + `</d></r>`
+	}
+	small := r5Time(t, prof, doc(500))
+	large := r5Time(t, prof, doc(2000))
+	if ratio := float64(large) / float64(small); ratio > 8 {
+		t.Errorf("4x the input takes %.1fx the time (%v vs %v); want about 4x", ratio, large, small)
+	}
+	d := r5Extract(t, prof, `<r><d c="a t49 b"><p>h</p></d><d c="t4"><p>h2</p></d><d c="t499"><p>p</p></d></r>`, nil)
+	got := ""
+	for _, b := range d.Parts[0].Blocks {
+		got += b.Kind.String() + " "
+	}
+	if got != "heading heading paragraph " {
+		t.Errorf("kinds %q", got)
 	}
 }
 

@@ -215,6 +215,8 @@ type frame struct {
 	// line break is owed after the element ends, written before the next
 	// text (none at the block's end: white space there is dropped).
 	broken *sink
+	// tokens: the token sets of the element's values that rules tested.
+	tokens map[profile.QName]map[string]bool
 
 	val    string
 	hasVal bool
@@ -279,7 +281,10 @@ type Engine struct {
 	clamped, mathml                  int
 	// Counts for the whole reading.
 	ValuesCut, ColumnsCut, SpansCut, TextCut, PartsCut int
-	Controls, Invalid                                  int
+	// PendingCut counts blocks cut because more than MaxPendingBlocks
+	// attribute notes waited for them.
+	PendingCut        int
+	Controls, Invalid int
 
 	com      generic.Builder
 	inCom    bool
@@ -332,6 +337,22 @@ func (e *Engine) Attr(i int, q profile.QName) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// HasToken implements profile.TokenPath: an element's tested value is
+// split into its tokens once, the first time a rule tests it.
+func (e *Engine) HasToken(i int, q profile.QName, tok string) bool {
+	f := &e.frames[len(e.frames)-1-i]
+	set, ok := f.tokens[q]
+	if !ok {
+		v, _ := e.Attr(i, q)
+		set = profile.Tokens(v)
+		if f.tokens == nil {
+			f.tokens = map[profile.QName]map[string]bool{}
+		}
+		f.tokens[q] = set
+	}
+	return set[tok]
 }
 
 func (e *Engine) getSink(kind sinkKind, start int64) *sink {
@@ -714,6 +735,22 @@ func (e *Engine) startUnmapped(f *frame, el *xmlread.Element) {
 		// follow it as notes.
 		f.role = roleInline
 		s.after = e.attrNotes(el, s.after)
+		if len(s.after) > generic.MaxPendingBlocks {
+			// The notes waiting for the block are bounded, as in
+			// generic reading: the block's text so far is given as a
+			// piece (when the sink makes a block) and the notes follow.
+			e.PendingCut++
+			e.wordCut = true
+			if e.givePiece(s, el.Start) {
+				e.out.Splits++
+			}
+			e.wordCut = false
+			after := s.after
+			s.after = nil
+			for _, b := range after {
+				e.add(b, e.sinkFrame(s), false)
+			}
+		}
 		return
 	}
 	f.role = roleContainer
@@ -1572,16 +1609,20 @@ func (e *Engine) cutSink(s *sink, at int64) {
 	e.out.Splits++
 }
 
+// sinkFrame returns the frame whose element opened s, or nil.
+func (e *Engine) sinkFrame(s *sink) *frame {
+	for i := len(e.frames) - 1; i >= 0; i-- {
+		if e.frames[i].sink == s {
+			return &e.frames[i]
+		}
+	}
+	return nil
+}
+
 // givePiece gives a block's text so far as a block of its own, when the
 // sink is one that makes a block; it reports whether it did.
 func (e *Engine) givePiece(s *sink, at int64) bool {
-	var f *frame
-	for i := len(e.frames) - 1; i >= 0; i-- {
-		if e.frames[i].sink == s {
-			f = &e.frames[i]
-			break
-		}
-	}
+	f := e.sinkFrame(s)
 	switch {
 	case s.kind == skStray:
 		f = &e.frames[min(e.strayAt, len(e.frames)-1)]
