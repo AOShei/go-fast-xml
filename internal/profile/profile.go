@@ -310,7 +310,7 @@ type fileJSON struct {
 	Namespaces       map[string]string `json:"namespaces"`
 	DefaultNamespace string            `json:"default_namespace"`
 	NamespaceAliases map[string]string `json:"namespace_aliases"`
-	Match          []matchJSON       `json:"match"`
+	Match            []matchJSON       `json:"match"`
 	HeadingBase      int               `json:"heading_base"`
 	Rules            []json.RawMessage `json:"rules"`
 }
