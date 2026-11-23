@@ -56,8 +56,13 @@ func patentCorpusFiles(dir string) []string {
 // blocks by kind, warnings by code, and the unmapped elements and
 // attributes (by name on dev only; held-out files are counted, never
 // looked at). It fails on a panic, an error, a Validate failure, a
-// timeout, or a file not read with the profile.
-func patentRunCorpus(t *testing.T, format, profile string) {
+// timeout, or a dev file not read with the profile, except the dev file
+// whose name contains notSelected (when not empty), which the profile
+// is known not to select.
+func patentRunCorpus(t *testing.T, format, profile, notSelected string) {
+	if notSelected == "" {
+		notSelected = "\x00"
+	}
 	for _, set := range []string{"dev", "heldout"} {
 		dir := patentCorpusDir(set, format)
 		if dir == "" {
@@ -91,7 +96,7 @@ func patentRunCorpus(t *testing.T, format, profile string) {
 				continue
 			}
 			profiles[res.doc.Metadata.Extra[ExtraProfile]]++
-			if res.doc.Metadata.Extra[ExtraProfile] != profile && set == "dev" {
+			if res.doc.Metadata.Extra[ExtraProfile] != profile && set == "dev" && !strings.Contains(path, notSelected) {
 				t.Errorf("%s: read with profile %q, not %s", label, res.doc.Metadata.Extra[ExtraProfile], profile)
 			}
 			for _, w := range res.doc.AllWarnings() {
@@ -401,7 +406,7 @@ image #if0001 pat.height=196 pat.img_content=drawing pat.img_format=tif pat.lang
 }
 
 func TestPatentCorpus(t *testing.T) {
-	patentRunCorpus(t, "xml-patent", "patent")
+	patentRunCorpus(t, "xml-patent", "patent", "")
 }
 
 // patentOracleSkip lists the elements whose character data is metadata

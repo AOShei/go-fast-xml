@@ -69,7 +69,7 @@ table #tab-1
 }
 
 func TestS1000DCorpus(t *testing.T) {
-	patentRunCorpus(t, "xml-s1000d", "s1000d")
+	patentRunCorpus(t, "xml-s1000d", "s1000d", "")
 }
 
 // s1000dOracleSkip lists the elements whose character data is metadata,
