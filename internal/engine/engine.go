@@ -240,6 +240,9 @@ type Engine struct {
 	opts Options
 	// Meta collects the metadata the rules give.
 	Meta gofastcore.Metadata
+	// extra collects the values of each Metadata.Extra key, joined as
+	// they come and written to Meta.Extra once, at Finish.
+	extra map[string]*strings.Builder
 
 	parts  []*gofastcore.Part
 	stored *gofastcore.Part
@@ -1134,20 +1137,36 @@ func (e *Engine) setExtra(k, v, join string) {
 	if v == "" {
 		return
 	}
-	if e.Meta.Extra == nil {
-		e.Meta.Extra = map[string]string{}
+	if e.extra == nil {
+		e.extra = map[string]*strings.Builder{}
 	}
-	if old, ok := e.Meta.Extra[k]; ok && old != "" {
+	b := e.extra[k]
+	if b == nil {
+		b = &strings.Builder{}
+		e.extra[k] = b
+	}
+	if b.Len() > 0 {
 		if join == "" {
 			join = "\n"
 		}
-		if len(old)+len(join)+len(v) > generic.MaxValueBytes {
+		if b.Len()+len(join)+len(v) > generic.MaxValueBytes {
 			e.ValuesCut++
 			return
 		}
-		v = old + join + v
+		b.WriteString(join)
 	}
-	e.Meta.Extra[k] = v
+	b.WriteString(v)
+}
+
+// flushExtra writes the collected Metadata.Extra values, once each.
+func (e *Engine) flushExtra() {
+	for k, b := range e.extra {
+		if e.Meta.Extra == nil {
+			e.Meta.Extra = map[string]string{}
+		}
+		e.Meta.Extra[k] = b.String()
+	}
+	e.extra = nil
 }
 
 // applyOwn gives a nested element's own attrs to the block it joins.
@@ -2255,6 +2274,7 @@ func (e *Engine) Finish(end int64) {
 	}
 	e.flushStray()
 	e.flushLabel()
+	e.flushExtra()
 }
 
 // Counts returns the control characters removed and invalid bytes met in

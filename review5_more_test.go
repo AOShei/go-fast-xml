@@ -47,3 +47,17 @@ func TestReview5TableWidthGrowsLate(t *testing.T) {
 		t.Errorf("rows %q", tb.Rows)
 	}
 }
+
+// Values of one Extra key are joined in order, and the joined value stops
+// growing at MaxValueBytes.
+func TestReview5ExtraJoinOrder(t *testing.T) {
+	doc := r5Extract(t, r5Prof, `<r><k>a</k><k>b</k><k>c</k></r>`, nil)
+	if got := doc.Metadata.Extra["k"]; got != "a\nb\nc" {
+		t.Errorf("extra k %q", got)
+	}
+	n := 2*MaxValueBytes/len("<k>abcdefgh</k>") + 10
+	doc = r5Extract(t, r5Prof, "<r>"+strings.Repeat("<k>abcdefgh</k>", n)+"</r>", nil)
+	if got := len(doc.Metadata.Extra["k"]); got > MaxValueBytes || got < MaxValueBytes-16 {
+		t.Errorf("joined value of %d bytes, bound %d", got, MaxValueBytes)
+	}
+}

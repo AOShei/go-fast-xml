@@ -8,6 +8,7 @@
   as its rows end and as it widens; one the text budget cannot take
   stops with `limit.exceeded` before its rows are padded (20,000 empty
   rows under one 1,024-column row no longer allocate 1.2 GB).
+- Repeated values of one `Metadata.Extra` key are joined in linear time.
 
 ### Phase 4: drafting a profile from an XSD
 
