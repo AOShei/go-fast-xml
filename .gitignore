@@ -1,0 +1,28 @@
+# Build output
+/gofastodf
+/cmd/gofastodf/gofastodf
+*.exe
+
+# Test, coverage and profiling output
+*.test
+*.out
+*.prof
+coverage.*
+
+# Go workspace files
+go.work
+go.work.sum
+
+# Agent instructions kept local
+CLAUDE.md
+.claude/
+
+# LibreOffice lock files
+.~lock.*
+
+# Editors and OS
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
