@@ -12,7 +12,7 @@ fmt.Println(doc.Text())
 
 **Status: in development (phase 1 of `XML_PLAN.md`).** Any XML document is read generically: its text in document order, as inferred paragraphs. Schema profiles, which map a known schema's elements onto headings, lists and tables, are not built yet (see [Not read](#not-read)).
 
-The document is read as a stream, never as a tree: memory is bounded by the largest block, not by the file. A generated 200 MiB document of small elements is read with a peak heap of about 1 MiB (`TestLargeStream`).
+The document is read as a stream, never as a tree: besides the document it returns, memory is bounded by the fixed bounds below (one tag, one block, the blocks waiting for an undecided element, the namespace declarations in scope), not by the file. For input not read as UTF-8, the map back to the file's bytes adds 16 bytes per 32 KiB of input. A generated 200 MiB document of small elements is read with a peak heap of about 1 MiB (`TestLargeStream`).
 
 ## API
 
@@ -46,7 +46,7 @@ One part of kind `body`, number 1.
 - **`Attrs["element"]`** on each block made from an element is the path of element names from the root as written in the file, prefixes included, joined with `/` (`Publication/Texte/Paragraphe`), so a consumer can tell `<name>` from `<address>`.
 - **Nothing is guessed from names.** No headings, lists, tables or titles are inferred from element names. That is what profiles will be for.
 - **Text outside the root element** (which a well-formed file does not have) is a paragraph of its own with no `element` path.
-- **Locations.** Every block has `Loc.Offset` and `Loc.Length`: for a paragraph the element's span from its start tag to its end tag, for an attribute note its element's start tag, for a comment the comment. Offsets are bytes in the text decoded to UTF-8: for a UTF-8 file, with or without a byte order mark, that is the file itself; for a file in another encoding they are offsets in its UTF-8 form. A block read from an entity's replacement has the location of the reference. A paragraph split by the block bound has the span of each piece's text. `Loc.Anchor` is the block's element's `xml:id`, else its `id`, else that of an element inside it.
+- **Locations.** Every block has `Loc.Offset` and `Loc.Length`: for a paragraph the element's span from its start tag to its end tag, for an attribute note its element's start tag, for a comment the comment. Offsets are bytes of the file, in every encoding (a byte order mark included): for a file not in UTF-8 the decoder keeps a checkpoint per 32 KiB and the offsets are mapped back after reading, re-reading only the stretches they fall in. A block read from an entity's replacement has the location of the reference. A paragraph or comment split by the block bound has the span of each piece's text; the pieces are in order and do not overlap. `Loc.Anchor` is the block's element's `xml:id`, else its `id`, else that of an element inside it.
 - **Ligatures** U+FB00 to U+FB06 are written as their letters; other characters are kept as the file has them, invisible ones included.
 
 ### Attributes
@@ -59,7 +59,7 @@ These attributes are not notes:
 |---|---|
 | `xmlns`, `xmlns:*` | nowhere: they declare namespaces, which are resolved |
 | `xml:space` | how white space is read |
-| `xml:lang` on the root element | `Metadata.Language` (elsewhere it is a note) |
+| `xml:lang` on the root element | `Metadata.Language` (elsewhere, or when longer than 64 bytes, it is a note) |
 | `xsi:schemaLocation`, `xsi:noNamespaceSchemaLocation` on the root | `Metadata.Extra` (elsewhere they are notes); never loaded |
 
 ### Comments
@@ -70,7 +70,7 @@ A comment is a `note` block marked `Attrs["stored"] = "markup_comment"`, as go-f
 
 | Field | From |
 |---|---|
-| `Language` | `xml:lang` on the root element |
+| `Language` | `xml:lang` on the root element, up to 64 bytes |
 | `Extra["root"]`, `Extra["root_namespace"]` | the root element's name as written and its namespace URI |
 | `Extra["schema_location"]`, `Extra["no_namespace_schema_location"]` | `xsi:schemaLocation` (white space collapsed), `xsi:noNamespaceSchemaLocation` on the root |
 | `Extra["doctype"]`, `Extra["doctype_public"]`, `Extra["doctype_system"]` | the document type declaration's name and external identifiers |
@@ -94,7 +94,7 @@ A file that declares no encoding and whose first MiB is not valid UTF-8 is read 
 
 ## Damaged input
 
-The reader is lenient and counts what it mends in one `input.repaired` (warning) on the document: an end tag that matches an element further out closes the elements inside it; one that matches nothing is dropped; elements open at the end are closed; a `<` or `&` that starts no markup is text; an attribute without a value is passed over and one without quotes runs to white space or `>`; a tag cut off by the next `<` ends there; a comment or CDATA section open at the end runs to it; a second root element and text outside the root are read as they come; a second document type declaration, or one after the root element starts, is not read. Input with no element at all is `ErrMalformed`.
+The reader is lenient and counts what it mends in one `input.repaired` (warning) on the document: an end tag that matches an element further out closes the elements inside it; one that matches nothing is dropped; elements open at the end are closed; a `<` or `&` that starts no markup is text; an attribute without a value is passed over and one without quotes runs to white space or `>`; a quoted value that runs into a `<` lacks its closing quote and ends at the first `>` (which ends the tag) or else before the `<`, and so does a public or system identifier in a document type declaration; a tag or document type declaration cut off by the next `<` ends there; a comment or CDATA section open at the end runs to it; a second root element and text outside the root are read as they come; a second document type declaration, or one after the root element starts, is not read. Input with no element at all is `ErrMalformed`.
 
 Processing instructions other than the XML declaration and `xml-stylesheet` are not text; they are counted in one `input.unread_content` (warning).
 
@@ -116,7 +116,7 @@ Processing instructions other than the XML declaration and `xml-stylesheet` are 
 
 ## Errors
 
-`ErrMalformed` (no element), `ErrUnsupported` (an encoding not read), `ErrLimitExceeded` (larger than `Limits.MaxInputBytes`), `ErrNoPartsSelected` (`Options.Parts` excludes part 1), and the context's error when it is cancelled.
+`ErrMalformed` (no element, or a negative size), `ErrUnsupported` (an encoding not read), `ErrLimitExceeded` (larger than `Limits.MaxInputBytes`, or a tag over `MaxTagBytes` before any element), `ErrNoPartsSelected` (`Options.Parts` excludes part 1), and the context's error when it is cancelled.
 
 ## Limits
 
@@ -126,16 +126,17 @@ Fixed bounds of this library, exported as constants. Each cut is `limit.exceeded
 
 | Bound | Value | What happens past it |
 |---|---|---|
-| `MaxDepth` | 512 | deeper elements are read as part of their ancestor: their text is kept, their tags and attributes are not read. Nesting never recurses on the Go stack |
+| `MaxDepth` | 512 | deeper elements are read as part of their ancestor: their text is kept, their tags and attributes are not read. Element nesting never recurses on the Go stack |
 | `MaxAttributes` | 1,024 per element | later attributes are not read |
-| `MaxTagBytes` | 16 MiB | reading stops at a larger tag, processing instruction or document type declaration |
+| `MaxTagBytes` | 16 MiB | reading stops at a larger tag, processing instruction, document type declaration or character reference |
 | `MaxNameBytes` | 256 | an element or attribute name in `Attrs` is cut |
 | `MaxPathBytes` | 4 KiB (256 × 16) | `Attrs["element"]` is cut at a `/` |
-| `MaxValueBytes` | 1 MiB | an attribute note or anchor is cut |
-| `MaxBlockBytes` | 1 MiB | a longer text is split at white space into paragraphs marked `Continued`; nothing is cut and no warning is raised |
+| `MaxValueBytes` | 1 MiB | an attribute value (decoded, entities expanded), and so its note or anchor, is cut; all the values of one tag together are held to `MaxTagBytes` |
+| (namespace declarations) | 16 MiB in scope | a declaration past it is not read |
+| `MaxBlockBytes` | 1 MiB | a longer text or comment is split into blocks marked `Continued`, between the pieces text is read in (at most 64 KiB each, cut after white space where there is some); white space at a cut is dropped, as at the ends of any block; no warning is raised |
 | `MaxEntityDepth`, `EntityExpansionBase`, `EntityExpansionRatio` | 16; 1 MiB + 8 × input | see [Entities](#entities-and-document-type-declarations) |
 
-The context is checked every 1,024 tokens. Output is deterministic.
+The context is checked every 1,024 tokens, and every 1,024 constructs passed over without a token (end tags that match nothing, elements past `MaxDepth`). Output is deterministic.
 
 ## What the file declares
 

@@ -30,7 +30,9 @@ import (
 // Fixed bounds. What they cut is reported with limit.exceeded.
 const (
 	// MaxBlockBytes bounds the text of one block. A longer text is split
-	// at white space into blocks marked Continued; nothing is cut.
+	// into blocks marked Continued between the scanner's pieces (which
+	// end after white space where there is some); white space at a cut
+	// is dropped, as at a block's ends.
 	MaxBlockBytes = 1 << 20
 	// MaxNameBytes bounds an element or attribute name as it appears in
 	// Attrs.

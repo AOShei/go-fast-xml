@@ -1,8 +1,9 @@
 // Package gofastxml extracts text from XML documents of any schema into
 // go-fast-core's shared document model.
 //
-// The document is read as a stream: memory is bounded by the largest
-// block, not by the file. Nothing a file refers to is loaded or run: no
+// The document is read as a stream: besides the document returned,
+// memory is bounded by fixed bounds (one tag, one block, the blocks
+// waiting for an undecided element), not by the file. Nothing a file refers to is loaded or run: no
 // external DTD, entity, schema, stylesheet or XInclude. See README.md for
 // how XML maps to the model.
 package gofastxml
@@ -166,11 +167,12 @@ func (e *Extractor) ExtractFile(ctx context.Context, path string, opts *gofastco
 // Extract reads size bytes from r and returns the document: one part of
 // kind body, number 1. An error wraps one of the gofastcore errors:
 //
-//   - ErrMalformed: the input has no element.
+//   - ErrMalformed: the input has no element, or size is negative.
 //   - ErrUnsupported: the input is in an encoding this library does not
 //     read: one it declares, UTF-32 or EBCDIC, or, with none declared and
 //     the bytes not UTF-8, one that could not be recognised.
-//   - ErrLimitExceeded: the input is larger than Limits.MaxInputBytes.
+//   - ErrLimitExceeded: the input is larger than Limits.MaxInputBytes, or
+//     a tag before any element is larger than MaxTagBytes.
 //   - ErrNoPartsSelected: Options.Parts does not select part 1.
 func (e *Extractor) Extract(ctx context.Context, r io.ReaderAt, size int64, opts *gofastcore.Options) (*gofastcore.Document, error) {
 	if err := ctx.Err(); err != nil {
