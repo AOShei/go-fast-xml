@@ -15,7 +15,8 @@
     {"root": "bookmap", "doctype_public": "-//OASIS//DTD DITA"},
     {"root": "subjectScheme", "doctype_public": "-//OASIS//DTD DITA"},
     {"root": "learningContent", "doctype_public": "-//OASIS//DTD DITA"},
-    {"root": "topic"}, {"root": "concept"}, {"root": "task"}, {"root": "reference"}, {"root": "map"}, {"root": "bookmap"}, {"root": "dita"}
+    {"root": "topic", "attr": "[@id]"}, {"root": "concept", "attr": "[@id]"}, {"root": "task", "attr": "[@id]"}, {"root": "reference", "attr": "[@id]"},
+    {"root": "map", "attr": "[@title]"}, {"root": "dita", "attr": "[@xml:lang]"}
   ],
   "heading_base": 1,
   "rules": [

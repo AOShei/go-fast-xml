@@ -6,8 +6,9 @@ The roots `topic`, `concept`, `task`, `reference`, `glossentry`,
 `glossgroup`, `troubleshooting`, `dita`, `map`, `bookmap`,
 `subjectScheme`, `learningContent` with a DOCTYPE public identifier
 starting `-//OASIS//DTD DITA` or a `ditaarch:DITAArchVersion` attribute;
-and `topic`, `concept`, `task`, `reference`, `map`, `bookmap`, `dita`
-with neither (DITA-OT test files have no DOCTYPE).
+and, with neither (DITA-OT test files have no DOCTYPE), a `topic`,
+`concept`, `task` or `reference` with the `id` DITA requires, a `map`
+with a `title` attribute, a `dita` with `xml:lang`.
 
 Rules go by element name, not by `@class`: the `class` attribute is
 usually supplied by the DTD's defaults, which are not read, so most
