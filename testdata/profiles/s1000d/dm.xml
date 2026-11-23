@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dmodule xmlns:dc="http://www.purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xlink="http://www.w3.org/1999/xlink">
+<rdf:Description><dc:creator>U0001</dc:creator><dc:date>2026-01-31</dc:date></rdf:Description>
+<identAndStatusSection>
+<dmAddress>
+<dmIdent>
+<dmCode modelIdentCode="TESTBIKE" systemDiffCode="A" systemCode="DA0" subSystemCode="1" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="AA" infoCode="520" infoCodeVariant="A" itemLocationCode="A"/>
+<language countryIsoCode="US" languageIsoCode="en"/>
+<issueInfo issueNumber="002" inWork="00"/>
+</dmIdent>
+<dmAddressItems>
+<issueDate day="31" month="01" year="2026"/>
+<dmTitle><techName>Front wheel</techName> <infoName>Remove procedures</infoName></dmTitle>
+</dmAddressItems>
+</dmAddress>
+<dmStatus issueType="new">
+<security securityClassification="01"/>
+<responsiblePartnerCompany enterpriseCode="U0001"><enterpriseName>Example Co</enterpriseName></responsiblePartnerCompany>
+<originator enterpriseCode="U0001"><enterpriseName>Example Co</enterpriseName></originator>
+<applic><displayText><simplePara>All bikes</simplePara></displayText></applic>
+<brexDmRef><dmRef><dmRefIdent><dmCode modelIdentCode="S1000D" systemDiffCode="F" systemCode="04" subSystemCode="1" subSubSystemCode="0" assyCode="0301" disassyCode="00" disassyCodeVariant="A" infoCode="022" infoCodeVariant="A" itemLocationCode="D"/></dmRefIdent></dmRef></brexDmRef>
+<qualityAssurance><unverified/></qualityAssurance>
+</dmStatus>
+</identAndStatusSection>
+<content>
+<referencedApplicGroup><applic id="app-1"><displayText><simplePara>Model A</simplePara></displayText><evaluate andOr="or"><assert applicPropertyIdent="model" applicPropertyType="prodattr" applicPropertyValues="A"/><assert applicPropertyIdent="model" applicPropertyType="prodattr" applicPropertyValues="B"/></evaluate></applic></referencedApplicGroup>
+<procedure>
+<preliminaryRqmts>
+<reqCondGroup><reqCondNoRef><reqCond>The bicycle is clean</reqCond></reqCondNoRef></reqCondGroup>
+<reqSupportEquips><supportEquipDescrGroup><supportEquipDescr id="seq-1"><name>Tool set</name> <identNumber><manufacturerCode>K1</manufacturerCode> <partAndSerialNumber><partNumber>T-1</partNumber></partAndSerialNumber></identNumber> <reqQuantity>1</reqQuantity></supportEquipDescr></supportEquipDescrGroup></reqSupportEquips>
+</preliminaryRqmts>
+<mainProcedure>
+<proceduralStep id="stp-1" applicRefId="app-1"><warning><warningAndCautionPara>Wear gloves.</warningAndCautionPara></warning><para>Hold the <emphasis>front</emphasis> of the bicycle (refer to <internalRef internalRefId="fig-1" internalRefTargetType="irtt01">Fig 1</internalRef>).</para></proceduralStep>
+<proceduralStep id="stp-2"><para>Lift the wheel, see <dmRef><dmRefIdent><dmCode modelIdentCode="TESTBIKE" systemDiffCode="A" systemCode="DA0" subSystemCode="1" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="AA" infoCode="720" infoCodeVariant="A" itemLocationCode="A"/></dmRefIdent><dmRefAddressItems><dmTitle><techName>Front wheel</techName> <infoName>Install</infoName></dmTitle></dmRefAddressItems></dmRef>.</para>
+<note><notePara>Keep the axle.</notePara></note></proceduralStep>
+</mainProcedure>
+<closeRqmts><reqCondGroup><noConds/></reqCondGroup></closeRqmts>
+</procedure>
+<levelledPara id="par-1"><title>Data</title>
+<para id="p-1">Values:</para>
+<figure id="fig-1"><title>Front wheel</title><graphic infoEntityIdent="ICN-TEST-00001-A-01" id="gra-1"/></figure>
+<table id="tab-1"><title>Torques</title><tgroup cols="2"><tbody><row><entry>Axle</entry><entry>10 Nm</entry></row></tbody></tgroup></table>
+</levelledPara>
+</content>
+</dmodule>

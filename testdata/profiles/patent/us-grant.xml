@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE us-patent-grant SYSTEM "us-patent-grant-v42-2006-08-23.dtd" [ ]>
+<us-patent-grant lang="EN" dtd-version="v4.2 2006-08-23" file="US09999999-20080101.XML" status="PRODUCTION" id="us-patent-grant" country="US" date-produced="20071214" date-publ="20080101">
+<us-bibliographic-data-grant>
+<publication-reference>
+<document-id>
+<country>US</country>
+<doc-number>09999999</doc-number>
+<kind>B2</kind>
+<date>20080101</date>
+</document-id>
+</publication-reference>
+<application-reference appl-type="utility">
+<document-id>
+<country>US</country>
+<doc-number>11000001</doc-number>
+<date>20050623</date>
+</document-id>
+</application-reference>
+<priority-claims>
+<priority-claim sequence="01" kind="national">
+<country>JP</country>
+<doc-number>2004-000001</doc-number>
+<date>20041224</date>
+</priority-claim>
+<priority-claim sequence="02" kind="national">
+<country>JP</country>
+<doc-number>2004-000002</doc-number>
+<date>20041225</date>
+</priority-claim>
+</priority-claims>
+<classification-national>
+<country>US</country>
+<main-classification>123/456</main-classification>
+</classification-national>
+<invention-title id="d0e71">Widget holder</invention-title>
+<references-cited>
+<citation id="cit1">
+<patcit>
+<document-id>
+<country>US</country>
+<doc-number>1234567</doc-number>
+<kind>A</kind>
+<name>Smith</name>
+<date>19900400</date>
+</document-id>
+</patcit>
+<category>cited by examiner</category>
+</citation>
+</references-cited>
+<number-of-claims>2</number-of-claims>
+<parties>
+<applicants>
+<applicant app-type="applicant-inventor">
+<addressbook>
+<last-name>Doe</last-name>
+<first-name>Jane</first-name>
+<address>
+<city>Austin</city>
+<country>US</country>
+</address>
+</addressbook>
+</applicant>
+</applicants>
+</parties>
+</us-bibliographic-data-grant>
+<abstract id="abstract">
+<p id="p-0001" num="0000">A <b>widget</b> holder.</p>
+</abstract>
+<drawings id="DRAWINGS">
+<figure id="Fig-EMI-D00001" num="00001">
+<img id="EMI-D00001" he="100mm" wi="80mm" file="US09999999-D00001.TIF" alt="embedded image" img-content="drawing" img-format="tif"/>
+</figure>
+</drawings>
+<description id="description">
+<heading id="h-0001" level="1">BACKGROUND</heading>
+<p id="p-0002" num="0001">See <figref idref="DRAWINGS">FIG. 1</figref>; H<sub>2</sub>O at 10<sup>3</sup> <i>Pa</i>.</p>
+<p id="p-0003" num="0002">Results:
+<tables id="TABLE-US-00001" num="00001">
+<table frame="none">
+<title>Table 1</title>
+<tgroup cols="2">
+<colspec colname="1" colwidth="50pt"/>
+<colspec colname="2" colwidth="50pt"/>
+<thead><row><entry>Run</entry><entry>Yield</entry></row></thead>
+<tbody><row><entry>1</entry><entry>90%</entry></row></tbody>
+</tgroup>
+</table>
+</tables>
+as shown.</p>
+<p id="p-0004" num="0003">Energy:
+<maths id="MATH-US-00001" num="00001"><math overflow="scroll"><mrow><mi>E</mi><mo>=</mo><msup><mi>m</mi><mn>2</mn></msup></mrow></math></maths>
+</p>
+<p id="p-0005" num="0004">Compound:
+<chemistry id="CHEM-US-00001" num="00001"><img id="EMI-C00001" he="20mm" wi="30mm" file="US09999999-C00001.TIF" alt="embedded image" img-content="chem" img-format="tif"/></chemistry>
+</p>
+<ul id="ul0001" list-style="none">
+<li id="ul0001-0001" num="0000">first item</li>
+</ul>
+</description>
+<us-claim-statement>What is claimed is:</us-claim-statement>
+<claims id="claims">
+<claim id="CLM-00001" num="00001">
+<claim-text>1. A holder comprising:
+<claim-text>a base; and</claim-text>
+<claim-text>a lid.</claim-text>
+</claim-text>
+</claim>
+<claim id="CLM-00002" num="00002">
+<claim-text>2. The holder of <claim-ref idref="CLM-00001">claim 1</claim-ref>, made of steel.</claim-text>
+</claim>
+</claims>
+<us-chemistry idref="CHEM-US-00001" cdx-file="US09999999-C00001.CDX" mol-file="US09999999-C00001.MOL"/>
+</us-patent-grant>

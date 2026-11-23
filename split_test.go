@@ -37,6 +37,36 @@ func TestProfilePartInsideBlock(t *testing.T) {
 	}
 }
 
+// TestProfileTableInsideBlock: a table met inside an open paragraph-like
+// block finishes the block first and is a table block of its own; text
+// after it starts a new block. In a cell it is still read into the cell.
+func TestProfileTableInsideBlock(t *testing.T) {
+	prof := head("tablein", `{"root": "doc"}`) + `"rules": [
+		{"match": "p", "as": "block", "kind": "paragraph"},
+		{"match": "doc", "as": "transparent"},
+		{"match": "wrap", "as": "transparent"},
+		{"match": "img", "as": "image", "id": {"attr": "src"}},
+		{"match": "table", "as": "table", "model": "cals"}]}`
+	src := `<doc><p>before <wrap><table><tgroup cols="1"><tbody><row><entry>c <p>in cell</p></entry></row></tbody></tgroup></table></wrap> after <img src="a.png"/> end</p></doc>`
+	doc := extractWith(t, prof, src, nil)
+	bs := blocks(doc)
+	if len(bs) != 5 || bs[0].Text != "before" || bs[1].Table == nil || bs[2].Text != "after" || bs[2].Continued ||
+		bs[3].Image == nil || bs[3].Image.ID != "a.png" || bs[4].Text != "end" {
+		t.Fatalf("blocks %s", dump(doc))
+	}
+	if got := bs[1].Table.Rows[0][0]; got != "c\nin cell" {
+		t.Errorf("cell %q", got)
+	}
+	if l := bs[1].Loc; !strings.HasPrefix(src[l.Offset:l.Offset+l.Length], "<table>") {
+		t.Errorf("table Loc %q", src[l.Offset:l.Offset+l.Length])
+	}
+	for _, w := range doc.AllWarnings() {
+		if w.Code == WarnUnmappedElements {
+			t.Errorf("unmapped: %s", w.Message)
+		}
+	}
+}
+
 // TestProfileUnmappedPerPart: the unmapped warnings go on the part where
 // the elements were met.
 func TestProfileUnmappedPerPart(t *testing.T) {

@@ -75,7 +75,8 @@ const (
 const (
 	// WarnEntitiesAssumed (info): references to entities the file does
 	// not declare, in a file with an external DTD subset, were read as
-	// the characters the W3C/HTML entity list gives those names.
+	// the characters HTML 4 gives those names (its 252 character
+	// entities; other names stay as written).
 	WarnEntitiesAssumed = "xml.entities_assumed"
 	// WarnEntityUndeclared (warning): references to entities the file
 	// does not declare were kept in the text as written.
@@ -459,7 +460,7 @@ func docWarnings(doc *gofastcore.Document, rep *xmlread.Report, enc xmlenc.Resul
 func partWarnings(part *gofastcore.Part, g interface{ Counts() (int, int) }, out *generic.Out, rep *xmlread.Report, dec *xmlenc.Reader, stats xmlscan.Stats, runErr error, at, size int64) {
 	if rep.Assumed > 0 {
 		part.Warn(gofastcore.SeverityInfo, WarnEntitiesAssumed,
-			fmt.Sprintf("%s to entities the file does not declare read as the characters the W3C entity list gives them; the file's external DTD subset was not loaded",
+			fmt.Sprintf("%s to entities the file does not declare read as the HTML 4 character entities of those names; the file's external DTD subset was not loaded",
 				plural(rep.Assumed, "reference", "references")))
 	}
 	if rep.Undeclared > 0 {

@@ -185,7 +185,7 @@ func TestEntities(t *testing.T) {
 	if msg := warned(doc, gofastcore.WarnInputExternalReference); !strings.Contains(msg, "external entity reference (1)") {
 		t.Errorf("external %q", msg)
 	}
-	// With an external subset, names from the W3C list are assumed.
+	// With an external subset, the HTML 4 names are assumed.
 	doc = extract(t, `<!DOCTYPE doc SYSTEM "doc.dtd"><doc><p>caf&eacute; &mdash; &nosuch;</p></doc>`, nil)
 	if got := lines(doc); got != "paragraph \"caf\u00e9 \u2014 &nosuch;\" (doc/p)\n" {
 		t.Errorf("assumed: %s", got)

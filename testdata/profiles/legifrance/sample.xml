@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ARTICLE>
+<META><META_COMMUN><ID>LEGIARTI000000000001</ID><ANCIEN_ID/><ORIGINE>LEGI</ORIGINE><URL>article/LEGI/ARTI/LEGIARTI000000000001.xml</URL><NATURE>Article</NATURE></META_COMMUN>
+<META_SPEC><META_ARTICLE><NUM>L1-1</NUM><ETAT>VIGUEUR</ETAT><DATE_DEBUT>2026-01-01</DATE_DEBUT><DATE_FIN>2999-01-01</DATE_FIN><TYPE>AUTONOME</TYPE><MCS_ART><MC>exemple</MC></MCS_ART></META_ARTICLE></META_SPEC></META>
+<CONTEXTE><TEXTE cid="LEGITEXT000000000002" nature="CODE"><TITRE_TXT c_titre_court="Code exemple" debut="2026-01-01" fin="2999-01-01" id_txt="LEGITEXT000000000002">Code de l'exemple</TITRE_TXT>
+<TM><TITRE_TM debut="2026-01-01" fin="2999-01-01" id="LEGISCTA000000000003">Partie législative</TITRE_TM><TM><TITRE_TM debut="2026-01-01" fin="2999-01-01" id="LEGISCTA000000000004">Livre Ier</TITRE_TM></TM></TM></TEXTE></CONTEXTE>
+<VERSIONS><VERSION etat="VIGUEUR"><LIEN_ART debut="2026-01-01" etat="VIGUEUR" fin="2999-01-01" id="LEGIARTI000000000001" num="L1-1" origine="LEGI"/></VERSION></VERSIONS>
+<BLOC_TEXTUEL><CONTENU><p>Le présent code s'applique aux <sup>1</sup> exemples.</p><table border="1"><tr><th>Cas</th><th>Taux</th></tr><tr><td colspan="2">aucun</td></tr></table></CONTENU></BLOC_TEXTUEL>
+<NOTA><CONTENU><p>Conformément à la loi.</p></CONTENU></NOTA>
+<LIENS><LIEN cidtexte="JORFTEXT000000000005" datesignatexte="2025-12-31" id="LEGIARTI000000000006" naturetexte="LOI" nortexte="" num="1" numtexte="2025-1" sens="cible" typelien="CREATION">LOI n°2025-1 du 31 décembre 2025 - art. 1</LIEN></LIENS>
+</ARTICLE>

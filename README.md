@@ -91,7 +91,7 @@ For the XML of Service-Public.fr published by DILA (schema Publication 3.5): the
 | `Image`, `Infographie`, `ImageIllustration` | `image` block: id from `@LienPublication`, alt from `TexteDeRemplacement`; `Legende` and `Infographie/Titre` captions; `Credits`, `Description` paragraphs |
 | `Public`, `Langue`, `Cout`, `Calendrier`, `Etapes`, `Documents`, ... (R files) | their blocks carry `Attrs["sp.field"]` = the element name |
 | `ItemArbo`, `ItemMenu`, `DatesModImp/Item` (index files) | a `list_item` at its depth with its `Titre`, anchor `@ID`, `sp.type`, `sp.date_modified`, `sp.file`, `sp.date_important` |
-| `Redirections` with `Redirection`, `RedirectionExterne` | one `table` in file order: a header row `from`, `to`, `toUrl`, `date`, `audience`, `type`, `corpus` (the profile's text: `Origin: inferred`, `Attrs["header_source"]="profile"`), then a row per element from its attributes (`cells`), an absent attribute an empty cell; `Attrs["attribute"]` lists the attributes. Core's `Table` has no location per row: the table's `Loc` covers the root element |
+| `Redirections` with `Redirection`, `RedirectionExterne` | one `table` in file order: a header row `from`, `to`, `toUrl`, `date`, `audience`, `type`, `corpus` (the profile's text, marked `Attrs["header_source"]="profile"`; the table is `Origin: native`, as every row and cell is the file's), then a row per element from its attributes (`cells`), an absent attribute an empty cell; `Attrs["attribute"]` lists the attributes. Core's `Table` has no location per row: the table's `Loc` covers the root element |
 
 On the public corpus (Service-Public, 4,194 dev and 1,362 held-out files), every element has a rule: `xml.unmapped_elements` is empty on both sets. The only unmapped attributes on dev are `Colonne@largeur` and `Colonne@type` (3,558 each, column layout); held-out has 2,728 unmapped attributes in all.
 
@@ -152,7 +152,7 @@ A file that declares no encoding and whose first MiB is not valid UTF-8 is read 
 - **The internal subset** is read for general entity declarations only. Element, attribute-list (default attribute values included) and notation declarations are passed over; parameter entities are never expanded.
 - **Internal entities** are expanded where referenced, their replacement read as markup (an entity may hold elements), in text and in attribute values. Nesting is bounded (`MaxEntityDepth`, 16), and so are the bytes all expansions produce together: `EntityExpansionBase` (1 MiB) plus `EntityExpansionRatio` (8) times the input size, and never more than the decode budget (`Limits.MaxDecodedBytes`, shared with embedding documents) has left. A reference past either bound is kept as written, and so is every expanding reference after the first one refused; the part carries `limit.exceeded`. A billion-laughs file and the quadratic-blowup variant finish in milliseconds. A reference to an entity inside its own replacement is kept as written and counted in `input.repaired`.
 - **The five predefined entities and character references** always work. A character reference to a control character other than tab, line feed and carriage return is removed with `text.control_characters_removed`; one to a surrogate or beyond U+10FFFF is U+FFFD.
-- **Undeclared entities** (`&eacute;` in a DocBook 4 or JATS file whose DTD is not loaded): if the file has an external DTD subset and the name is in the W3C/HTML character entity list (go-fast-html's table), the character is written and the part carries `xml.entities_assumed` (info) with the count. Otherwise the reference stays in the text as written (`&name;`) and the part carries `xml.entity_undeclared` (warning) with the count. A reference to an external entity also stays as written.
+- **Undeclared entities** (`&eacute;` in a DocBook 4 or JATS file whose DTD is not loaded): if the file has an external DTD subset and the name is one of the 252 character entities of HTML 4 (the names that mean the same in every vocabulary), the character is written and the part carries `xml.entities_assumed` (info) with the count. Otherwise the reference stays in the text as written (`&name;`) and the part carries `xml.entity_undeclared` (warning) with the count. A reference to an external entity also stays as written.
 
 ## Damaged input
 
@@ -171,7 +171,7 @@ Processing instructions other than the XML declaration and `xml-stylesheet` are 
 | `input.repaired` | warning | document | damaged markup read leniently, with the count |
 | `input.external_reference` | warning | document | one per kind of reference a conforming processor would load, with the count; nothing was loaded |
 | `input.unread_content` | warning | document | processing instructions, with the count |
-| `xml.entities_assumed` | info | part | undeclared entities read from the W3C/HTML list, with the count |
+| `xml.entities_assumed` | info | part | undeclared entities read as the HTML 4 character entities of those names, with the count |
 | `xml.entity_undeclared` | warning | part | undeclared entities kept as written, with the count |
 | `part.no_text` | warning | part | the document has no block |
 | `part.failed` | error | part | reading stopped on an I/O error; what was read is kept |

@@ -107,7 +107,7 @@ type Report struct {
 	// and xml-stylesheet.
 	PIs int
 	// Assumed counts references to undeclared entities read as the
-	// character the W3C/HTML entity list gives, in a file with an
+	// character HTML 4 gives that name, in a file with an
 	// external DTD subset; Undeclared those kept as written.
 	Assumed, Undeclared int
 	// Repairs counts places where damaged markup was read leniently.
@@ -201,7 +201,7 @@ func (r *Reader) resolve(name []byte) ([]byte, xmlscan.Resolution) {
 				r.Report.Assumed++
 				return v, xmlscan.Insert
 			}
-			if v, ok := entity.Lookup(string(name) + ";"); ok {
+			if v, ok := entity.Classic(string(name)); ok {
 				if r.ents == nil {
 					r.ents = map[string][]byte{}
 				}

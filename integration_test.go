@@ -1,0 +1,234 @@
+package gofastxml
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/AOShei/go-fast-core"
+)
+
+// Tests of the phase 3 integration: what the three profile branches'
+// engine changes do together.
+
+// TestProfileLabelBeforeTableInBlock: a label that is the first thing in
+// a paragraph after a table split it, followed by another table, is not
+// lost: it is a block of its own before the table, in file order.
+func TestProfileLabelBeforeTableInBlock(t *testing.T) {
+	prof := head("tablelabel", `{"root": "doc"}`) + `"rules": [
+		{"match": "doc", "as": "transparent"},
+		{"match": "p", "as": "block", "kind": "paragraph"},
+		{"match": "mod", "as": "inline"},
+		{"match": "tblock", "as": "section"},
+		{"match": "num", "as": "label"},
+		{"match": "table", "as": "table"},
+		{"match": "tr", "as": "row"},
+		{"match": "td", "as": "cell"}]}`
+	src := `<doc><p>for Table 1 <mod><tblock><num>TABLE 1</num><table><tr><td>a</td></tr></table></tblock>` +
+		`<tblock><num>TABLE 1A</num><table><tr><td>b</td></tr></table></tblock></mod></p></doc>`
+	doc := extractWith(t, prof, src, nil)
+	wantBrief(t, doc, "paragraph:for Table 1 TABLE 1\ntable:\nparagraph:TABLE 1A\ntable:\n")
+}
+
+// TestProfileSplit: a rule with "split" met inside an open paragraph ends
+// it there and is read on its own; text after it is a new block. A
+// nested block without it is still a line of the paragraph; in a cell a
+// split element is read into the cell.
+func TestProfileSplit(t *testing.T) {
+	prof := head("split", `{"root": "doc"}`) + `"rules": [
+		{"match": "doc", "as": "transparent"},
+		{"match": "p", "as": "block", "kind": "paragraph"},
+		{"match": "fig", "as": "transparent", "split": true},
+		{"match": "fig/label", "as": "label"},
+		{"match": "caption", "as": "block", "kind": "caption"},
+		{"match": "fn", "as": "block", "kind": "footnote", "split": true},
+		{"match": "q", "as": "block", "kind": "quote"},
+		{"match": "table", "as": "table"},
+		{"match": "tr", "as": "row"},
+		{"match": "td", "as": "cell"}]}`
+	src := `<doc><p>See <fig><label>Fig. 1</label><caption>A cat</caption></fig> and<fn>Note</fn> more<q>joined</q></p>` +
+		`<table><tr><td>a<fn>in cell</fn></td></tr></table></doc>`
+	doc := extractWith(t, prof, src, nil)
+	wantBrief(t, doc, "paragraph:See\ncaption(Fig. 1):A cat\nparagraph:and\nfootnote:Note\nparagraph:more\njoined\ntable:\n")
+	if got := blocks(doc)[5].Table.Rows[0][0]; got != "a\nin cell" {
+		t.Errorf("cell %q", got)
+	}
+	if _, err := LoadProfile(strings.NewReader(head("bad", `{"root": "doc"}`) + `"rules": [{"match": "a", "as": "block", "kind": "footnote", "split": true, "out_of_line": true}]}`)); err == nil {
+		t.Error("split with out_of_line loaded")
+	}
+	if _, err := LoadProfile(strings.NewReader(head("bad", `{"root": "doc"}`) + `"rules": [{"match": "a", "as": "inline", "split": true}]}`)); err == nil {
+		t.Error("split on an inline loaded")
+	}
+}
+
+// TestProfileBreak: a "break" rule writes a line break inside a block as
+// core's hard break "\n", as go-fast-html does for <br>: white space
+// around it dropped, two breaks two "\n", none at a block's ends; in a
+// cell too; in a metadata value or a label a space; between blocks
+// nothing.
+func TestProfileBreak(t *testing.T) {
+	prof := head("brk", `{"root": "doc"}`) + `"rules": [
+		{"match": "doc", "as": "transparent"},
+		{"match": "title", "as": "metadata", "field": "title"},
+		{"match": "p", "as": "block", "kind": "paragraph"},
+		{"match": "num", "as": "label"},
+		{"match": "br", "as": "break"},
+		{"match": "table", "as": "table"},
+		{"match": "tr", "as": "row"},
+		{"match": "td", "as": "cell"}]}`
+	src := `<doc><title>Two<br/>lines</title><br/><p><br/>EDI<br/>über <br/> x<br/><br/>y<br/></p>` +
+		`<p><num>1<br/>a</num>text</p><table><tr><td>c<br/>d</td></tr></table></doc>`
+	doc := extractWith(t, prof, src, nil)
+	wantBrief(t, doc, "paragraph:EDI\nüber\nx\n\ny\nparagraph(1 a):text\ntable:\n")
+	if doc.Metadata.Title != "Two lines" {
+		t.Errorf("title %q", doc.Metadata.Title)
+	}
+	if got := blocks(doc)[2].Table.Rows[0][0]; got != "c\nd" {
+		t.Errorf("cell %q", got)
+	}
+	if _, err := LoadProfile(strings.NewReader(head("bad", `{"root": "doc"}`) + `"rules": [{"match": "br", "as": "break", "style": "bold"}]}`)); err == nil {
+		t.Error("a break with a style loaded")
+	}
+}
+
+// TestProfileNothingDropped: (a) the attribute of a child as a value
+// source, and the attributes of unmapped elements inside a metadata
+// value kept as notes; (b) a label is not lost before an auto-numbered
+// item, a block with no other text, or a table; (c) titles after the
+// first in Extra.
+func TestProfileNothingDropped(t *testing.T) {
+	prof := head("nodrop", `{"root": "doc"}`) + `"rules": [
+		{"match": "doc", "as": "transparent"},
+		{"match": "title", "as": "metadata", "field": "title"},
+		{"match": "subject", "as": "metadata", "field": "subject"},
+		{"match": "target", "as": "metadata", "field": "extra", "key": "x.target",
+			"extra": {"x.gender": {"attr": "code", "child": "patient/gender"}, "x.root": {"attr": "root", "child": "tid"}}},
+		{"match": "tid", "as": "transparent"},
+		{"match": "sec", "as": "section", "attrs": {"x.code": {"attr": "code", "child": "code"}}},
+		{"match": "sec/code", "as": "transparent"},
+		{"match": "h", "as": "heading", "level": 1},
+		{"match": "p", "as": "block", "kind": "paragraph"},
+		{"match": "num", "as": "label"},
+		{"match": "ol", "as": "list", "ordered": true},
+		{"match": "li", "as": "item"},
+		{"match": "table", "as": "table"},
+		{"match": "tr", "as": "row"},
+		{"match": "td", "as": "cell"}]}`
+	src := `<doc><title>One</title><title>Two</title><subject>S1</subject><subject>S2</subject>` +
+		`<target><tid root="1.2.3"/><patient><name>Ann</name><gender code="F" system="x"/><birth value="1950"/></patient></target>` +
+		`<sec><code code="11348-0"/><h>Hist</h>` +
+		`<num>(a)</num><ol><li>item</li></ol>` +
+		`<p><num>2</num></p>` +
+		`<num>Table 1</num><table><tr><td>c</td></tr></table></sec></doc>`
+	doc := extractWith(t, prof, src, nil)
+	wantBrief(t, doc, "note~:x\nnote~:1950\nheading1:Hist\nlist_item1((a)):item\nparagraph:2\nparagraph:Table 1\ntable:\n")
+	x := doc.Metadata.Extra
+	if doc.Metadata.Title != "One" || x["title"] != "Two" || doc.Metadata.Subject != "S1" || x["subject"] != "S2" {
+		t.Errorf("title %q subject %q extra %v", doc.Metadata.Title, doc.Metadata.Subject, x)
+	}
+	if x["x.target"] != "Ann" || x["x.gender"] != "F" || x["x.root"] != "1.2.3" {
+		t.Errorf("extra %v", x)
+	}
+	if bs := blocks(doc); bs[2].Attrs["x.code"] != "11348-0" {
+		t.Errorf("section attrs %v", bs[2].Attrs)
+	}
+	for _, w := range doc.AllWarnings() {
+		if w.Code == WarnUnmappedAttributes && strings.Contains(w.Message, "gender@code") {
+			t.Errorf("read attribute counted unread: %s", w.Message)
+		}
+	}
+}
+
+// TestXIncludeReported: an xi:include element raises core's
+// input.external_reference in generic reading and in profile reading
+// (with and without a rule for it), as phase 1 reports external DTDs and
+// stylesheets; nothing is fetched and the href is kept as text.
+func TestXIncludeReported(t *testing.T) {
+	const xi = `xmlns:xi="http://www.w3.org/2001/XInclude"`
+	src := `<doc ` + xi + `><p>t</p><xi:include href="chapter2.xml" parse="xml"/></doc>`
+	withRule := head("xin", `{"root": "doc"}`) + `"namespaces": {"xi": "http://www.w3.org/2001/XInclude"}, "rules": [
+		{"match": "doc", "as": "transparent"},
+		{"match": "p", "as": "block", "kind": "paragraph"},
+		{"match": "xi:include", "as": "block", "kind": "paragraph", "value": {"attr": "href"}, "attrs": {"x.parse": {"attr": "parse"}}}]}`
+	noRule := head("xin2", `{"root": "doc"}`) + `"rules": [
+		{"match": "doc", "as": "transparent"},
+		{"match": "p", "as": "block", "kind": "paragraph"}]}`
+	docs := map[string]*gofastcore.Document{
+		"generic":   extract(t, src, nil),
+		"rule":      extractWith(t, withRule, src, nil),
+		"no rule":   extractWith(t, noRule, src, nil),
+		"in a cell": extractWith(t, noRule, `<doc `+xi+`><p>t <xi:include href="chapter2.xml"/></p></doc>`, nil),
+	}
+	for name, doc := range docs {
+		n := 0
+		for _, w := range doc.AllWarnings() {
+			if w.Code == gofastcore.WarnInputExternalReference && strings.Contains(w.Message, "XInclude element (1)") {
+				n++
+				if w.Severity != gofastcore.SeverityWarning {
+					t.Errorf("%s: severity %v", name, w.Severity)
+				}
+			}
+		}
+		if n != 1 {
+			t.Errorf("%s: %d XInclude warnings: %v", name, n, doc.AllWarnings())
+		}
+		found := false
+		for _, b := range blocks(doc) {
+			found = found || b.Text == "chapter2.xml"
+		}
+		if !found {
+			t.Errorf("%s: href not kept:\n%s", name, dump(doc))
+		}
+	}
+}
+
+// TestProfileItemValue: "value" on an item is its text when its element
+// gives none, carrying Attrs["attribute"]; the item has no Marker.
+func TestProfileItemValue(t *testing.T) {
+	prof := head("itemval", `{"root": "map"}`) + `"rules": [
+		{"match": "map", "as": "list"},
+		{"match": "topicref", "as": "item", "value": {"attr": "href"}},
+		{"match": "navtitle", "as": "block", "kind": "paragraph"}]}`
+	src := `<map><topicref href="a.dita"><topicref href="b.dita"/></topicref><topicref href="c.dita"><navtitle>C</navtitle></topicref></map>`
+	doc := extractWith(t, prof, src, nil)
+	wantBrief(t, doc, "list_item1:a.dita\nlist_item2:b.dita\nlist_item1:C\n")
+	if bs := blocks(doc); bs[0].Attrs[AttrAttribute] != "href" || bs[2].Attrs[AttrAttribute] != "" {
+		t.Errorf("attrs %v %v", bs[0].Attrs, bs[2].Attrs)
+	}
+}
+
+// TestProfileHeaderCells: a leading row whose cells all match a header
+// cell rule is a header row; one after a body row is not.
+func TestProfileHeaderCells(t *testing.T) {
+	prof := head("thead", `{"root": "doc"}`) + `"rules": [
+		{"match": "doc", "as": "transparent"},
+		{"match": "table", "as": "table"},
+		{"match": "tr", "as": "row"},
+		{"match": "td", "as": "cell"},
+		{"match": "th", "as": "cell", "header": true}]}`
+	for src, want := range map[string]int{
+		`<doc><table><tr><th>a</th><th>b</th></tr><tr><th>c</th><th>d</th></tr><tr><td>1</td><td>2</td></tr><tr><th>x</th><th>y</th></tr></table></doc>`: 2,
+		`<doc><table><tr><th>a</th><td>b</td></tr><tr><td>1</td><td>2</td></tr></table></doc>`:                                                           0,
+	} {
+		doc := extractWith(t, prof, src, nil)
+		if got := blocks(doc)[0].Table.HeaderRows; got != want {
+			t.Errorf("%s: header rows %d, want %d", src, got, want)
+		}
+	}
+}
+
+// TestProfileNoteInTableInBlock: an out_of_line note inside a table that
+// split a paragraph is in file order: the table's caption, the note, the
+// table, then the paragraph's text after the table.
+func TestProfileNoteInTableInBlock(t *testing.T) {
+	prof := head("tablenote", `{"root": "doc"}`) + `"rules": [
+		{"match": "doc", "as": "transparent"},
+		{"match": "P", "as": "block", "kind": "paragraph"},
+		{"match": "TBL", "as": "table"},
+		{"match": "TBL/TITLE", "as": "block", "kind": "caption"},
+		{"match": "NOTE", "as": "block", "kind": "footnote", "out_of_line": true},
+		{"match": "ROW", "as": "row"},
+		{"match": "CELL", "as": "cell"}]}`
+	src := `<doc><P>See:<TBL><TITLE>Table 2</TITLE><NOTE>A note</NOTE><ROW><CELL>c</CELL></ROW></TBL>after end</P></doc>`
+	doc := extractWith(t, prof, src, nil)
+	wantBrief(t, doc, "paragraph:See:\ncaption:Table 2\nfootnote:A note\ntable:\nparagraph:after end\n")
+}

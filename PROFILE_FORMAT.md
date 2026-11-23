@@ -93,7 +93,8 @@ in no namespace. The prefix `xml` is predefined.
 | `list`, `item` | A list and its items; depth from nesting | `ordered`: `true`, `false` or an attribute test `{"attr": "type", "in": ["numero"]}`; on `item`: `marker` |
 | `table` | A table | `model`: `rows` (default) or `cals`; `header` **(added)** |
 | `row`, `cell` | In the `rows` model | `row`: `header` (`true` or an attribute test), `cells` **(added)**; `cell`: `header`, `colspan`, `rowspan` (attribute names) |
-| `inline` | Text that stays inside its block | `style`: `bold`, `italic`, `superscript`, `subscript`, `code`; `link`: a value source for the address; `title` and `attrs` **(added)** |
+| `inline` | Text that stays inside its block | `style`: `bold`, `italic`, `superscript`, `subscript`, `code`; `link`: a value source for the address; `title` and `attrs` **(added)**; `space` **(added)** |
+| `break` **(added)** | A line break written as an element (`br`, `lb`, `eol`): a `\n` in the block it stands in | |
 | `label` | Its text becomes the `Marker` of the block it belongs to (the parent block, or the next block in the same container) | |
 | `image` | An image block | `id` (value source for the address or identifier), `alt` (value source) |
 | `note` | A `note` block | `type`: one of core's note types; `value` **(added)** |
@@ -137,6 +138,7 @@ Where a rule takes a value:
 | `{"attr": "name"}` | The attribute of this element |
 | `{"attr": "name", "of": "Ancestor"}` | The attribute of the nearest ancestor of that name |
 | `{"child": "selector"}` | The text of the first matching child, which is then not emitted again. The selector is relative: `Theme/Titre` is a `Titre` in a `Theme` child |
+| `{"attr": "name", "child": "selector"}` **(added)** | The attribute of the first matching child (`templateId@root`, `patient/administrativeGenderCode@code`). The child is still read by its own rule (or generically); the attribute is then not counted as unread nor made a note |
 | `{"structure": "selector"}` | A matching child written as an outline of its element names and attributes, e.g. `ou(estVrai(var=T1), estIndefini(var=T2))`, for machine-readable subtrees with no text; the child is then not emitted again |
 
 A value read from a child is known when the child ends; the engine gives
@@ -167,6 +169,25 @@ element so far) as well as those to come.
   the block's element, starts a new block (not `Continued`: it is in
   another part) whose `Loc` begins at that text. Inside a cell or a value
   read for a rule, a part is read into it as before.
+- A `table` or `image` met inside an open paragraph-like `block` (a
+  patent's `p/tables/table`, `p/chemistry/img`), or the element of a
+  rule with `"split": true` (JATS `p/fig`, DocBook `para/footnote`, TEI
+  `p/note`), finishes that block the same way and is read on its own, in
+  reading order; text after it starts a new block. Inside a cell, an
+  item, a heading or a value read for a rule it is read into it as
+  before. A label waiting as the marker of a block that has no text when
+  it is finished this way is that block's text.
+- So a block met inside a paragraph is read one of three ways, chosen by
+  its rule: by default it is a line of the paragraph; with `split` it
+  ends the paragraph there (content stays in file order); with
+  `out_of_line` (notes only: a footnote written inside its sentence) it
+  is a block made just before the paragraph, which goes on unbroken.
+- An `xi:include` (XInclude 2001 or its 2003 draft) is never followed:
+  with or without a rule it raises core's `input.external_reference`
+  (warning, once per document with the count), as in generic reading
+  and as external DTDs and stylesheets are reported. Its `href` stays as
+  text: the block of its rule (DocBook reads it as a paragraph whose
+  text is the `href`), or an attribute note when it has no rule.
 - Inline styles and links become `Spans` when `Options.Spans` is set (in a
   block split into `Continued` pieces, each span is on the piece that
   holds it, and a span across the cut is in both, with each piece's
@@ -218,4 +239,14 @@ for; none changes what an existing key means.
 | `join` | `metadata` | The separator of repeated values of one `Extra` key (` > ` for the breadcrumb, C1); default a line break |
 | `value` | `block`, `note` | A block whose text is an attribute (`RessourceWeb@URL`, C4); it carries `Attrs["attribute"]` |
 | `cells` | `row` | A row whose data is in its element's attributes (`Redirection@from`, `@to`, ...): `"cells": [{"attr": "from"}, {"attr": "to"}]`, one cell per entry in order, 1 to 64 entries. Each entry is `{"attr": "name"}` of the row's own element (no literal, `of`, `child` or `structure`: a cell holds only what the element holds). An absent attribute gives an empty cell. The table carries the names, space-separated in order of first use, in `Attrs["attribute"]` |
-| `header` | `table` | A header row of fixed text: `"header": ["from", "to"]` (1 to 64 strings of at most 256 bytes). It is the profile's text, not the file's, so the table is `Origin: inferred` and carries `Attrs["header_source"]="profile"` (core prescribes nothing for text a file does not hold; this is the library's choice). It is the table's first row and counts in `HeaderRows`. On a `row` or `cell`, `header` keeps its meaning (a test) |
+| `space` | `inline` | Phase 3 (JATS, DocBook, TEI): `"space": true` sets the element's text off by white space: a space is held before and after it (collapsed with white space the source has, dropped at a block's ends), also in metadata values and values read from a child. For fields the schema writes with no white space between them (`<surname>Krusche</surname><given-names>Adele</given-names>` gives `Krusche Adele`, not `KruscheAdele`). It adds no words; the text stays the file's |
+| `header` | `table` | A header row of fixed text: `"header": ["from", "to"]` (1 to 64 strings of at most 256 bytes). It is the profile's text, not the file's, so the table carries `Attrs["header_source"]="profile"` (core prescribes nothing for text a file does not hold; this is the library's choice). The table stays `Origin: native`: core's `inferred` is structure deduced by guessing, and here every row and cell is declared by the file. It is the table's first row and counts in `HeaderRows`. On a `row` or `cell`, `header` keeps its meaning (a test) |
+| `namespace_aliases` | profile | Phase 3 (Akoma Ntoso): one schema published under several namespaces (AKN 3.0, its draft `3.0/CSD03`, `akomantoso.org/2.0`). `"namespace_aliases": {"http://www.akomantoso.org/2.0": "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"}`: an element in an alias namespace is matched by the rules as if it were in the target namespace. Attributes are not affected; the target may not itself be an alias; at most 64. The `match` entries still name each namespace the profile is chosen for |
+| `out_of_line` | `block`, `note` | Phase 3 (Akoma Ntoso `authorialNote`, Formex `NOTE`, CLML `Footnote`): a note written inside the sentence it annotates. `"out_of_line": true`: met inside an open paragraph, heading or item, the element is a block of its own instead of a line of that block, made where it ends, so it comes just before the block it stands in (made at its end); that block goes on after it with the rest of its text and keeps a waiting `label`. Its `Loc` covers its element, inside the span of the block it stands in, whose text is the span's minus the note. In a cell, or a value read for a rule, it stays inline as before |
+| `split` | `block`, `note`, `list`, `transparent` | Phase 3 integration (JATS `fig`, `table-wrap`, `fn`; DocBook `footnote`, `programlisting`, admonitions; TEI `note`, `figure`): `"split": true`: met inside an open paragraph-like block, the element ends that block there, as a table or image does, and is read by its rule as if it stood outside; text after it, still in the paragraph's element, starts a new block (not `Continued`, with the paragraph's anchor). In a cell, an item, a heading or a value read for a rule it is read into it as before. A rule has `split` or `out_of_line`, not both |
+| `"as": "break"` | rule kind | Phase 3 integration (Légifrance, AKN `br`/`eol`/`eop`, TEI `lb`, CDA and patent `br`, JATS `break`, DocBook `sbr`): an element that is a line break. Inside a block, a heading, an item or a cell it writes core's hard break, a `\n`, as go-fast-html does for `<br>`: white space on either side of it is dropped, two breaks give `\n\n`, and none is written at the start or end of a block. In a value read for a rule, a label or a metadata field it is a space; between blocks it writes nothing. The rule takes no keys; its element's attributes are counted as unread |
+| `{"attr", "child"}` | value source | Phase 3 integration (CDA participants, patent `patcit@num`): a coded value in an attribute of a child of an element read for its text, which was dropped. See section 4 |
+| (nothing dropped) | engine | Phase 3 integration. A waiting label that cannot be the marker of the next block (the block has one, or is a table or image) is a paragraph of its own before it; an ordered list's number gives way to the file's label; a block whose only text is its label (`<p><num>2</num></p>`) has the label as its text. The attributes of elements with no rule, and comments, inside a metadata value, a label or a stored element are notes where it stands. A metadata field that holds one value (`title`, `subject`, `language`, `created`, `modified`) takes the first; the others go to `Extra` under the field's name (`title` only when the rule has no `also_heading`: then they are headings) |
+| `value` | `item` | Phase 3 integration (DITA `topicref@href`): the item's text when its element gives none of its own (an empty `topicref`, or one whose children are only other items); it then carries `Attrs["attribute"]`. It is not the `Marker` (a marker is the item's number or bullet) |
+| (header cells) | `cell` with `header` | Phase 3 integration (AKN and HTML-like `th`): a row with no `header` of its own whose cells all match a cell rule whose `header` test is true counts in `HeaderRows` when it is among the leading rows (no body row before it) |
+| (label inside a block) | `label` | Phase 3 (AKN `num` in a `quotedStructure` inside a paragraph, `num` in a table cell): a label met inside a paragraph or item that already has text, a marker or a waiting label, or inside a cell, is read as text of that block, after a space. It was the block's marker only if it had none, and was dropped otherwise. A label as the first thing in a block is its marker as before. An `out_of_line` note inside a label is a block of its own as inside a paragraph |

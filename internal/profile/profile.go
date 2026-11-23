@@ -50,13 +50,14 @@ const (
 	AsStored
 	AsTransparent
 	AsSkip
+	AsBreak
 )
 
 var asNames = map[string]As{
 	"section": AsSection, "heading": AsHeading, "block": AsBlock, "list": AsList, "item": AsItem,
 	"table": AsTable, "row": AsRow, "cell": AsCell, "inline": AsInline, "label": AsLabel,
 	"image": AsImage, "note": AsNote, "metadata": AsMetadata, "part": AsPart, "stored": AsStored,
-	"transparent": AsTransparent, "skip": AsSkip,
+	"transparent": AsTransparent, "skip": AsSkip, "break": AsBreak,
 }
 
 func (a As) String() string {
@@ -74,21 +75,22 @@ var (
 	allowed = map[As][]string{
 		AsSection:     common,
 		AsHeading:     append(slices.Clone(common), "level", "marker", "duplicate_of", "key"),
-		AsBlock:       append(slices.Clone(common), "kind", "language", "notation", "marker", "value", "duplicate_of", "key"),
-		AsList:        append(slices.Clone(common), "ordered"),
-		AsItem:        append(slices.Clone(common), "marker"),
+		AsBlock:       append(slices.Clone(common), "kind", "language", "notation", "marker", "value", "duplicate_of", "key", "out_of_line", "split"),
+		AsList:        append(slices.Clone(common), "ordered", "split"),
+		AsItem:        append(slices.Clone(common), "marker", "value"),
 		AsTable:       append(slices.Clone(common), "model", "header"),
 		AsRow:         append(slices.Clone(common), "header", "cells"),
 		AsCell:        append(slices.Clone(common), "header", "colspan", "rowspan"),
-		AsInline:      {"match", "as", "style", "link", "title", "attrs", "extra"},
+		AsInline:      {"match", "as", "style", "link", "title", "attrs", "extra", "space"},
 		AsLabel:       {"match", "as"},
 		AsImage:       append(slices.Clone(common), "id", "alt"),
-		AsNote:        append(slices.Clone(common), "type", "value"),
+		AsNote:        append(slices.Clone(common), "type", "value", "out_of_line", "split"),
 		AsMetadata:    {"match", "as", "field", "key", "value", "also_heading", "join", "extra"},
 		AsPart:        append(slices.Clone(common), "kind", "name"),
 		AsStored:      {"match", "as", "kind", "extra"},
-		AsTransparent: common,
+		AsTransparent: append(slices.Clone(common), "split"),
 		AsSkip:        {"match", "as"},
+		AsBreak:       {"match", "as"},
 	}
 	allKeys = map[string]bool{}
 )
@@ -109,6 +111,9 @@ type Value struct {
 	Of        *QName // {"attr": ..., "of": ...}
 	Child     *Selector
 	Structure *Selector
+	// AttrChild: {"attr": ..., "child": ...}, the attribute Attr of the
+	// first matching child, which is still read by its own rule.
+	AttrChild *Selector
 }
 
 // Claims reports whether the value is read from a child element.
@@ -165,6 +170,15 @@ type Rule struct {
 	Join        string
 	AlsoHeading int
 	DuplicateOf string
+	OutOfLine   bool // a block or note met inside an open block is a block of its own
+	// Split: met inside an open paragraph-like block, the element ends
+	// that block, is read on its own, and text after it starts a new
+	// block ("split"), as a table or image does.
+	Split bool
+	// Space: the element's text is set off by white space ("space",
+	// inline): a space is held before and after it, where the source has
+	// none, as between the fields of a name or a citation.
+	Space bool
 
 	Level   Level
 	Ordered *Test
@@ -210,6 +224,22 @@ type Profile struct {
 	kept     []QName
 	tested   []QName
 	ofReads  map[QName][]QName
+	aliases  map[string]string
+	// childAttrs: some value reads an attribute of a child.
+	childAttrs bool
+}
+
+// ReadsChildAttrs reports whether a rule reads an attribute of a child
+// element ({"attr": ..., "child": ...}).
+func (p *Profile) ReadsChildAttrs() bool { return p.childAttrs }
+
+// ElementNamespace returns the namespace an element of namespace uri is
+// matched in: the target of "namespace_aliases", or uri itself.
+func (p *Profile) ElementNamespace(uri string) string {
+	if t, ok := p.aliases[uri]; ok {
+		return t
+	}
+	return uri
 }
 
 // MaxSteps returns the most steps of any selector.
@@ -299,6 +329,7 @@ type fileJSON struct {
 	Format           int               `json:"format"`
 	Namespaces       map[string]string `json:"namespaces"`
 	DefaultNamespace string            `json:"default_namespace"`
+	NamespaceAliases map[string]string `json:"namespace_aliases"`
 	Match            []matchJSON       `json:"match"`
 	HeadingBase      int               `json:"heading_base"`
 	Rules            []json.RawMessage `json:"rules"`
@@ -349,6 +380,21 @@ func Load(r io.Reader, builtin bool) (*Profile, error) {
 	}
 	p := &Profile{Name: f.Profile, Title: f.Title, HeadingBase: f.HeadingBase,
 		byName: map[QName][]*Rule{}, ofReads: map[QName][]QName{}}
+	if len(f.NamespaceAliases) > 64 {
+		return nil, &Error{Msg: "more than 64 \"namespace_aliases\""}
+	}
+	for from, to := range f.NamespaceAliases {
+		if from == "" || from == to || from == "http://www.w3.org/XML/1998/namespace" {
+			return nil, &Error{Msg: fmt.Sprintf("namespace alias %q -> %q cannot be declared", from, to)}
+		}
+		if _, chained := f.NamespaceAliases[to]; chained {
+			return nil, &Error{Msg: fmt.Sprintf("namespace alias %q -> %q: the target is itself an alias", from, to)}
+		}
+		if p.aliases == nil {
+			p.aliases = map[string]string{}
+		}
+		p.aliases[from] = to
+	}
 	if p.HeadingBase == 0 {
 		p.HeadingBase = 1
 	}
@@ -403,7 +449,11 @@ func Load(r io.Reader, builtin bool) (*Profile, error) {
 				kept[v.Attr] = true
 				p.ofReads[*v.Of] = appendNew(p.ofReads[*v.Of], v.Attr)
 			}
-			if s := v.Claims(); s != nil {
+			s := v.Claims()
+			if s == nil && v.AttrChild != nil {
+				s, p.childAttrs = v.AttrChild, true
+			}
+			if s != nil {
 				p.maxSteps = max(p.maxSteps, len(s.Steps)+1)
 				for _, st := range s.Steps[:len(s.Steps)-1] {
 					for _, t := range st.Tests {
@@ -590,6 +640,11 @@ func compileRule(raw json.RawMessage, i int, f *fileJSON, builtin bool) (*Rule, 
 	if r.Join, err = str("join"); err != nil {
 		return nil, err
 	}
+	if v, ok := m["space"]; ok {
+		if err := json.Unmarshal(v, &r.Space); err != nil {
+			return nil, fmt.Errorf("%s: \"space\" must be true or false", where)
+		}
+	}
 	if r.As == AsMetadata {
 		if !slices.Contains(fields, r.Field) {
 			return nil, fmt.Errorf("%s: \"field\" %q is not one of %s", where, r.Field, strings.Join(fields, ", "))
@@ -609,6 +664,19 @@ func compileRule(raw json.RawMessage, i int, f *fileJSON, builtin bool) (*Rule, 
 	}
 	if r.Key != "" && !validKey(r.Key) {
 		return nil, fmt.Errorf("%s: \"key\" %q is empty, too long or has white space", where, r.Key)
+	}
+	if v, ok := m["out_of_line"]; ok {
+		if err := json.Unmarshal(v, &r.OutOfLine); err != nil {
+			return nil, fmt.Errorf("%s: \"out_of_line\" must be true or false", where)
+		}
+	}
+	if v, ok := m["split"]; ok {
+		if err := json.Unmarshal(v, &r.Split); err != nil {
+			return nil, fmt.Errorf("%s: \"split\" must be true or false", where)
+		}
+		if r.Split && r.OutOfLine {
+			return nil, fmt.Errorf("%s: \"split\" and \"out_of_line\" are two ways to read one element; a rule has one", where)
+		}
 	}
 	if v, ok := m["also_heading"]; ok {
 		if err := json.Unmarshal(v, &r.AlsoHeading); err != nil || r.AlsoHeading < 1 || r.AlsoHeading > 6 {
@@ -652,7 +720,7 @@ func compileRule(raw json.RawMessage, i int, f *fileJSON, builtin bool) (*Rule, 
 			if err != nil {
 				return nil, err
 			}
-			if cv.IsLiteral || cv.Of != nil || cv.Claims() != nil {
+			if cv.IsLiteral || cv.Of != nil || cv.Claims() != nil || cv.AttrChild != nil {
 				return nil, fmt.Errorf("%s: a cell of \"cells\" is an attribute of the row's element, {\"attr\": \"name\"}", where)
 			}
 			r.Cells = append(r.Cells, cv)
@@ -739,7 +807,7 @@ func (r *Rule) reads() {
 		add(t.Name)
 	}
 	for _, v := range r.values() {
-		if v.Attr.Local != "" && v.Of == nil {
+		if v.Attr.Local != "" && v.Of == nil && v.AttrChild == nil {
 			add(v.Attr)
 		}
 		if v.Claims() != nil {
@@ -844,11 +912,21 @@ func (c *compiler) value(key string, v json.RawMessage) (*Value, error) {
 			n++
 		}
 	}
-	if n != 1 || o.Of != "" && o.Attr == "" {
-		return nil, fmt.Errorf("%s: %q needs exactly one of \"attr\" (with \"of\" optionally), \"child\", \"structure\"", c.where, key)
-	}
 	val := &Value{}
 	var err error
+	if o.Attr != "" && o.Child != "" && o.Of == "" && o.Structure == "" {
+		// The attribute of a child.
+		if val.Attr, err = ResolveName(o.Attr, c.f.Namespaces, ""); err != nil {
+			return nil, fmt.Errorf("%s: %q: %v", c.where, key, err)
+		}
+		if val.AttrChild, err = c.relative(key, o.Child); err != nil {
+			return nil, err
+		}
+		return val, nil
+	}
+	if n != 1 || o.Of != "" && o.Attr == "" {
+		return nil, fmt.Errorf("%s: %q needs exactly one of \"attr\" (with \"of\" or \"child\" optionally), \"child\", \"structure\"", c.where, key)
+	}
 	switch {
 	case o.Attr != "":
 		if val.Attr, err = ResolveName(o.Attr, c.f.Namespaces, ""); err != nil {

@@ -157,9 +157,16 @@ type frame struct {
 	kept    []xmlread.Attr
 	sink    *sink
 	prevCur *sink
-	// suspended: a part met inside an open block; prevCur is that block's
-	// sink, resumed when the part ends.
+	// suspended: a part, table, image or "split" element met inside an
+	// open block, which it ended; resume is that block's sink, resumed
+	// when the element ends.
 	suspended bool
+	// outOfLine: an out_of_line rule's element read beside an open block,
+	// whose waiting label it does not take; resume is that block's sink.
+	outOfLine bool
+	resume    *sink
+	// labelFresh: a label read inline at the start of a line.
+	labelFresh bool
 
 	sections int
 	quotes   int
@@ -199,6 +206,9 @@ type frame struct {
 	href      string
 	title     string
 	valAttr   string
+	// spaced: the sink of an inline "space" rule, given a space when the
+	// element ends.
+	spaced *sink
 
 	val    string
 	hasVal bool
@@ -243,6 +253,10 @@ type Engine struct {
 	marks   []mark
 	anchors []anchorAt
 	label   *labelAt
+	// readAttrs: the attributes of the element being started that a
+	// rule of an open element read ({"attr": ..., "child": ...}).
+	readAttrs     []profile.QName
+	hasChildAttrs bool
 
 	cache  map[string]*profile.Rule
 	keybuf []byte
@@ -266,7 +280,7 @@ type Engine struct {
 // part.
 func New(p *profile.Profile, out *generic.Out, opts Options) *Engine {
 	e := &Engine{p: p, out: out, opts: opts, parts: []*gofastcore.Part{out.Part},
-		cache: map[string]*profile.Rule{}}
+		cache: map[string]*profile.Rule{}, hasChildAttrs: p.ReadsChildAttrs()}
 	e.resetCounts()
 	return e
 }
@@ -389,7 +403,7 @@ func (e *Engine) parent() *frame {
 // StartElement implements xmlread.Handler.
 func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 	e.attrs = el.Attrs
-	e.frames = append(e.frames, frame{name: profile.QName{URI: el.URI, Local: el.Local}, qname: el.Name, start: el.Start})
+	e.frames = append(e.frames, frame{name: profile.QName{URI: e.p.ElementNamespace(el.URI), Local: el.Local}, qname: el.Name, start: el.Start})
 	f := e.top()
 	if kept := e.p.KeptAttrs(); len(kept) > 0 {
 		for _, a := range el.Attrs {
@@ -411,13 +425,23 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 	}
 	f.marks, f.anchors = len(e.marks), len(e.anchors)
 	f.partAt, f.idxAt = e.out.Part, len(e.out.Part.Blocks)
+	e.readAttrs = e.readAttrs[:0]
+	if e.hasChildAttrs {
+		e.readAttrs = e.childAttrs()
+	}
 	if f.capture != nil {
 		// Inside an element read for a value: its text, or its outline.
 		f.role = roleInline
 		if s := e.cur; s != nil && s.structure {
 			e.structStart(s, el)
-		} else if e.lookup() == nil {
+		} else if r := e.lookup(); r == nil {
 			e.count(e.unmapped, el.Name)
+		} else if r.As == profile.AsInline && r.Space && s != nil {
+			s.b.Space()
+			f.spaced = s
+		} else if r.As == profile.AsBreak && s != nil {
+			// A value is one line: a break in it is a space.
+			s.b.Space()
 		}
 		return
 	}
@@ -455,11 +479,36 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 		e.startInline(f, el)
 		return
 	}
-	if rule.As == profile.AsPart && e.cur != nil && e.breakOpen(el.Start) {
-		// The open block is finished; the part is read on its own, and
-		// what follows it in the block starts a new block.
-		f.prevCur, e.cur, f.suspended = e.cur, nil, true
+	if rule.As == profile.AsBreak {
+		// A line break inside a block is a "\n" (core's hard break); in
+		// a value, a label or a metadata field, a space; between blocks,
+		// nothing.
+		f.role = roleInline
+		if s := e.active(); s != nil && !s.structure {
+			if s.kind == skCapture {
+				s.b.Space()
+			} else {
+				s.b.LineBreak()
+			}
+		}
+		return
+	}
+	if e.cur != nil && (rule.As == profile.AsPart ||
+		(rule.As == profile.AsTable || rule.As == profile.AsImage || rule.Split) && e.cur.kind == skBlock) && e.breakOpen(el.Start) {
+		// The open block is finished; the part (or a table, an image or
+		// a "split" rule's element met inside a paragraph-like block) is
+		// read on its own, and what follows it in the block starts a new
+		// block.
+		f.resume, e.cur, f.suspended = e.cur, nil, true
 		e.flushStray()
+		e.startRule(f, el)
+		return
+	}
+	if rule.OutOfLine && e.cur != nil && (e.cur.kind == skBlock || e.cur.kind == skHeading || e.cur.kind == skItem || e.inLabel()) {
+		// An out-of-line note: a block of its own, made where it ends
+		// (before the block it stands in, which is made at its end);
+		// the open block goes on after it.
+		f.resume, e.cur, f.outOfLine = e.cur, nil, true
 		e.startRule(f, el)
 		return
 	}
@@ -471,6 +520,26 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 		e.flushStray()
 	}
 	e.startRule(f, el)
+}
+
+// inLabel reports whether the open sink is a label's.
+func (e *Engine) inLabel() bool {
+	if e.cur == nil || e.cur.kind != skCapture {
+		return false
+	}
+	for i := len(e.frames) - 2; i >= 0; i-- {
+		if o := &e.frames[i]; o.sink == e.cur {
+			return o.rule != nil && o.rule.As == profile.AsLabel && o.capture == nil
+		}
+	}
+	return false
+}
+
+// labelInline reports whether a label met inside the open block s is read
+// as text of the block: when the block has text or a marker already, or a
+// label is waiting for it, the label's text cannot be its marker.
+func (e *Engine) labelInline(s *sink) bool {
+	return s.b.Len() > 0 || s.marker != "" || e.label != nil
 }
 
 // count adds one to name in m, within MaxNamesCounted names.
@@ -489,7 +558,7 @@ func (e *Engine) countAttrs(f *frame, el *xmlread.Element) {
 			continue
 		}
 		q := profile.QName{URI: a.URI, Local: a.Local}
-		if slices.Contains(f.rule.Reads, q) || slices.Contains(e.p.OfReads(f.name), q) {
+		if slices.Contains(f.rule.Reads, q) || slices.Contains(e.p.OfReads(f.name), q) || slices.Contains(e.readAttrs, q) {
 			continue
 		}
 		e.count(e.unmappedAttrs, el.Name+"@"+a.Name)
@@ -504,12 +573,35 @@ func (e *Engine) claim() (*slot, int) {
 		o := &e.frames[n-1-k]
 		for i := range o.slots {
 			s := &o.slots[i]
-			if !s.filled && s.v.Claims().MatchFrom(e, k) {
+			if !s.filled && s.v.AttrChild == nil && s.v.Claims().MatchFrom(e, k) {
 				return s, n - 1 - k
 			}
 		}
 	}
 	return nil, 0
+}
+
+// childAttrs fills the slots of open elements that read an attribute of
+// the element on top of the stack ({"attr": ..., "child": ...}), which is
+// then read by its own rule as usual. It returns the attributes read.
+func (e *Engine) childAttrs() []profile.QName {
+	var read []profile.QName
+	n := len(e.frames)
+	for k := 1; k < n && k < e.p.MaxSteps(); k++ {
+		o := &e.frames[n-1-k]
+		for i := range o.slots {
+			s := &o.slots[i]
+			if s.filled || s.v.AttrChild == nil || !s.v.AttrChild.MatchFrom(e, k) {
+				continue
+			}
+			s.filled = true
+			read = append(read, s.v.Attr)
+			if v, ok := e.Attr(0, s.v.Attr); ok {
+				e.fill(o, s, e.clean(v))
+			}
+		}
+	}
+	return read
 }
 
 func (e *Engine) startCapture(f *frame, s *slot, owner int, el *xmlread.Element) {
@@ -527,10 +619,21 @@ func (e *Engine) startCapture(f *frame, s *slot, owner int, el *xmlread.Element)
 	}
 	// The attributes of a child read for its text are not read.
 	for i := range el.Attrs {
-		if !generic.Skipped(el, &el.Attrs[i]) {
-			e.count(e.unmappedAttrs, el.Name+"@"+el.Attrs[i].Name)
+		if a := &el.Attrs[i]; !generic.Skipped(el, a) && !e.readAttr(a) {
+			e.count(e.unmappedAttrs, el.Name+"@"+a.Name)
 		}
 	}
+}
+
+// readAttr reports whether a rule of an open element read attribute a of
+// the element being started.
+func (e *Engine) readAttr(a *xmlread.Attr) bool {
+	for _, q := range e.readAttrs {
+		if q.Local == a.Local && q.URI == a.URI {
+			return true
+		}
+	}
+	return false
 }
 
 // structStart writes an element into an outline: name(attr=value, ...
@@ -604,7 +707,7 @@ func (e *Engine) startUnmapped(f *frame, el *xmlread.Element) {
 func (e *Engine) attrNotes(el *xmlread.Element, dst []gofastcore.Block) []gofastcore.Block {
 	for i := range el.Attrs {
 		a := &el.Attrs[i]
-		if a.Value == "" || generic.Skipped(el, a) {
+		if a.Value == "" || generic.Skipped(el, a) || e.readAttr(a) {
 			continue
 		}
 		text := e.clean(a.Value)
@@ -660,7 +763,7 @@ func (e *Engine) value(v *profile.Value) (string, bool) {
 		return "", true
 	case v.IsLiteral:
 		return v.Literal, true
-	case v.Claims() != nil:
+	case v.Claims() != nil, v.AttrChild != nil:
 		return "", false
 	case v.Of != nil:
 		for i := len(e.frames) - 2; i >= 0; i-- {
@@ -698,8 +801,12 @@ func (e *Engine) startInline(f *frame, el *xmlread.Element) {
 		e.flushHeld()
 		s = e.newStray(el.Start)
 	}
-	f.span, f.spanStart = s, s.b.Pos()
 	r := f.rule
+	if r.Space {
+		s.b.Space()
+		f.spaced = s
+	}
+	f.span, f.spanStart = s, s.b.Pos()
 	if r.Link != nil {
 		f.href, _ = e.resolve(f, r.Link, "", useLink)
 	}
@@ -744,6 +851,11 @@ func (e *Engine) nested(f *frame, el *xmlread.Element) bool {
 		f.role = roleInline
 		return true
 	case skItem:
+		if r.As == profile.AsLabel && e.labelInline(s) {
+			f.role = roleInline
+			s.b.Space()
+			return true
+		}
 		switch r.As {
 		case profile.AsSection, profile.AsTransparent, profile.AsLabel, profile.AsMetadata, profile.AsStored:
 			return false
@@ -766,6 +878,14 @@ func (e *Engine) nested(f *frame, el *xmlread.Element) bool {
 		}
 		return false
 	default: // skBlock, skCell
+		if r.As == profile.AsLabel && (s.kind == skCell || e.labelInline(s)) {
+			f.role = roleInline
+			if !s.fresh {
+				s.b.Space()
+			}
+			f.labelFresh = s.fresh
+			return true
+		}
 		switch r.As {
 		case profile.AsBlock, profile.AsHeading, profile.AsNote, profile.AsRow:
 			f.role = roleInline
@@ -885,6 +1005,14 @@ func (e *Engine) startRule(f *frame, el *xmlread.Element) {
 			lvl = f.ld + 1
 		}
 		f.ld, f.inItem = lvl, true
+		if r.Value != nil {
+			// The item's text when its element gives none (DITA's
+			// topicref@href).
+			f.val, f.hasVal = e.resolve(f, r.Value, "", useValue)
+			if r.Value.Claims() == nil && !r.Value.IsLiteral && r.Value.Of == nil {
+				f.valAttr = r.Value.Attr.Local
+			}
+		}
 		e.openSink(f, skItem, el.Start)
 		if r.Marker != nil {
 			f.sink.marker, _ = e.resolve(f, r.Marker, "", useMarker)
@@ -1081,6 +1209,17 @@ func (e *Engine) add(b gofastcore.Block, f *frame, own bool) blockRef {
 	if e.out.Stopped {
 		return blockRef{}
 	}
+	if e.label != nil && b.Kind != gofastcore.KindNote && !(own && f != nil && f.outOfLine) {
+		// A waiting label marks this block; one that cannot be its
+		// marker (the block has one, or is a table or image) is a block
+		// of its own before it, so that no label text is lost.
+		if b.Marker != "" || b.Kind == gofastcore.KindTable || b.Kind == gofastcore.KindImage {
+			e.flushLabel()
+		} else {
+			b.Marker = e.label.text
+			e.label = nil
+		}
+	}
 	if b.Origin == 0 {
 		b.Origin = gofastcore.OriginNative
 	}
@@ -1131,12 +1270,6 @@ func (e *Engine) add(b gofastcore.Block, f *frame, own bool) blockRef {
 				break
 			}
 		}
-	}
-	if e.label != nil && b.Kind != gofastcore.KindNote && b.Kind != gofastcore.KindTable && b.Kind != gofastcore.KindImage {
-		if b.Marker == "" {
-			b.Marker = e.label.text
-		}
-		e.label = nil
 	}
 	if b.Kind == gofastcore.KindHeading && b.Level > 6 {
 		set("level", strconv.Itoa(int(b.Level)))
@@ -1206,8 +1339,18 @@ func (e *Engine) patch(r blockRef, k, v string) {
 // finishSink makes the block of a sink, with the notes that follow it.
 func (e *Engine) finishSink(s *sink, f *frame, kind gofastcore.Kind, origin gofastcore.Origin, end int64) blockRef {
 	var ref blockRef
-	if text := s.b.String(); text != "" || kind == gofastcore.KindListItem && s.marker != "" && !s.auto {
+	if s.auto && e.label != nil {
+		// The file's label numbers the item, not the list's count.
+		s.marker, s.auto = "", false
+	}
+	fromValue := false
+	if kind == gofastcore.KindListItem && s.b.Size() == 0 && f != nil && f.hasVal && f.val != "" && s.pieces == 0 && !s.done {
+		s.b.Append([]byte(f.val), false)
+		fromValue = true
+	}
+	if text := s.b.String(); text != "" || s.marker != "" && !s.auto {
 		if text == "" {
+			// A block whose only text is its label: the label is its text.
 			text, s.marker = s.marker, ""
 		}
 		b := gofastcore.Block{Kind: kind, Origin: origin, Text: text, Marker: s.marker, Continued: s.pieces > 0,
@@ -1221,6 +1364,9 @@ func (e *Engine) finishSink(s *sink, f *frame, kind gofastcore.Kind, origin gofa
 		if kind == gofastcore.KindListItem {
 			b.Level = uint8(min(max(f.ld, 1), 255))
 			b.Ordered = e.orderedItem(f)
+			if fromValue && f.valAttr != "" {
+				b.Attrs = map[string]string{generic.AttrAttribute: f.valAttr}
+			}
 		}
 		if kind == gofastcore.KindHeading {
 			b.Level = uint8(min(e.level(f), 255))
@@ -1422,7 +1568,17 @@ func (e *Engine) givePiece(s *sink, at int64) bool {
 // is then read into as before.
 func (e *Engine) breakOpen(at int64) bool {
 	s := e.cur
-	if s.structure || !e.givePiece(s, at) {
+	if s.structure {
+		return false
+	}
+	if s.b.Size() == 0 && s.marker != "" && !s.auto && s.kind != skCell && s.kind != skCapture && s.kind != skStray {
+		// A label that marks a block with no text yet (the block's text
+		// so far is empty, as after an earlier break) is its text: the
+		// piece made here holds it, so it is not lost.
+		s.b.Append([]byte(s.marker), false)
+		s.marker = ""
+	}
+	if !e.givePiece(s, at) {
 		return false
 	}
 	s.pieces, s.restart = 0, true
@@ -1566,10 +1722,19 @@ func (e *Engine) EndElement(r *xmlread.Reader, el *xmlread.Element, start, end i
 		}
 	case f.role == roleInline:
 		e.endInline(f, end)
+		if f.rule != nil && f.rule.As == profile.AsLabel && e.cur != nil {
+			// A label read inline is followed by a space; one that starts
+			// a line (an item's) keeps the line open for what follows.
+			e.cur.b.Space()
+			e.cur.fresh = f.labelFresh
+		}
 	case f.cals != "":
 		e.calsEnd(f)
 	default:
 		ref = e.endRule(f, end)
+	}
+	if f.spaced != nil && f.spaced == e.active() {
+		f.spaced.b.Space()
 	}
 	if f.held != nil {
 		e.addHeld(f.held)
@@ -1581,8 +1746,8 @@ func (e *Engine) EndElement(r *xmlread.Reader, el *xmlread.Element, start, end i
 	if e.label != nil && e.label.depth >= n-1 {
 		e.flushLabel() // a label whose container ends with no block after it
 	}
-	if f.suspended {
-		e.cur = f.prevCur
+	if f.suspended || f.outOfLine {
+		e.cur = f.resume
 	}
 	e.marks = e.marks[:min(f.marks, len(e.marks))]
 	e.anchors = e.anchors[:min(f.anchors, len(e.anchors))]
@@ -1828,6 +1993,7 @@ func (e *Engine) endRule(f *frame, end int64) blockRef {
 	case profile.AsLabel:
 		s := e.closeSink(f)
 		text := s.b.String()
+		e.keepAfter(s, f)
 		e.putSink(s)
 		if text == "" {
 			break
@@ -1872,6 +2038,7 @@ func (e *Engine) endRule(f *frame, end int64) blockRef {
 		if f.sink != nil {
 			s := e.closeSink(f)
 			v = s.b.String()
+			e.keepAfter(s, f)
 			e.putSink(s)
 		}
 		e.metadata(f, v, end)
@@ -1882,9 +2049,25 @@ func (e *Engine) endRule(f *frame, end int64) blockRef {
 				Attrs: map[string]string{gofastcore.AttrStored: r.StoredKind},
 				Loc:   gofastcore.Location{Offset: f.start, Length: max(end-f.start, 0)}})
 		}
+		e.keepAfter(s, f)
 		e.putSink(s)
 	}
 	return f.ref
+}
+
+// keepAfter gives the notes that followed a value's text (the attributes
+// of elements with no rule, comments) a place, so that they are not
+// lost with the sink: after the open block, else where the element
+// stood.
+func (e *Engine) keepAfter(s *sink, f *frame) {
+	for _, b := range s.after {
+		if o := e.active(); o != nil && o != s && len(o.after) < generic.MaxPendingBlocks {
+			o.after = append(o.after, b)
+		} else {
+			e.add(b, f, false)
+		}
+	}
+	s.after = nil
 }
 
 func (e *Engine) closeSink(f *frame) *sink {
@@ -1998,9 +2181,14 @@ func (e *Engine) metadata(f *frame, v string, end int64) {
 	}
 	m := &e.Meta
 	switch r.Field {
+	// A field that holds one value takes the first; the others go to
+	// Extra under the field's name, so that none is lost.
 	case "title":
-		if m.Title == "" {
+		switch {
+		case m.Title == "":
 			m.Title = v
+		case r.AlsoHeading == 0:
+			e.setExtra("title", v, r.Join)
 		}
 		if r.AlsoHeading > 0 {
 			e.add(gofastcore.Block{Kind: gofastcore.KindHeading, Level: uint8(r.AlsoHeading), Text: v,
@@ -2009,28 +2197,36 @@ func (e *Engine) metadata(f *frame, v string, end int64) {
 	case "author":
 		if len(m.Authors) < 1000 {
 			m.Authors = append(m.Authors, v)
+		} else {
+			e.ValuesCut++
 		}
 	case "keyword":
 		if len(m.Keywords) < 1000 {
 			m.Keywords = append(m.Keywords, v)
+		} else {
+			e.ValuesCut++
 		}
 	case "subject":
 		if m.Subject == "" {
 			m.Subject = v
+		} else {
+			e.setExtra("subject", v, r.Join)
 		}
 	case "language":
 		if m.Language == "" && len(v) <= generic.MaxLangBytes {
 			m.Language = v
+		} else {
+			e.setExtra("language", v, r.Join)
 		}
 	case "created", "modified":
 		t, ok := parseDate(v)
 		switch {
-		case !ok:
-			e.setExtra(r.Field, v, r.Join)
-		case r.Field == "created" && m.Created.IsZero():
+		case r.Field == "created" && ok && m.Created.IsZero():
 			m.Created = t
-		case r.Field == "modified" && m.Modified.IsZero():
+		case r.Field == "modified" && ok && m.Modified.IsZero():
 			m.Modified = t
+		default:
+			e.setExtra(r.Field, v, r.Join)
 		}
 	case "description":
 		e.setExtra("description", v, r.Join)
