@@ -223,6 +223,11 @@ to its place in the file:
   covers the table element; a heading's covers its title element; a block
   made from an attribute covers the element that holds it; an item covers
   the item element; stray text covers the text.
+- A table's rows are cited one by one: `Table.RowLocs` has one location
+  per row, in the order of `Rows`: the row element's bytes, and its
+  `Anchor` when the row rule has an `anchor`. A header row the profile
+  supplies (`header`) has an empty location. Both table models and rows
+  made from attributes (`cells`) give them.
 - `Loc.Anchor` is the identifier the source gives the block: the rule's
   `anchor`, else `xml:id`. A block with no identifier of its own carries
   the nearest enclosing identified element's in `Attrs["anchor_parent"]`,
@@ -241,7 +246,7 @@ for; none changes what an existing key means.
 |---|---|---|
 | `duplicate_of`, `key` | `heading`, `block` | S4: `Cas` has `Titre` and `TitreRiche` with the same text. `{"match": "Cas/Titre", ..., "duplicate_of": "TitreRiche", "key": "sp.title_plain"}`: when the element and its adjacent sibling `TitreRiche` (before or after it) have the same text, the element gives nothing; when they differ, its text goes to `Attrs[key]` of the sibling's block. With no such sibling the element is read by its own rule |
 | `title` | `inline` with `link` | S6: the title of a link's target (`commentaireLien`). Core's `Span` has no field for it, so a link with a `title` or `attrs` gives a record in the stored part: a `note` (`stored`=`custom_property`, `name` the element's name) whose text is the link's own text (its address when it has none), and whose `Attrs` hold `href`, the title under `title`, and the rule's `attrs`. The Service-Public profile puts `commentaireLien` in `attrs` as `sp.comment` |
-| `attrs` | `inline` | The other attributes of a link (`type`, `audience`), in that record. On an inline that is not a link (`TermeEtranger@langue`) the record is made too, its text repeating the element's: core's `Span` has no language field to hold it (core v0.1.2) |
+| `attrs` | `inline` | The other attributes of a link (`type`, `audience`), in that record. On an inline that is not a link (`TermeEtranger@langue`) the record is made too, its text repeating the element's: core's `Span` has no language field to hold it (core v0.1.3) |
 | `extra` | any rule but `label`, `skip` | Root attributes (`ID`, `spUrl`) into `Metadata.Extra` (C1) while the root stays `transparent` |
 | `join` | `metadata` | The separator of repeated values of one `Extra` key (` > ` for the breadcrumb, C1); default a line break |
 | `value` | `block`, `note` | A block whose text is an attribute (`RessourceWeb@URL`, C4); it carries `Attrs["attribute"]` |

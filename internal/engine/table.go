@@ -15,12 +15,19 @@ import (
 // with spans by attribute) or the CALS model (tgroup, colspec, spanspec,
 // thead, tbody, tfoot, row, entry).
 type table struct {
-	model  string
-	rows   [][]string
-	merges []gofastcore.Merge
-	cells  []gofastcore.CellDetail
-	header int  // leading header rows
-	body   bool // a row that is not a header row came
+	// locs has one entry per row of rows: where the row's element is in
+	// the file and the anchor it carries, zero for a row no element of the
+	// file made (a header row the profile gives). locPending: the last
+	// row's element has not ended yet.
+	locs       []gofastcore.Location
+	locPending bool
+	anyLoc     bool
+	model      string
+	rows       [][]string
+	merges     []gofastcore.Merge
+	cells      []gofastcore.CellDetail
+	header     int  // leading header rows
+	body       bool // a row that is not a header row came
 	// The row being read: declared a header row (counted at its start),
 	// its cells, and whether all of them are header cells (a row of th
 	// among the leading rows is a header row, counted at its end).
@@ -130,6 +137,7 @@ func (t *table) startRow(header bool) {
 	if t.inRow {
 		t.endRow()
 	}
+	t.locPending = false
 	t.inRow, t.col, t.row = true, 0, t.row[:0]
 	t.rowHead, t.rowCells, t.rowAllHeadCells = header && !t.body, 0, true
 	if t.rowHead {
@@ -234,6 +242,19 @@ func (t *table) endRow() {
 		return
 	}
 	t.rows = append(t.rows, append([]string(nil), t.row...))
+	t.locs, t.locPending = append(t.locs, gofastcore.Location{}), true
+}
+
+// rowDone records where the element of the row just ended is in the file,
+// and its anchor.
+func (t *table) rowDone(start, end int64, anchor string) {
+	if !t.locPending || len(t.locs) == 0 {
+		return
+	}
+	t.locPending = false
+	t.locs[len(t.locs)-1] = gofastcore.Location{Offset: start, Length: max(end-start, 0), Anchor: anchor}
+	t.cost += int64(len(anchor))
+	t.anyLoc = true
 }
 
 // block returns the table's block; ok is false for a table with no cells,
@@ -262,6 +283,9 @@ func (t *table) block(e *Engine, start, end int64) (gofastcore.Block, bool) {
 	tb := &gofastcore.Table{Rows: t.rows, HeaderRows: min(t.header, n), Merges: merges}
 	if e.opts.Spans {
 		tb.Cells = t.cells
+	}
+	if t.anyLoc && len(t.locs) == n {
+		tb.RowLocs = t.locs
 	}
 	b := gofastcore.Block{Kind: gofastcore.KindTable, Table: tb,
 		Loc: gofastcore.Location{Offset: start, Length: max(end-start, 0)}}
@@ -402,7 +426,7 @@ func (e *Engine) calsStart(t *table, f *frame, el *xmlread.Element) bool {
 }
 
 // calsEnd ends an element of the CALS model.
-func (e *Engine) calsEnd(f *frame) {
+func (e *Engine) calsEnd(f *frame, start, end int64) {
 	t := f.owner
 	if t == nil {
 		return
@@ -410,6 +434,7 @@ func (e *Engine) calsEnd(f *frame) {
 	switch f.cals {
 	case "row":
 		t.endRow()
+		t.rowDone(start, end, f.anchor)
 	case "thead":
 		t.inHead = false
 	case "entry":

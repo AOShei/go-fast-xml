@@ -2,11 +2,20 @@
 
 ## Unreleased
 
+### Row locations (core v0.1.3)
+
+- A table says where each row came from: `Table.RowLocs` has the row
+  element's offset and length in the file, and its anchor when the row
+  rule has one, for both table models and for rows made from attributes.
+  A row of Service-Public's redirections table can be cited by itself.
+  Requires go-fast-core v0.1.3.
+
 ### Phase 5: allocation and speed
 
 Output unchanged (digests of every dev file of every corpus). On the
 Service-Public dev batch through `ExtractFile`, one thread: 1,296 to
-899 MB allocated, 6.86 to 5.52 million allocations, about 84 to 91 MB/s.
+899 MB allocated, 6.86 to 5.52 million allocations, about 84 to 91 MB/s. (After the
+review fixes and row locations below: 920 MB and 5.8 million.)
 
 - A UTF-8 input smaller than the 64 KiB window is scanned in place from
   the encoding sample: no window, nothing read twice.

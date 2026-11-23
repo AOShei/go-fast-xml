@@ -1830,7 +1830,7 @@ func (e *Engine) EndElement(r *xmlread.Reader, el *xmlread.Element, start, end i
 			e.cur.fresh = f.labelFresh
 		}
 	case f.cals != "":
-		e.calsEnd(f)
+		e.calsEnd(f, f.start, end)
 	default:
 		ref = e.endRule(f, end)
 	}
@@ -2126,6 +2126,7 @@ func (e *Engine) endRule(f *frame, end int64) blockRef {
 	case profile.AsRow:
 		if t := f.owner; t != nil {
 			t.endRow()
+			t.rowDone(f.start, end, f.anchor)
 		}
 	case profile.AsTable:
 		e.flushStray()
