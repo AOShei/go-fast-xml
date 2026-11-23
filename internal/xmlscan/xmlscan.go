@@ -646,6 +646,16 @@ func (s *Scanner) popFrame() {
 // charData scans text up to the next '<'.
 func (s *Scanner) charData() scanStatus {
 	b := s.buf[s.pos:s.end]
+	// A complete reference at the start is looked at before the text is
+	// measured: measuring looks for white space to cut at, and a long run
+	// of references would pay for that once per reference.
+	if len(b) > 0 && b[0] == '&' && s.resolve != nil {
+		if _, m, ok := refName(b); ok {
+			if st, done := s.entityRef(b[:m], s.here()); done {
+				return st
+			}
+		}
+	}
 	n := bytes.IndexByte(b, '<')
 	if n < 0 {
 		switch {
