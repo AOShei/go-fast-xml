@@ -185,6 +185,20 @@ func TestReview5DraftIncludeLinks(t *testing.T) {
 	}
 }
 
+// In an ordered list, a label first in an item is its marker; one after
+// text stays in the text and the count stands; items with no label keep
+// the list's count.
+func TestReview5OrderedItemLabelMore(t *testing.T) {
+	doc := r5Extract(t, r5Prof, `<r><ol><li><num>(a)</num>ay</li><li>bee <num>(x)</num> more</li><li>sea</li></ol></r>`, nil)
+	got := ""
+	for _, b := range doc.Parts[0].Blocks {
+		got += b.Marker + "|" + b.Text + ";"
+	}
+	if want := "(a)|ay;2.|bee (x) more;3.|sea;"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
 // Values of one Extra key are joined in order, and the joined value stops
 // growing at MaxValueBytes.
 func TestReview5ExtraJoinOrder(t *testing.T) {

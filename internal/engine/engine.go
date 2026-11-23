@@ -557,7 +557,9 @@ func (e *Engine) inLabel() bool {
 // as text of the block: when the block has text or a marker already, or a
 // label is waiting for it, the label's text cannot be its marker.
 func (e *Engine) labelInline(s *sink) bool {
-	return s.b.Len() > 0 || s.marker != "" || e.label != nil
+	// An ordered list's generated number (auto) gives way to the file's
+	// label: a label first in such an item is its marker.
+	return s.b.Len() > 0 || s.marker != "" && !s.auto || e.label != nil
 }
 
 // count adds one to name in m, within MaxNamesCounted names.
@@ -2060,8 +2062,10 @@ func (e *Engine) endRule(f *frame, end int64) blockRef {
 			break
 		}
 		if o := e.cur; o != nil && o.kind != skCapture && o.kind != skStray {
-			if o.marker == "" {
-				o.marker = text
+			if o.marker == "" || o.auto {
+				// The file's label is the marker; an ordered list's
+				// generated number gives way to it.
+				o.marker, o.auto = text, false
 			}
 			break
 		}

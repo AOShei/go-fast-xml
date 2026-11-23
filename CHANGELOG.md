@@ -26,6 +26,8 @@
   `os.Stat` finds a regular file, so an include naming a FIFO no longer
   hangs; symbolic links are followed; the context is consulted before
   each file.
+- In an ordered list, a label first in an item is its marker in place of
+  the list's generated number, as `PROFILE_FORMAT.md` says.
 
 ### Phase 4: drafting a profile from an XSD
 
