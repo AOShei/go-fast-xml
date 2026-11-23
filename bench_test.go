@@ -137,3 +137,102 @@ func BenchmarkEncodingXML(b *testing.B) {
 		}
 	}
 }
+
+// batchFiles lists the Service-Public dev batch: every file of
+// dev/xml-servicepublic (4,194 files, 106 MB, one of 25 MB), sorted.
+func batchFiles(b *testing.B) ([]string, int64) {
+	dir := spDir("dev")
+	if dir == "" {
+		b.Skip("no Service-Public dev corpus")
+	}
+	files := spFiles(dir)
+	var total int64
+	for _, f := range files {
+		info, err := os.Stat(f)
+		if err != nil {
+			b.Fatal(err)
+		}
+		total += info.Size()
+	}
+	return files, total
+}
+
+// BenchmarkBatch reads the whole Service-Public dev batch as a consumer
+// would, one document at a time, the result dropped. One op is the
+// batch; MB/s is of the files' bytes.
+//
+//   - file: ExtractFile, the profile chosen by the root element;
+//   - bytes: ExtractBytes, each file read into one reused buffer first;
+//   - generic: ExtractFile with generic reading (ProfileNone);
+//   - encodingxml: encoding/xml's RawToken over each file (tokens only,
+//     no document), for comparison.
+func BenchmarkBatch(b *testing.B) {
+	files, total := batchFiles(b)
+	ctx := context.Background()
+	b.Run("file", func(b *testing.B) {
+		b.SetBytes(total)
+		b.ReportAllocs()
+		for b.Loop() {
+			for _, f := range files {
+				if _, err := ExtractFile(ctx, f, nil); err != nil {
+					b.Fatal(err)
+				}
+			}
+		}
+	})
+	b.Run("bytes", func(b *testing.B) {
+		b.SetBytes(total)
+		b.ReportAllocs()
+		var buf bytes.Buffer
+		for b.Loop() {
+			for _, f := range files {
+				buf.Reset()
+				fh, err := os.Open(f)
+				if err != nil {
+					b.Fatal(err)
+				}
+				_, err = buf.ReadFrom(fh)
+				fh.Close()
+				if err != nil {
+					b.Fatal(err)
+				}
+				if _, err := ExtractBytes(ctx, buf.Bytes(), nil); err != nil {
+					b.Fatal(err)
+				}
+			}
+		}
+	})
+	b.Run("generic", func(b *testing.B) {
+		x := &Extractor{Profile: ProfileNone}
+		b.SetBytes(total)
+		b.ReportAllocs()
+		for b.Loop() {
+			for _, f := range files {
+				if _, err := x.ExtractFile(ctx, f, nil); err != nil {
+					b.Fatal(err)
+				}
+			}
+		}
+	})
+	b.Run("encodingxml", func(b *testing.B) {
+		b.SetBytes(total)
+		b.ReportAllocs()
+		for b.Loop() {
+			for _, f := range files {
+				fh, err := os.Open(f)
+				if err != nil {
+					b.Fatal(err)
+				}
+				d := xml.NewDecoder(fh)
+				for {
+					if _, err := d.RawToken(); err == io.EOF {
+						break
+					} else if err != nil {
+						b.Fatal(err)
+					}
+				}
+				fh.Close()
+			}
+		}
+	})
+}
