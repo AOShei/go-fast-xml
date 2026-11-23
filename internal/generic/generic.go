@@ -669,12 +669,10 @@ func (g *Generic) attrNotes(d int, dst []gofastcore.Block) []gofastcore.Block {
 			v = cutString(v, MaxValueBytes)
 			g.out.ValuesCut++
 		}
-		tmp.Reset()
-		tmp.Append([]byte(v), false)
+		text := Clean(v, false, &tmp)
 		g.out.Clean.Controls += tmp.Controls
 		g.out.Clean.Invalid += tmp.Invalid
 		tmp.Controls, tmp.Invalid = 0, 0
-		text := tmp.String()
 		if text == "" {
 			continue
 		}
