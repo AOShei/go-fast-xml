@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Legislation xmlns="http://www.legislation.gov.uk/namespaces/legislation" xmlns:ukm="http://www.legislation.gov.uk/namespaces/metadata" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:html="http://www.w3.org/1999/xhtml" DocumentURI="http://www.legislation.gov.uk/ukpga/2026/1" IdURI="http://www.legislation.gov.uk/id/ukpga/2026/1" SchemaVersion="2.0">
+<ukm:Metadata><dc:title>Sample Act 2026</dc:title><dc:language>en</dc:language><atom:link rel="self" href="http://www.legislation.gov.uk/ukpga/2026/1/data.xml"/>
+<ukm:PrimaryMetadata><ukm:DocumentClassification><ukm:DocumentCategory Value="primary"/></ukm:DocumentClassification><ukm:Year Value="2026"/><ukm:Number Value="1"/><ukm:EnactmentDate Date="2026-01-02"/></ukm:PrimaryMetadata></ukm:Metadata>
+<Primary><PrimaryPrelims DocumentURI="http://www.legislation.gov.uk/ukpga/2026/1/introduction"><Title>Sample Act 2026</Title><Number>2026 CHAPTER 1</Number><LongTitle>An Act to make provision about samples.</LongTitle></PrimaryPrelims>
+<Body DocumentURI="http://www.legislation.gov.uk/ukpga/2026/1/body"><Part id="part-1" DocumentURI="http://www.legislation.gov.uk/ukpga/2026/1/part/1"><Number>Part 1</Number><Title>Samples</Title>
+<P1group><Title>Meaning of sample<CommentaryRef Ref="c1"/></Title><P1 id="section-1" DocumentURI="http://www.legislation.gov.uk/ukpga/2026/1/section/1"><Pnumber>1</Pnumber><P1para>
+<P2 id="section-1-1"><Pnumber>1</Pnumber><P2para><Text>A sample is <Emphasis>anything</Emphasis> listed in <Citation URI="http://www.legislation.gov.uk/id/ukpga/2025/9">the 2025 Act</Citation>.</Text></P2para></P2>
+<P2 id="section-1-2"><Pnumber>2</Pnumber><P2para><Text>Samples include—</Text><P3 id="section-1-2-a"><Pnumber>a</Pnumber><P3para><Text>apples, and</Text></P3para></P3><UnorderedList Decoration="dash"><ListItem><Para><Text>pears</Text></Para></ListItem></UnorderedList></P2para></P2>
+</P1para></P1></P1group>
+<Tabular id="t1"><html:table cols="2"><html:thead><html:tr><html:th>Fruit</html:th><html:th>Rate</html:th></html:tr></html:thead><html:tbody><html:tr><html:td>apple</html:td><html:td>1</html:td></html:tr></html:tbody></html:table></Tabular>
+</Part></Body></Primary>
+<Commentaries><Commentary id="c1" Type="F"><Para><Text>Words substituted by <Citation URI="http://www.legislation.gov.uk/id/uksi/2026/5">S.I. 2026/5</Citation>.</Text></Para></Commentary></Commentaries>
+</Legislation>

@@ -74,7 +74,7 @@ var (
 	allowed = map[As][]string{
 		AsSection:     common,
 		AsHeading:     append(slices.Clone(common), "level", "marker", "duplicate_of", "key"),
-		AsBlock:       append(slices.Clone(common), "kind", "language", "notation", "marker", "value", "duplicate_of", "key"),
+		AsBlock:       append(slices.Clone(common), "kind", "language", "notation", "marker", "value", "duplicate_of", "key", "out_of_line"),
 		AsList:        append(slices.Clone(common), "ordered"),
 		AsItem:        append(slices.Clone(common), "marker"),
 		AsTable:       append(slices.Clone(common), "model", "header"),
@@ -83,7 +83,7 @@ var (
 		AsInline:      {"match", "as", "style", "link", "title", "attrs", "extra"},
 		AsLabel:       {"match", "as"},
 		AsImage:       append(slices.Clone(common), "id", "alt"),
-		AsNote:        append(slices.Clone(common), "type", "value"),
+		AsNote:        append(slices.Clone(common), "type", "value", "out_of_line"),
 		AsMetadata:    {"match", "as", "field", "key", "value", "also_heading", "join", "extra"},
 		AsPart:        append(slices.Clone(common), "kind", "name"),
 		AsStored:      {"match", "as", "kind", "extra"},
@@ -165,6 +165,7 @@ type Rule struct {
 	Join        string
 	AlsoHeading int
 	DuplicateOf string
+	OutOfLine   bool // a block or note met inside an open block is a block of its own
 
 	Level   Level
 	Ordered *Test
@@ -210,6 +211,16 @@ type Profile struct {
 	kept     []QName
 	tested   []QName
 	ofReads  map[QName][]QName
+	aliases  map[string]string
+}
+
+// ElementNamespace returns the namespace an element of namespace uri is
+// matched in: the target of "namespace_aliases", or uri itself.
+func (p *Profile) ElementNamespace(uri string) string {
+	if t, ok := p.aliases[uri]; ok {
+		return t
+	}
+	return uri
 }
 
 // MaxSteps returns the most steps of any selector.
@@ -299,6 +310,7 @@ type fileJSON struct {
 	Format           int               `json:"format"`
 	Namespaces       map[string]string `json:"namespaces"`
 	DefaultNamespace string            `json:"default_namespace"`
+	NamespaceAliases map[string]string `json:"namespace_aliases"`
 	Match            []matchJSON       `json:"match"`
 	HeadingBase      int               `json:"heading_base"`
 	Rules            []json.RawMessage `json:"rules"`
@@ -349,6 +361,21 @@ func Load(r io.Reader, builtin bool) (*Profile, error) {
 	}
 	p := &Profile{Name: f.Profile, Title: f.Title, HeadingBase: f.HeadingBase,
 		byName: map[QName][]*Rule{}, ofReads: map[QName][]QName{}}
+	if len(f.NamespaceAliases) > 64 {
+		return nil, &Error{Msg: "more than 64 \"namespace_aliases\""}
+	}
+	for from, to := range f.NamespaceAliases {
+		if from == "" || from == to || from == "http://www.w3.org/XML/1998/namespace" {
+			return nil, &Error{Msg: fmt.Sprintf("namespace alias %q -> %q cannot be declared", from, to)}
+		}
+		if _, chained := f.NamespaceAliases[to]; chained {
+			return nil, &Error{Msg: fmt.Sprintf("namespace alias %q -> %q: the target is itself an alias", from, to)}
+		}
+		if p.aliases == nil {
+			p.aliases = map[string]string{}
+		}
+		p.aliases[from] = to
+	}
 	if p.HeadingBase == 0 {
 		p.HeadingBase = 1
 	}
@@ -609,6 +636,11 @@ func compileRule(raw json.RawMessage, i int, f *fileJSON, builtin bool) (*Rule, 
 	}
 	if r.Key != "" && !validKey(r.Key) {
 		return nil, fmt.Errorf("%s: \"key\" %q is empty, too long or has white space", where, r.Key)
+	}
+	if v, ok := m["out_of_line"]; ok {
+		if err := json.Unmarshal(v, &r.OutOfLine); err != nil {
+			return nil, fmt.Errorf("%s: \"out_of_line\" must be true or false", where)
+		}
 	}
 	if v, ok := m["also_heading"]; ok {
 		if err := json.Unmarshal(v, &r.AlsoHeading); err != nil || r.AlsoHeading < 1 || r.AlsoHeading > 6 {

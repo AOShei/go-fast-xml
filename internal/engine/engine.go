@@ -160,6 +160,12 @@ type frame struct {
 	// suspended: a part met inside an open block; prevCur is that block's
 	// sink, resumed when the part ends.
 	suspended bool
+	// outOfLine: an out_of_line rule's element read beside an open block,
+	// whose waiting label it does not take; resume is that block's sink.
+	outOfLine bool
+	resume    *sink
+	// labelFresh: a label read inline at the start of a line.
+	labelFresh bool
 
 	sections int
 	quotes   int
@@ -389,7 +395,7 @@ func (e *Engine) parent() *frame {
 // StartElement implements xmlread.Handler.
 func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 	e.attrs = el.Attrs
-	e.frames = append(e.frames, frame{name: profile.QName{URI: el.URI, Local: el.Local}, qname: el.Name, start: el.Start})
+	e.frames = append(e.frames, frame{name: profile.QName{URI: e.p.ElementNamespace(el.URI), Local: el.Local}, qname: el.Name, start: el.Start})
 	f := e.top()
 	if kept := e.p.KeptAttrs(); len(kept) > 0 {
 		for _, a := range el.Attrs {
@@ -463,6 +469,14 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 		e.startRule(f, el)
 		return
 	}
+	if rule.OutOfLine && e.cur != nil && (e.cur.kind == skBlock || e.cur.kind == skHeading || e.cur.kind == skItem || e.inLabel()) {
+		// An out-of-line note: a block of its own, made where it ends
+		// (before the block it stands in, which is made at its end);
+		// the open block goes on after it.
+		f.resume, e.cur, f.outOfLine = e.cur, nil, true
+		e.startRule(f, el)
+		return
+	}
 	if e.cur != nil {
 		if e.nested(f, el) {
 			return
@@ -471,6 +485,26 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 		e.flushStray()
 	}
 	e.startRule(f, el)
+}
+
+// inLabel reports whether the open sink is a label's.
+func (e *Engine) inLabel() bool {
+	if e.cur == nil || e.cur.kind != skCapture {
+		return false
+	}
+	for i := len(e.frames) - 2; i >= 0; i-- {
+		if o := &e.frames[i]; o.sink == e.cur {
+			return o.rule != nil && o.rule.As == profile.AsLabel && o.capture == nil
+		}
+	}
+	return false
+}
+
+// labelInline reports whether a label met inside the open block s is read
+// as text of the block: when the block has text or a marker already, or a
+// label is waiting for it, the label's text cannot be its marker.
+func (e *Engine) labelInline(s *sink) bool {
+	return s.b.Len() > 0 || s.marker != "" || e.label != nil
 }
 
 // count adds one to name in m, within MaxNamesCounted names.
@@ -744,6 +778,11 @@ func (e *Engine) nested(f *frame, el *xmlread.Element) bool {
 		f.role = roleInline
 		return true
 	case skItem:
+		if r.As == profile.AsLabel && e.labelInline(s) {
+			f.role = roleInline
+			s.b.Space()
+			return true
+		}
 		switch r.As {
 		case profile.AsSection, profile.AsTransparent, profile.AsLabel, profile.AsMetadata, profile.AsStored:
 			return false
@@ -766,6 +805,14 @@ func (e *Engine) nested(f *frame, el *xmlread.Element) bool {
 		}
 		return false
 	default: // skBlock, skCell
+		if r.As == profile.AsLabel && (s.kind == skCell || e.labelInline(s)) {
+			f.role = roleInline
+			if !s.fresh {
+				s.b.Space()
+			}
+			f.labelFresh = s.fresh
+			return true
+		}
 		switch r.As {
 		case profile.AsBlock, profile.AsHeading, profile.AsNote, profile.AsRow:
 			f.role = roleInline
@@ -1132,7 +1179,8 @@ func (e *Engine) add(b gofastcore.Block, f *frame, own bool) blockRef {
 			}
 		}
 	}
-	if e.label != nil && b.Kind != gofastcore.KindNote && b.Kind != gofastcore.KindTable && b.Kind != gofastcore.KindImage {
+	if e.label != nil && b.Kind != gofastcore.KindNote && b.Kind != gofastcore.KindTable && b.Kind != gofastcore.KindImage &&
+		!(own && f != nil && f.outOfLine) {
 		if b.Marker == "" {
 			b.Marker = e.label.text
 		}
@@ -1566,6 +1614,12 @@ func (e *Engine) EndElement(r *xmlread.Reader, el *xmlread.Element, start, end i
 		}
 	case f.role == roleInline:
 		e.endInline(f, end)
+		if f.rule != nil && f.rule.As == profile.AsLabel && e.cur != nil {
+			// A label read inline is followed by a space; one that starts
+			// a line (an item's) keeps the line open for what follows.
+			e.cur.b.Space()
+			e.cur.fresh = f.labelFresh
+		}
 	case f.cals != "":
 		e.calsEnd(f)
 	default:
@@ -1583,6 +1637,9 @@ func (e *Engine) EndElement(r *xmlread.Reader, el *xmlread.Element, start, end i
 	}
 	if f.suspended {
 		e.cur = f.prevCur
+	}
+	if f.outOfLine {
+		e.cur = f.resume
 	}
 	e.marks = e.marks[:min(f.marks, len(e.marks))]
 	e.anchors = e.anchors[:min(f.anchors, len(e.anchors))]
