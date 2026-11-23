@@ -2,7 +2,7 @@
 
 ## v0.1.0 (unreleased)
 
-First release. Requires go-fast-core v0.1.3. Standard library only.
+First release. Requires go-fast-core v0.1.4. Standard library only.
 
 ### Reading
 
