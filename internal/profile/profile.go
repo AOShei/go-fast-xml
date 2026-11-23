@@ -80,7 +80,7 @@ var (
 		AsTable:       append(slices.Clone(common), "model", "header"),
 		AsRow:         append(slices.Clone(common), "header", "cells"),
 		AsCell:        append(slices.Clone(common), "header", "colspan", "rowspan"),
-		AsInline:      {"match", "as", "style", "link", "title", "attrs", "extra"},
+		AsInline:      {"match", "as", "style", "link", "title", "attrs", "extra", "space"},
 		AsLabel:       {"match", "as"},
 		AsImage:       append(slices.Clone(common), "id", "alt"),
 		AsNote:        append(slices.Clone(common), "type", "value"),
@@ -165,6 +165,10 @@ type Rule struct {
 	Join        string
 	AlsoHeading int
 	DuplicateOf string
+	// Space: the element's text is set off by white space ("space",
+	// inline): a space is held before and after it, where the source has
+	// none, as between the fields of a name or a citation.
+	Space bool
 
 	Level   Level
 	Ordered *Test
@@ -589,6 +593,11 @@ func compileRule(raw json.RawMessage, i int, f *fileJSON, builtin bool) (*Rule, 
 	}
 	if r.Join, err = str("join"); err != nil {
 		return nil, err
+	}
+	if v, ok := m["space"]; ok {
+		if err := json.Unmarshal(v, &r.Space); err != nil {
+			return nil, fmt.Errorf("%s: \"space\" must be true or false", where)
+		}
 	}
 	if r.As == AsMetadata {
 		if !slices.Contains(fields, r.Field) {
