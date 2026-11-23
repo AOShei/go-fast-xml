@@ -4,8 +4,14 @@ package gofastxml
 // test is narrow.
 
 import (
+	"context"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/AOShei/go-fast-core"
 )
@@ -135,6 +141,47 @@ func TestReview5LookupLongValueRight(t *testing.T) {
 	}
 	if want := "heading:h1 paragraph:p1 paragraph:p2 heading:h2 paragraph:p3 "; got != want {
 		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+// An include through a symbolic link to a regular file is read (links are
+// followed); one through a link to a FIFO is not opened; a context ended
+// before reading stops the draft.
+func TestReview5DraftIncludeLinks(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, s string) {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(s), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const xs = `<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">`
+	write("real.xsd", xs+`<xs:element name="inc" type="xs:string"/></xs:schema>`)
+	if err := os.Symlink("real.xsd", filepath.Join(dir, "link.xsd")); err != nil {
+		t.Skip("no symbolic link:", err)
+	}
+	fifo := syscall.Mkfifo(filepath.Join(dir, "pipe"), 0o600) == nil
+	if fifo {
+		if err := os.Symlink("pipe", filepath.Join(dir, "pipe.xsd")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("main.xsd", xs+`<xs:include schemaLocation="link.xsd"/><xs:include schemaLocation="pipe.xsd"/><xs:element name="a" type="xs:string"/></xs:schema>`)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	d, err := DraftProfile(ctx, filepath.Join(dir, "main.xsd"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(d.JSON), `"inc"`) {
+		t.Errorf("the element of the linked include is not in the draft:\n%s", d.JSON)
+	}
+	if fifo && slices.ContainsFunc(d.Files, func(f string) bool { return strings.HasSuffix(f, "pipe.xsd") }) {
+		t.Errorf("the FIFO is listed as read: %v", d.Files)
+	}
+	done, stop := context.WithCancel(context.Background())
+	stop()
+	if _, err := DraftProfile(done, filepath.Join(dir, "main.xsd")); err == nil {
+		t.Error("a cancelled context gives a draft")
 	}
 }
 

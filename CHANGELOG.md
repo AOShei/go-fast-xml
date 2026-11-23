@@ -22,6 +22,10 @@
   stands.
 - Choosing a rule under ancestors with long tested attribute values no
   longer costs time in proportion to those values for every element.
+- `-draft-profile`: a schema file (entry or include) is opened only when
+  `os.Stat` finds a regular file, so an include naming a FIFO no longer
+  hangs; symbolic links are followed; the context is consulted before
+  each file.
 
 ### Phase 4: drafting a profile from an XSD
 
