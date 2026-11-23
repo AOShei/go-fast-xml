@@ -75,7 +75,7 @@ var (
 		AsSection:     common,
 		AsHeading:     append(slices.Clone(common), "level", "marker", "duplicate_of", "key"),
 		AsBlock:       append(slices.Clone(common), "kind", "language", "notation", "marker", "value", "duplicate_of", "key", "out_of_line"),
-		AsList:       append(slices.Clone(common), "ordered"),
+		AsList:        append(slices.Clone(common), "ordered"),
 		AsItem:        append(slices.Clone(common), "marker"),
 		AsTable:       append(slices.Clone(common), "model", "header"),
 		AsRow:         append(slices.Clone(common), "header", "cells"),
