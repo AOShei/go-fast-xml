@@ -217,6 +217,14 @@ func (e *Extractor) Extract(ctx context.Context, r io.ReaderAt, size int64, opts
 	if err != nil {
 		return nil, fmt.Errorf("gofastxml: %w: %w", err, gofastcore.ErrUnsupported)
 	}
+	// When the sample holds the whole input, it is UTF-8 and smaller than
+	// the window, the scanner reads the sample in place: it would read
+	// the same bytes into a window that holds them all, with the same
+	// tokens, so no window is made and nothing is read twice.
+	var whole []byte
+	if enc.UTF8 && int64(len(sample)) == size && len(sample)-enc.Skip < min(xmlscan.DefaultBufferSize, tagBytes) {
+		whole = sample[enc.Skip:]
+	}
 	sample = nil
 
 	ctx, decode := gofastcore.WithDecodeBudget(ctx, o.Limits, DefaultMaxDecodedBytes)
@@ -235,7 +243,12 @@ func (e *Extractor) Extract(ctx context.Context, r io.ReaderAt, size int64, opts
 	if enc.UTF8 {
 		scan.BaseOffset = int64(enc.Skip)
 	}
-	rd := xmlread.New(ctx, dec, xmlread.Options{Scan: scan})
+	var rd *xmlread.Reader
+	if whole != nil {
+		rd = xmlread.NewBytes(ctx, whole, xmlread.Options{Scan: scan})
+	} else {
+		rd = xmlread.New(ctx, dec, xmlread.Options{Scan: scan})
+	}
 
 	doc := gofastcore.New("xml")
 	doc.Source.Name, doc.Source.Size, doc.Source.MIME = o.Name, size, "application/xml"
