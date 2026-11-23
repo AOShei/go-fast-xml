@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TEI xmlns="http://www.tei-c.org/ns/1.0" xml:id="t1" xml:lang="en">
+<teiHeader><fileDesc><titleStmt><title>A Play</title><author>Anon</author></titleStmt>
+<publicationStmt><publisher>Test Press</publisher><idno type="DOI">10.1/t</idno></publicationStmt>
+<sourceDesc><p>Born digital.</p></sourceDesc></fileDesc>
+<profileDesc><langUsage><language ident="en">English</language></langUsage></profileDesc></teiHeader>
+<text><body>
+<div type="act" n="1" xml:id="a1"><head>Act 1</head>
+<div type="scene" n="2" xml:id="a1s2"><head>Scene 2</head>
+<stage type="entrance">Enter Hamlet.</stage>
+<sp who="#ham" xml:id="sp1"><speaker>HAMLET</speaker><l n="1" xml:id="l1">To be, or not to be</l><l n="2" xml:id="l2">That is the question.</l></sp>
+<pb n="12"/>
+<lg type="stanza"><l n="3">One line</l><l n="4">Two line</l></lg>
+<p xml:id="p1">The <pb n="13"/><choice><sic>teh</sic><corr>the</corr></choice> end<note place="foot" n="a">A note.</note>.</p>
+<list type="ordered"><item>First</item><item>Second</item></list>
+<table><row role="label"><cell>H</cell></row><row><cell>v</cell></row></table>
+</div></div>
+</body></text>
+</TEI>

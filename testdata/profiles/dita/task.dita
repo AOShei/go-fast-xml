@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="install" xml:lang="en">
+<title>Installing</title>
+<shortdesc>How to install.</shortdesc>
+<prolog><author>Writer</author><metadata><keywords><keyword>setup</keyword><indexterm>install</indexterm></keywords></metadata></prolog>
+<taskbody>
+<prereq><p>Have <xref href="java.dita" format="dita">Java</xref>.</p></prereq>
+<steps><step><cmd>Unzip the <filepath>zip</filepath>.</cmd><info><p>Anywhere.</p></info></step><step><cmd>Run it.</cmd></step></steps>
+<result><note type="tip"><p>Done.</p></note>
+<codeblock outputclass="bash">dita --help</codeblock>
+<simpletable><sthead><stentry>Option</stentry></sthead><strow><stentry>-o</stentry></strow></simpletable>
+<p conref="common.dita#c/p1">Reused.</p></result>
+</taskbody>
+</task>

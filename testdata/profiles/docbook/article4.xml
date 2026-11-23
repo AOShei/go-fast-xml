@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd">
+<article id="a1">
+<articleinfo><title>Old Article</title><author><firstname>Eric</firstname><surname>Raymond</surname></author><copyright><year>2000</year><holder>ESR</holder></copyright></articleinfo>
+<sect1 id="s1"><title>Top</title><para>Go to <ulink url="http://x.example">x</ulink>.</para>
+<sect2 id="s2"><title>Deeper</title><screen>$ ls</screen></sect2></sect1>
+</article>

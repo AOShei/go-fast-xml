@@ -205,6 +205,9 @@ type frame struct {
 	href      string
 	title     string
 	valAttr   string
+	// spaced: the sink of an inline "space" rule, given a space when the
+	// element ends.
+	spaced *sink
 
 	val    string
 	hasVal bool
@@ -422,8 +425,11 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 		f.role = roleInline
 		if s := e.cur; s != nil && s.structure {
 			e.structStart(s, el)
-		} else if e.lookup() == nil {
+		} else if r := e.lookup(); r == nil {
 			e.count(e.unmapped, el.Name)
+		} else if r.As == profile.AsInline && r.Space && s != nil {
+			s.b.Space()
+			f.spaced = s
 		}
 		return
 	}
@@ -734,8 +740,12 @@ func (e *Engine) startInline(f *frame, el *xmlread.Element) {
 		e.flushHeld()
 		s = e.newStray(el.Start)
 	}
-	f.span, f.spanStart = s, s.b.Pos()
 	r := f.rule
+	if r.Space {
+		s.b.Space()
+		f.spaced = s
+	}
+	f.span, f.spanStart = s, s.b.Pos()
 	if r.Link != nil {
 		f.href, _ = e.resolve(f, r.Link, "", useLink)
 	}
@@ -1626,6 +1636,9 @@ func (e *Engine) EndElement(r *xmlread.Reader, el *xmlread.Element, start, end i
 		e.calsEnd(f)
 	default:
 		ref = e.endRule(f, end)
+	}
+	if f.spaced != nil && f.spaced == e.active() {
+		f.spaced.b.Space()
 	}
 	if f.held != nil {
 		e.addHeld(f.held)
