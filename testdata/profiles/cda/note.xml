@@ -9,7 +9,7 @@
 <effectiveTime value="20260131120000-0500"/>
 <confidentialityCode code="N" codeSystem="2.16.840.1.113883.5.25"/>
 <languageCode code="en-US"/>
-<recordTarget><patientRole><id extension="P-1" root="2.16.840.1.113883.19.5"/><patient><name><given>Ada</given> <family>Example</family></name></patient></patientRole></recordTarget>
+<recordTarget><patientRole><id extension="P-1" root="2.16.840.1.113883.19.5"/><patient><name><given>Ada</given> <family>Example</family></name><administrativeGenderCode code="F" codeSystem="2.16.840.1.113883.5.1"/><birthTime value="19800101"/></patient></patientRole></recordTarget>
 <author><time value="20260131"/><assignedAuthor><id root="2.16.840.1.113883.4.6" extension="999"/><assignedPerson><name><given>Ben</given> <family>Doctor</family></name></assignedPerson></assignedAuthor></author>
 <component>
 <structuredBody>

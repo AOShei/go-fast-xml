@@ -111,6 +111,9 @@ type Value struct {
 	Of        *QName // {"attr": ..., "of": ...}
 	Child     *Selector
 	Structure *Selector
+	// AttrChild: {"attr": ..., "child": ...}, the attribute Attr of the
+	// first matching child, which is still read by its own rule.
+	AttrChild *Selector
 }
 
 // Claims reports whether the value is read from a child element.
@@ -222,7 +225,13 @@ type Profile struct {
 	tested   []QName
 	ofReads  map[QName][]QName
 	aliases  map[string]string
+	// childAttrs: some value reads an attribute of a child.
+	childAttrs bool
 }
+
+// ReadsChildAttrs reports whether a rule reads an attribute of a child
+// element ({"attr": ..., "child": ...}).
+func (p *Profile) ReadsChildAttrs() bool { return p.childAttrs }
 
 // ElementNamespace returns the namespace an element of namespace uri is
 // matched in: the target of "namespace_aliases", or uri itself.
@@ -440,7 +449,11 @@ func Load(r io.Reader, builtin bool) (*Profile, error) {
 				kept[v.Attr] = true
 				p.ofReads[*v.Of] = appendNew(p.ofReads[*v.Of], v.Attr)
 			}
-			if s := v.Claims(); s != nil {
+			s := v.Claims()
+			if s == nil && v.AttrChild != nil {
+				s, p.childAttrs = v.AttrChild, true
+			}
+			if s != nil {
 				p.maxSteps = max(p.maxSteps, len(s.Steps)+1)
 				for _, st := range s.Steps[:len(s.Steps)-1] {
 					for _, t := range st.Tests {
@@ -707,7 +720,7 @@ func compileRule(raw json.RawMessage, i int, f *fileJSON, builtin bool) (*Rule, 
 			if err != nil {
 				return nil, err
 			}
-			if cv.IsLiteral || cv.Of != nil || cv.Claims() != nil {
+			if cv.IsLiteral || cv.Of != nil || cv.Claims() != nil || cv.AttrChild != nil {
 				return nil, fmt.Errorf("%s: a cell of \"cells\" is an attribute of the row's element, {\"attr\": \"name\"}", where)
 			}
 			r.Cells = append(r.Cells, cv)
@@ -794,7 +807,7 @@ func (r *Rule) reads() {
 		add(t.Name)
 	}
 	for _, v := range r.values() {
-		if v.Attr.Local != "" && v.Of == nil {
+		if v.Attr.Local != "" && v.Of == nil && v.AttrChild == nil {
 			add(v.Attr)
 		}
 		if v.Claims() != nil {
@@ -899,11 +912,21 @@ func (c *compiler) value(key string, v json.RawMessage) (*Value, error) {
 			n++
 		}
 	}
-	if n != 1 || o.Of != "" && o.Attr == "" {
-		return nil, fmt.Errorf("%s: %q needs exactly one of \"attr\" (with \"of\" optionally), \"child\", \"structure\"", c.where, key)
-	}
 	val := &Value{}
 	var err error
+	if o.Attr != "" && o.Child != "" && o.Of == "" && o.Structure == "" {
+		// The attribute of a child.
+		if val.Attr, err = ResolveName(o.Attr, c.f.Namespaces, ""); err != nil {
+			return nil, fmt.Errorf("%s: %q: %v", c.where, key, err)
+		}
+		if val.AttrChild, err = c.relative(key, o.Child); err != nil {
+			return nil, err
+		}
+		return val, nil
+	}
+	if n != 1 || o.Of != "" && o.Attr == "" {
+		return nil, fmt.Errorf("%s: %q needs exactly one of \"attr\" (with \"of\" or \"child\" optionally), \"child\", \"structure\"", c.where, key)
+	}
 	switch {
 	case o.Attr != "":
 		if val.Attr, err = ResolveName(o.Attr, c.f.Namespaces, ""); err != nil {

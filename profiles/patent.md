@@ -117,9 +117,10 @@ EPO documents repeat the claims in three languages: tell them apart with
   `classification-us-primary`, `uspc`, `parent-child`, ...): inside
   metadata values, counted as unmapped; their text is in the value.
 - `sequence-list`, `us-sequence-list-doc` (an external file reference).
-- Unmapped attributes kept out: `patcit@num`/`@dnum`/`@id`,
-  `nplcit@num` (core has no slot for an identifier of a run inside an
-  item), the `sequence` of parties, MathML presentation attributes,
+- `patcit@num`/`@dnum`/`@id` and `nplcit@num` of a citation are its
+  item's `pat.patcit_num`, `pat.patcit_dnum`, `pat.patcit_id`,
+  `pat.nplcit_num` (an attribute of a child, `{"attr": ..., "child": ...}`).
+- Unmapped attributes kept out: the `sequence` of parties, MathML presentation attributes,
   `ul@compact`.
 
 ## Versions

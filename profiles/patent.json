@@ -79,8 +79,10 @@
 
     {"match": "references-cited", "as": "list", "ordered": false, "mark": {"pat.section": "references-cited"}},
     {"match": "us-references-cited", "as": "list", "ordered": false, "mark": {"pat.section": "references-cited"}},
-    {"match": "references-cited/citation", "as": "item", "anchor": {"attr": "id"}},
-    {"match": "us-references-cited/us-citation", "as": "item", "anchor": {"attr": "id"}},
+    {"match": "references-cited/citation", "as": "item", "anchor": {"attr": "id"},
+      "attrs": {"pat.patcit_num": {"attr": "num", "child": "patcit"}, "pat.patcit_dnum": {"attr": "dnum", "child": "patcit"}, "pat.patcit_id": {"attr": "id", "child": "patcit"}, "pat.nplcit_num": {"attr": "num", "child": "nplcit"}}},
+    {"match": "us-references-cited/us-citation", "as": "item", "anchor": {"attr": "id"},
+      "attrs": {"pat.patcit_num": {"attr": "num", "child": "patcit"}, "pat.patcit_dnum": {"attr": "dnum", "child": "patcit"}, "pat.patcit_id": {"attr": "id", "child": "patcit"}, "pat.nplcit_num": {"attr": "num", "child": "nplcit"}}},
     {"match": "category", "as": "inline"},
     {"match": "rel-passage", "as": "inline"},
     {"match": "passage", "as": "inline"},

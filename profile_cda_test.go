@@ -31,11 +31,16 @@ func TestCDAFixture(t *testing.T) {
 		"cda.template_id": "2.16.840.1.113883.10.20.22.1.1", "cda.id_root": "2.16.840.1.113883.19.5", "cda.id_extension": "DOC-1",
 		"cda.code": "11488-4", "cda.code_display": "Consultation note", "cda.effective_time": "20260131120000-0500",
 		"cda.confidentiality": "N", "cda.record_target": "Ada Example", "cda.author": "Ben Doctor",
+		"cda.patient_id_root": "2.16.840.1.113883.19.5", "cda.patient_id_extension": "P-1", "cda.patient_gender": "F",
+		"cda.patient_birth_time": "19800101", "cda.author_time": "20260131",
 	})
 	if doc.Metadata.Title != "Consultation Note" || doc.Metadata.Language != "en-US" {
 		t.Errorf("metadata %+v", doc.Metadata)
 	}
 	patentCheck(t, doc, `heading1:Consultation Note
+note~:2.16.840.1.113883.5.1
+note~:2.16.840.1.113883.4.6
+note~:999
 note:2.16.840.1.113883.10.20.22.2.5.1
 note:Problem list
 heading2:Problems
@@ -54,6 +59,9 @@ note~:#prob1
 heading3:History
 paragraph~:No surgery.
 `, `heading #
+note # attribute=codeSystem element=ClinicalDocument/recordTarget/patientRole/patient/administrativeGenderCode type=attribute
+note # attribute=root element=ClinicalDocument/author/assignedAuthor/id type=attribute
+note # attribute=extension element=ClinicalDocument/author/assignedAuthor/id type=attribute
 note # anchor_parent=sec-1 attribute=root cda.field=templateId type=attribute
 note # anchor_parent=sec-1 attribute=displayName cda.code=11450-4 cda.code_system=2.16.840.1.113883.6.1 cda.field=code type=attribute
 heading # anchor_parent=sec-1
@@ -73,14 +81,14 @@ heading # anchor_parent=sec-1
 paragraph # anchor_parent=sec-1 cda.part=narrative element=ClinicalDocument/component/structuredBody/component/section/component/section/text
 `)
 	bs := blocks(doc)
-	if tb := bs[9].Table; tb == nil || tb.HeaderRows != 1 || tb.Rows[1][1] != "80%" {
-		t.Errorf("table %+v", bs[9].Table)
+	if tb := bs[12].Table; tb == nil || tb.HeaderRows != 1 || tb.Rows[1][1] != "80%" {
+		t.Errorf("table %+v", bs[12].Table)
 	}
-	if sp := bs[4].Spans; len(sp) != 3 || sp[1].Href != "#tab-1" || sp[2].Href != "fn-1" {
+	if sp := bs[7].Spans; len(sp) != 3 || sp[1].Href != "#tab-1" || sp[2].Href != "fn-1" {
 		t.Errorf("spans %+v", sp)
 	}
-	if bs[11].Image == nil || bs[11].Image.ID != "img-1" {
-		t.Errorf("image %+v", bs[11].Image)
+	if bs[14].Image == nil || bs[14].Image.ID != "img-1" {
+		t.Errorf("image %+v", bs[14].Image)
 	}
 	st := doc.Parts[len(doc.Parts)-1]
 	found := false

@@ -253,6 +253,10 @@ type Engine struct {
 	marks   []mark
 	anchors []anchorAt
 	label   *labelAt
+	// readAttrs: the attributes of the element being started that a
+	// rule of an open element read ({"attr": ..., "child": ...}).
+	readAttrs     []profile.QName
+	hasChildAttrs bool
 
 	cache  map[string]*profile.Rule
 	keybuf []byte
@@ -276,7 +280,7 @@ type Engine struct {
 // part.
 func New(p *profile.Profile, out *generic.Out, opts Options) *Engine {
 	e := &Engine{p: p, out: out, opts: opts, parts: []*gofastcore.Part{out.Part},
-		cache: map[string]*profile.Rule{}}
+		cache: map[string]*profile.Rule{}, hasChildAttrs: p.ReadsChildAttrs()}
 	e.resetCounts()
 	return e
 }
@@ -421,6 +425,10 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 	}
 	f.marks, f.anchors = len(e.marks), len(e.anchors)
 	f.partAt, f.idxAt = e.out.Part, len(e.out.Part.Blocks)
+	e.readAttrs = e.readAttrs[:0]
+	if e.hasChildAttrs {
+		e.readAttrs = e.childAttrs()
+	}
 	if f.capture != nil {
 		// Inside an element read for a value: its text, or its outline.
 		f.role = roleInline
@@ -550,7 +558,7 @@ func (e *Engine) countAttrs(f *frame, el *xmlread.Element) {
 			continue
 		}
 		q := profile.QName{URI: a.URI, Local: a.Local}
-		if slices.Contains(f.rule.Reads, q) || slices.Contains(e.p.OfReads(f.name), q) {
+		if slices.Contains(f.rule.Reads, q) || slices.Contains(e.p.OfReads(f.name), q) || slices.Contains(e.readAttrs, q) {
 			continue
 		}
 		e.count(e.unmappedAttrs, el.Name+"@"+a.Name)
@@ -565,12 +573,35 @@ func (e *Engine) claim() (*slot, int) {
 		o := &e.frames[n-1-k]
 		for i := range o.slots {
 			s := &o.slots[i]
-			if !s.filled && s.v.Claims().MatchFrom(e, k) {
+			if !s.filled && s.v.AttrChild == nil && s.v.Claims().MatchFrom(e, k) {
 				return s, n - 1 - k
 			}
 		}
 	}
 	return nil, 0
+}
+
+// childAttrs fills the slots of open elements that read an attribute of
+// the element on top of the stack ({"attr": ..., "child": ...}), which is
+// then read by its own rule as usual. It returns the attributes read.
+func (e *Engine) childAttrs() []profile.QName {
+	var read []profile.QName
+	n := len(e.frames)
+	for k := 1; k < n && k < e.p.MaxSteps(); k++ {
+		o := &e.frames[n-1-k]
+		for i := range o.slots {
+			s := &o.slots[i]
+			if s.filled || s.v.AttrChild == nil || !s.v.AttrChild.MatchFrom(e, k) {
+				continue
+			}
+			s.filled = true
+			read = append(read, s.v.Attr)
+			if v, ok := e.Attr(0, s.v.Attr); ok {
+				e.fill(o, s, e.clean(v))
+			}
+		}
+	}
+	return read
 }
 
 func (e *Engine) startCapture(f *frame, s *slot, owner int, el *xmlread.Element) {
@@ -588,10 +619,21 @@ func (e *Engine) startCapture(f *frame, s *slot, owner int, el *xmlread.Element)
 	}
 	// The attributes of a child read for its text are not read.
 	for i := range el.Attrs {
-		if !generic.Skipped(el, &el.Attrs[i]) {
-			e.count(e.unmappedAttrs, el.Name+"@"+el.Attrs[i].Name)
+		if a := &el.Attrs[i]; !generic.Skipped(el, a) && !e.readAttr(a) {
+			e.count(e.unmappedAttrs, el.Name+"@"+a.Name)
 		}
 	}
+}
+
+// readAttr reports whether a rule of an open element read attribute a of
+// the element being started.
+func (e *Engine) readAttr(a *xmlread.Attr) bool {
+	for _, q := range e.readAttrs {
+		if q.Local == a.Local && q.URI == a.URI {
+			return true
+		}
+	}
+	return false
 }
 
 // structStart writes an element into an outline: name(attr=value, ...
@@ -665,7 +707,7 @@ func (e *Engine) startUnmapped(f *frame, el *xmlread.Element) {
 func (e *Engine) attrNotes(el *xmlread.Element, dst []gofastcore.Block) []gofastcore.Block {
 	for i := range el.Attrs {
 		a := &el.Attrs[i]
-		if a.Value == "" || generic.Skipped(el, a) {
+		if a.Value == "" || generic.Skipped(el, a) || e.readAttr(a) {
 			continue
 		}
 		text := e.clean(a.Value)
@@ -721,7 +763,7 @@ func (e *Engine) value(v *profile.Value) (string, bool) {
 		return "", true
 	case v.IsLiteral:
 		return v.Literal, true
-	case v.Claims() != nil:
+	case v.Claims() != nil, v.AttrChild != nil:
 		return "", false
 	case v.Of != nil:
 		for i := len(e.frames) - 2; i >= 0; i-- {
@@ -1159,6 +1201,17 @@ func (e *Engine) add(b gofastcore.Block, f *frame, own bool) blockRef {
 	if e.out.Stopped {
 		return blockRef{}
 	}
+	if e.label != nil && b.Kind != gofastcore.KindNote && !(own && f != nil && f.outOfLine) {
+		// A waiting label marks this block; one that cannot be its
+		// marker (the block has one, or is a table or image) is a block
+		// of its own before it, so that no label text is lost.
+		if b.Marker != "" || b.Kind == gofastcore.KindTable || b.Kind == gofastcore.KindImage {
+			e.flushLabel()
+		} else {
+			b.Marker = e.label.text
+			e.label = nil
+		}
+	}
 	if b.Origin == 0 {
 		b.Origin = gofastcore.OriginNative
 	}
@@ -1209,13 +1262,6 @@ func (e *Engine) add(b gofastcore.Block, f *frame, own bool) blockRef {
 				break
 			}
 		}
-	}
-	if e.label != nil && b.Kind != gofastcore.KindNote && b.Kind != gofastcore.KindTable && b.Kind != gofastcore.KindImage &&
-		!(own && f != nil && f.outOfLine) {
-		if b.Marker == "" {
-			b.Marker = e.label.text
-		}
-		e.label = nil
 	}
 	if b.Kind == gofastcore.KindHeading && b.Level > 6 {
 		set("level", strconv.Itoa(int(b.Level)))
@@ -1285,8 +1331,13 @@ func (e *Engine) patch(r blockRef, k, v string) {
 // finishSink makes the block of a sink, with the notes that follow it.
 func (e *Engine) finishSink(s *sink, f *frame, kind gofastcore.Kind, origin gofastcore.Origin, end int64) blockRef {
 	var ref blockRef
-	if text := s.b.String(); text != "" || kind == gofastcore.KindListItem && s.marker != "" && !s.auto {
+	if s.auto && e.label != nil {
+		// The file's label numbers the item, not the list's count.
+		s.marker, s.auto = "", false
+	}
+	if text := s.b.String(); text != "" || s.marker != "" && !s.auto {
 		if text == "" {
+			// A block whose only text is its label: the label is its text.
 			text, s.marker = s.marker, ""
 		}
 		b := gofastcore.Block{Kind: kind, Origin: origin, Text: text, Marker: s.marker, Continued: s.pieces > 0,
@@ -1926,6 +1977,7 @@ func (e *Engine) endRule(f *frame, end int64) blockRef {
 	case profile.AsLabel:
 		s := e.closeSink(f)
 		text := s.b.String()
+		e.keepAfter(s, f)
 		e.putSink(s)
 		if text == "" {
 			break
@@ -1970,6 +2022,7 @@ func (e *Engine) endRule(f *frame, end int64) blockRef {
 		if f.sink != nil {
 			s := e.closeSink(f)
 			v = s.b.String()
+			e.keepAfter(s, f)
 			e.putSink(s)
 		}
 		e.metadata(f, v, end)
@@ -1980,9 +2033,25 @@ func (e *Engine) endRule(f *frame, end int64) blockRef {
 				Attrs: map[string]string{gofastcore.AttrStored: r.StoredKind},
 				Loc:   gofastcore.Location{Offset: f.start, Length: max(end-f.start, 0)}})
 		}
+		e.keepAfter(s, f)
 		e.putSink(s)
 	}
 	return f.ref
+}
+
+// keepAfter gives the notes that followed a value's text (the attributes
+// of elements with no rule, comments) a place, so that they are not
+// lost with the sink: after the open block, else where the element
+// stood.
+func (e *Engine) keepAfter(s *sink, f *frame) {
+	for _, b := range s.after {
+		if o := e.active(); o != nil && o != s && len(o.after) < generic.MaxPendingBlocks {
+			o.after = append(o.after, b)
+		} else {
+			e.add(b, f, false)
+		}
+	}
+	s.after = nil
 }
 
 func (e *Engine) closeSink(f *frame) *sink {
@@ -2096,9 +2165,14 @@ func (e *Engine) metadata(f *frame, v string, end int64) {
 	}
 	m := &e.Meta
 	switch r.Field {
+	// A field that holds one value takes the first; the others go to
+	// Extra under the field's name, so that none is lost.
 	case "title":
-		if m.Title == "" {
+		switch {
+		case m.Title == "":
 			m.Title = v
+		case r.AlsoHeading == 0:
+			e.setExtra("title", v, r.Join)
 		}
 		if r.AlsoHeading > 0 {
 			e.add(gofastcore.Block{Kind: gofastcore.KindHeading, Level: uint8(r.AlsoHeading), Text: v,
@@ -2107,28 +2181,36 @@ func (e *Engine) metadata(f *frame, v string, end int64) {
 	case "author":
 		if len(m.Authors) < 1000 {
 			m.Authors = append(m.Authors, v)
+		} else {
+			e.ValuesCut++
 		}
 	case "keyword":
 		if len(m.Keywords) < 1000 {
 			m.Keywords = append(m.Keywords, v)
+		} else {
+			e.ValuesCut++
 		}
 	case "subject":
 		if m.Subject == "" {
 			m.Subject = v
+		} else {
+			e.setExtra("subject", v, r.Join)
 		}
 	case "language":
 		if m.Language == "" && len(v) <= generic.MaxLangBytes {
 			m.Language = v
+		} else {
+			e.setExtra("language", v, r.Join)
 		}
 	case "created", "modified":
 		t, ok := parseDate(v)
 		switch {
-		case !ok:
-			e.setExtra(r.Field, v, r.Join)
-		case r.Field == "created" && m.Created.IsZero():
+		case r.Field == "created" && ok && m.Created.IsZero():
 			m.Created = t
-		case r.Field == "modified" && m.Modified.IsZero():
+		case r.Field == "modified" && ok && m.Modified.IsZero():
 			m.Modified = t
+		default:
+			e.setExtra(r.Field, v, r.Join)
 		}
 	case "description":
 		e.setExtra("description", v, r.Join)

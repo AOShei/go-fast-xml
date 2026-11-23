@@ -88,6 +88,54 @@ func TestProfileBreak(t *testing.T) {
 	}
 }
 
+// TestProfileNothingDropped: (a) the attribute of a child as a value
+// source, and the attributes of unmapped elements inside a metadata
+// value kept as notes; (b) a label is not lost before an auto-numbered
+// item, a block with no other text, or a table; (c) titles after the
+// first in Extra.
+func TestProfileNothingDropped(t *testing.T) {
+	prof := head("nodrop", `{"root": "doc"}`) + `"rules": [
+		{"match": "doc", "as": "transparent"},
+		{"match": "title", "as": "metadata", "field": "title"},
+		{"match": "subject", "as": "metadata", "field": "subject"},
+		{"match": "target", "as": "metadata", "field": "extra", "key": "x.target",
+			"extra": {"x.gender": {"attr": "code", "child": "patient/gender"}, "x.root": {"attr": "root", "child": "tid"}}},
+		{"match": "tid", "as": "transparent"},
+		{"match": "sec", "as": "section", "attrs": {"x.code": {"attr": "code", "child": "code"}}},
+		{"match": "sec/code", "as": "transparent"},
+		{"match": "h", "as": "heading", "level": 1},
+		{"match": "p", "as": "block", "kind": "paragraph"},
+		{"match": "num", "as": "label"},
+		{"match": "ol", "as": "list", "ordered": true},
+		{"match": "li", "as": "item"},
+		{"match": "table", "as": "table"},
+		{"match": "tr", "as": "row"},
+		{"match": "td", "as": "cell"}]}`
+	src := `<doc><title>One</title><title>Two</title><subject>S1</subject><subject>S2</subject>` +
+		`<target><tid root="1.2.3"/><patient><name>Ann</name><gender code="F" system="x"/><birth value="1950"/></patient></target>` +
+		`<sec><code code="11348-0"/><h>Hist</h>` +
+		`<num>(a)</num><ol><li>item</li></ol>` +
+		`<p><num>2</num></p>` +
+		`<num>Table 1</num><table><tr><td>c</td></tr></table></sec></doc>`
+	doc := extractWith(t, prof, src, nil)
+	wantBrief(t, doc, "note~:x\nnote~:1950\nheading1:Hist\nlist_item1((a)):item\nparagraph:2\nparagraph:Table 1\ntable:\n")
+	x := doc.Metadata.Extra
+	if doc.Metadata.Title != "One" || x["title"] != "Two" || doc.Metadata.Subject != "S1" || x["subject"] != "S2" {
+		t.Errorf("title %q subject %q extra %v", doc.Metadata.Title, doc.Metadata.Subject, x)
+	}
+	if x["x.target"] != "Ann" || x["x.gender"] != "F" || x["x.root"] != "1.2.3" {
+		t.Errorf("extra %v", x)
+	}
+	if bs := blocks(doc); bs[2].Attrs["x.code"] != "11348-0" {
+		t.Errorf("section attrs %v", bs[2].Attrs)
+	}
+	for _, w := range doc.AllWarnings() {
+		if w.Code == WarnUnmappedAttributes && strings.Contains(w.Message, "gender@code") {
+			t.Errorf("read attribute counted unread: %s", w.Message)
+		}
+	}
+}
+
 // TestProfileNoteInTableInBlock: an out_of_line note inside a table that
 // split a paragraph is in file order: the table's caption, the note, the
 // table, then the paragraph's text after the table.

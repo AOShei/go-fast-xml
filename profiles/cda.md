@@ -49,11 +49,18 @@ Document: `cda.id_root` + `cda.id_extension` (with `cda.set_id_*` and
 
 Everything inside `entry` (by choice, above). Unmapped attributes kept
 out: `td@ID`/`th@ID` (core has no anchor for a cell), `content@styleCode`
-values other than Bold/Italics, `xsi:type`, the attributes inside header
-participants (`administrativeGenderCode@code`, `birthTime@value`,
-`telecom@value`, `time@value`, ids: the participant's text is kept, its
-coded values are not; see "Needs" in the report), `reference@value` of a
+values other than Bold/Italics, `xsi:type`, `reference@value` of a
 non-inline `nonXMLBody`.
+
+Header participants: their text is the `Extra` value; the patient's
+`id@root`/`@extension`, `administrativeGenderCode@code` and
+`birthTime@value` are `Extra["cda.patient_id_root"]`,
+`cda.patient_id_extension`, `cda.patient_gender`,
+`cda.patient_birth_time`, and the author's `time@value` is
+`cda.author_time` (attributes of a child, `{"attr": ..., "child": ...}`).
+Every other attribute inside a participant (`telecom@value`, ids,
+code systems) is an attribute `note` where the participant stands, as
+generic reading makes for an element with no rule.
 
 ## Versions
 
