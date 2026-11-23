@@ -49,6 +49,24 @@ func (b *Builder) Space() {
 	}
 }
 
+// Break appends a hard line break: the white space held before it becomes
+// one "\n". Like other white space it is dropped at the ends.
+func (b *Builder) Break() {
+	if !b.started {
+		b.lead, b.started = true, true
+	}
+	b.pending = append(b.pending[:0], '\n')
+}
+
+// Pos returns the offset in the text where the next character appended
+// will be, white space held before it included.
+func (b *Builder) Pos() int {
+	if len(b.buf) == 0 {
+		return 0
+	}
+	return len(b.buf) + len(b.pending)
+}
+
 func (b *Builder) text() {
 	if len(b.pending) > 0 {
 		if len(b.buf) > 0 {

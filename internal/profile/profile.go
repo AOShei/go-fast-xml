@@ -197,6 +197,7 @@ type Profile struct {
 	maxSteps int
 	anchored bool
 	kept     []QName
+	tested   []QName
 	ofReads  map[QName][]QName
 }
 
@@ -209,6 +210,9 @@ func (p *Profile) Anchored() bool { return p.anchored }
 // KeptAttrs lists the attributes whose values a reader keeps on open
 // elements: those that selectors test and those read from ancestors.
 func (p *Profile) KeptAttrs() []QName { return p.kept }
+
+// TestedAttrs lists every attribute a selector tests.
+func (p *Profile) TestedAttrs() []QName { return p.tested }
 
 // OfReads lists the attributes rules read from an ancestor of this name.
 func (p *Profile) OfReads(name QName) []QName { return p.ofReads[name] }
@@ -377,6 +381,7 @@ func Load(r io.Reader, builtin bool) (*Profile, error) {
 		p.anchored = p.anchored || r.Selector.Anchored
 		for k, st := range r.Selector.Steps {
 			for _, t := range st.Tests {
+				p.tested = appendNew(p.tested, t.Name)
 				if k < len(r.Selector.Steps)-1 {
 					kept[t.Name] = true
 				}
