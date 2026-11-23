@@ -82,6 +82,7 @@ type sink struct {
 	pieceAt int64
 	done    bool // an item has its text
 	fresh   bool // a line was just started (an item's marker written)
+	auto    bool // the marker is an ordered list's number, not from the file
 	// structure captures
 	structure bool
 	sb        []byte
@@ -95,6 +96,7 @@ func (s *sink) reset(kind sinkKind, start int64) {
 	s.b.Reset()
 	s.spans, s.after, s.marker = s.spans[:0], nil, ""
 	s.structure, s.sb, s.levels, s.cut, s.href = false, s.sb[:0], s.levels[:0], false, ""
+	s.fresh, s.auto = false, false
 }
 
 type blockRef struct {
@@ -869,7 +871,7 @@ func (e *Engine) startRule(f *frame, el *xmlread.Element) {
 			f.sink.marker, _ = e.resolve(f, r.Marker, "", useMarker)
 		} else if p != nil && p.ordered && p.rule != nil && p.rule.As == profile.AsList {
 			p.counter++
-			f.sink.marker = strconv.Itoa(p.counter) + "."
+			f.sink.marker, f.sink.auto = strconv.Itoa(p.counter)+".", true
 		}
 	case profile.AsList:
 		f.ld++
@@ -1179,7 +1181,7 @@ func (e *Engine) patch(r blockRef, k, v string) {
 // finishSink makes the block of a sink, with the notes that follow it.
 func (e *Engine) finishSink(s *sink, f *frame, kind gofastcore.Kind, origin gofastcore.Origin, end int64) blockRef {
 	var ref blockRef
-	if text := s.b.String(); text != "" || kind == gofastcore.KindListItem && s.marker != "" {
+	if text := s.b.String(); text != "" || kind == gofastcore.KindListItem && s.marker != "" && !s.auto {
 		if text == "" {
 			text, s.marker = s.marker, ""
 		}
