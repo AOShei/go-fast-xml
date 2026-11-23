@@ -167,6 +167,11 @@ element so far) as well as those to come.
   the block's element, starts a new block (not `Continued`: it is in
   another part) whose `Loc` begins at that text. Inside a cell or a value
   read for a rule, a part is read into it as before.
+- A `table` or `image` met inside an open paragraph-like `block` (a
+  patent's `p/tables/table`, `p/chemistry/img`) finishes that block the
+  same way and is a block of its own, in reading order; text after it
+  starts a new block. Inside a cell, a
+  heading or a value read for a rule it is read into it as before.
 - Inline styles and links become `Spans` when `Options.Spans` is set (in a
   block split into `Continued` pieces, each span is on the piece that
   holds it, and a span across the cut is in both, with each piece's
