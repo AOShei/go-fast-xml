@@ -141,6 +141,9 @@ type Options struct {
 	// BaseOffset is the offset of the first byte read, added to every
 	// offset the scanner reports.
 	BaseOffset int64
+	// MaxValueBytes bounds one decoded attribute value; a longer one is
+	// cut and counted in Stats.ValuesCut. Zero means DefaultMaxValueBytes.
+	MaxValueBytes int
 	// Interrupt, if set, is called every 1,024 constructs Next passes
 	// over without making a token; an error it returns ends the scan.
 	Interrupt func() error
@@ -156,6 +159,15 @@ const (
 	// MaxEntityName is the longest entity name looked up. A longer one is
 	// not read as a reference.
 	MaxEntityName = 64
+	// DefaultMaxValueBytes bounds one decoded attribute value.
+	DefaultMaxValueBytes = 1 << 20
+	// MaxNameKept bounds the bytes of an open element's name that are
+	// kept, for its End token and for matching its end tag (two names
+	// longer than this match when their kept starts and lengths do).
+	MaxNameKept = 1024
+	// MaxBindingBytes bounds the prefixes and URIs of the namespace
+	// declarations in scope.
+	MaxBindingBytes = 16 << 20
 )
 
 // Stats counts what the scanner did besides reading well-formed input.
@@ -175,6 +187,15 @@ type Stats struct {
 	// Expanded is the bytes of replacement text read in place of
 	// references.
 	Expanded int64
+	// ValuesCut counts attribute values cut to Options.MaxValueBytes, or
+	// to what is left of MaxTokenBytes for all the values of one tag.
+	ValuesCut int
+	// NamesCut counts element names longer than MaxNameKept, of which
+	// only the start is kept.
+	NamesCut int
+	// BindingsCut counts namespace declarations not read because those
+	// in scope already hold MaxBindingBytes.
+	BindingsCut int
 }
 
 type attr struct {
@@ -188,9 +209,12 @@ const (
 	bindEnded      = -4 // the End token of an element that declared its own namespace
 )
 
+// The int32 offsets cannot overflow: names keeps at most MaxNameKept
+// bytes per open element and bindNames at most MaxBindingBytes.
 type elem struct {
 	nameStart int32 // offset of the qualified name in Scanner.names
-	nameLen   int32
+	nameLen   int32 // the bytes kept, at most MaxNameKept
+	fullLen   int32 // the length of the name as written
 	colon     int32 // index of ':' in the name, or -1
 	bind      int32 // the binding of the element's namespace, or a bind* value
 	bindMark  int32 // len(binds) before this element's declarations
@@ -251,6 +275,9 @@ type Scanner struct {
 	over      int   // open elements beyond maxDepth
 	interrupt func() error
 	skips     int // constructs passed over without a token
+	maxValue  int
+	valueEnd  int  // attrBuf may not grow past this while a value is decoded
+	valueFull bool // the value being decoded reached valueEnd
 
 	frames           []frame
 	refStart, refEnd int64 // the outermost reference being expanded
@@ -307,6 +334,7 @@ func NewBytes(data []byte, opts *Options) *Scanner {
 
 func (s *Scanner) configure(opts *Options) {
 	s.maxDepth, s.maxToken, s.maxAttrs, s.maxEntity = DefaultMaxDepth, DefaultMaxTokenBytes, DefaultMaxAttrs, DefaultMaxEntityDepth
+	s.maxValue = DefaultMaxValueBytes
 	if opts == nil {
 		return
 	}
@@ -322,6 +350,9 @@ func (s *Scanner) configure(opts *Options) {
 	}
 	if opts.MaxEntityDepth > 0 {
 		s.maxEntity = opts.MaxEntityDepth
+	}
+	if opts.MaxValueBytes > 0 {
+		s.maxValue = opts.MaxValueBytes
 	}
 	s.expLeft = opts.ExpansionLimit
 	if s.expLeft < 0 {
@@ -1037,8 +1068,8 @@ func (s *Scanner) endTag(b []byte) scanStatus {
 	// no space. Compare it in place.
 	if n := len(s.stack); n > 0 && s.over == 0 {
 		top := &s.stack[n-1]
-		end := 2 + int(top.nameLen)
-		if end < len(b) && b[end] == '>' && string(b[2:end]) == string(s.names[top.nameStart:top.nameStart+top.nameLen]) {
+		end := 2 + int(top.fullLen)
+		if end < len(b) && b[end] == '>' && s.named(n-1, b[2:end]) {
 			s.pos += end + 1
 			s.pop()
 			s.kind = End
@@ -1095,7 +1126,7 @@ func (s *Scanner) endTag(b []byte) scanStatus {
 // qualified name.
 func (s *Scanner) named(i int, name []byte) bool {
 	e := &s.stack[i]
-	return string(s.names[e.nameStart:e.nameStart+e.nameLen]) == string(name)
+	return len(name) == int(e.fullLen) && string(s.names[e.nameStart:e.nameStart+e.nameLen]) == string(name[:e.nameLen])
 }
 
 func isSpace(c byte) bool { return c == ' ' || c == '\n' || c == '\t' || c == '\r' }
@@ -1245,6 +1276,11 @@ func (s *Scanner) startTag(b []byte) scanStatus {
 		return skipped
 	}
 	s.Stats.AttrsCut += cut
+	// Each value is decoded once, here, within bounds: one value to
+	// maxValue, all of a tag's together to maxToken.
+	for i := range s.attrs {
+		s.attrs[i].value = s.decodeValue(s.attrs[i].value)
+	}
 	s.push(name, bytes.IndexByte(name, ':'), declares)
 	s.pendingEnd = selfClose
 	s.kind = Start
@@ -1258,9 +1294,15 @@ var xmlnsPrefix = []byte("xmlns")
 // attributes just parsed, resolves the element's own namespace and puts
 // the element on the stack. colon is the index of ':' in name, or -1.
 func (s *Scanner) push(name []byte, colon int, declares bool) {
+	kept := name
+	if len(kept) > MaxNameKept {
+		kept = kept[:runeCut(kept, MaxNameKept)]
+		s.Stats.NamesCut++
+	}
 	e := elem{
 		nameStart: int32(len(s.names)),
-		nameLen:   int32(len(name)),
+		nameLen:   int32(len(kept)),
+		fullLen:   int32(len(name)),
 		colon:     int32(colon),
 		bindMark:  int32(len(s.binds)),
 		bindBytes: int32(len(s.bindNames)),
@@ -1278,12 +1320,16 @@ func (s *Scanner) push(name []byte, colon int, declares bool) {
 		default:
 			continue // an ordinary attribute whose name starts with "xmlns"
 		}
-		uri := s.attrValue(a)
+		uri := a.value
 		space := SpaceUnknown
 		if len(uri) == 0 {
 			space = NoSpace // xmlns="" undeclares the default namespace
 		} else if v, ok := s.spaces[string(uri)]; ok {
 			space = v
+		}
+		if len(s.bindNames)+len(prefix)+len(uri) > MaxBindingBytes {
+			s.Stats.BindingsCut++
+			continue
 		}
 		slot, known := s.slots[string(prefix)]
 		if !known {
@@ -1313,7 +1359,7 @@ func (s *Scanner) push(name []byte, colon int, declares bool) {
 	}
 	// A child usually has its parent's prefix. If this tag declared
 	// nothing, the parent's answer is the answer.
-	if n := len(s.stack); n > 0 && int(e.bindMark) == len(s.binds) {
+	if n := len(s.stack); n > 0 && int(e.bindMark) == len(s.binds) && s.stack[n-1].nameLen == s.stack[n-1].fullLen {
 		p := &s.stack[n-1]
 		var parentPrefix []byte
 		if p.colon >= 0 {
@@ -1326,11 +1372,17 @@ func (s *Scanner) push(name []byte, colon int, declares bool) {
 	}
 	e.bind = s.resolveBind(prefix, true)
 resolved:
-	s.names = append(s.names, name...)
+	s.names = append(s.names, kept...)
 	s.stack = append(s.stack, e)
 	s.qname = s.names[e.nameStart : e.nameStart+e.nameLen]
-	s.local = s.qname[e.colon+1:]
+	s.local = localOf(s.qname, e.colon)
 	s.bind = e.bind
+}
+
+// localOf returns the local part of a kept name; empty when the name was
+// cut before its colon.
+func localOf(qname []byte, colon int32) []byte {
+	return qname[min(int(colon)+1, len(qname)):]
 }
 
 // resolveBind returns the binding of prefix. An element without a prefix
@@ -1370,7 +1422,7 @@ func (s *Scanner) pop() {
 	e := s.stack[len(s.stack)-1]
 	s.stack = s.stack[:len(s.stack)-1]
 	s.qname = s.names[e.nameStart : e.nameStart+e.nameLen]
-	s.local = s.qname[e.colon+1:]
+	s.local = localOf(s.qname, e.colon)
 	s.bind = e.bind
 	// The name stays readable until the next push: names are only
 	// truncated here, and qname points below the new length.
@@ -1418,7 +1470,7 @@ func (s *Scanner) AttrAt(i int) (uri, local, value []byte) {
 	case colon >= 0:
 		uri = s.uriOf(s.resolveBind(a.name[:colon], false))
 	}
-	return uri, a.name[colon+1:], s.attrValue(a)
+	return uri, a.name[colon+1:], a.value
 }
 
 var xmlnsNamespace = []byte(XMLNSNamespace)
@@ -1440,16 +1492,42 @@ func (s *Scanner) Attr(uri, local string) ([]byte, bool) {
 	return nil, false
 }
 
-func (s *Scanner) attrValue(a *attr) []byte {
-	if !needsAttrDecode(a.value) {
-		return a.value
+// decodeValue returns the decoded form of a raw attribute value, cut to
+// the bounds and counted when it passes them.
+func (s *Scanner) decodeValue(raw []byte) []byte {
+	room := min(s.maxValue, max(s.maxToken-len(s.attrBuf), 0))
+	if !needsAttrDecode(raw) {
+		if len(raw) > room {
+			s.Stats.ValuesCut++
+			return raw[:runeCut(raw, room)]
+		}
+		return raw
 	}
 	start := len(s.attrBuf)
-	s.attrBuf = s.decodeAttr(s.attrBuf, a.value)
+	s.valueEnd, s.valueFull = start+room, false
+	s.attrBuf = s.decodeAttr(s.attrBuf, raw)
+	v := s.attrBuf[start:]
+	if s.valueFull || len(v) > room {
+		s.Stats.ValuesCut++
+		v = v[:runeCut(v, room)]
+		s.attrBuf = s.attrBuf[:start+len(v)]
+	}
 	// A value that needed decoding may leave attrBuf's backing array when
 	// it grows; earlier values keep pointing at the old array, which stays
 	// valid, so they are unaffected.
-	return s.attrBuf[start:]
+	return v
+}
+
+// runeCut returns the largest n <= max at which b can be cut without
+// splitting a UTF-8 sequence.
+func runeCut(b []byte, n int) int {
+	if n >= len(b) {
+		return len(b)
+	}
+	for n > 0 && !utf8.RuneStart(b[n]) {
+		n--
+	}
+	return n
 }
 
 func needsAttrDecode(v []byte) bool {
@@ -1468,6 +1546,11 @@ func (s *Scanner) decodeAttr(buf, raw []byte) []byte {
 	for i := 0; i < len(raw); {
 		switch c := raw[i]; c {
 		case '&':
+			if len(buf) > s.valueEnd {
+				// Past the bound: nothing more is expanded or kept.
+				s.valueFull = true
+				return buf
+			}
 			if name, n, ok := refName(raw[i:]); ok && predefined(name) == 0 && s.resolve != nil {
 				switch repl, how := s.resolve(name); how {
 				case Expand:

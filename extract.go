@@ -359,8 +359,12 @@ func partWarnings(part *gofastcore.Part, g *generic.Generic, out *generic.Out, r
 	if out.PathsCut > 0 {
 		limit(fmt.Sprintf("%s of element names longer than %d bytes cut", plural(out.PathsCut, "path", "paths"), MaxPathBytes))
 	}
-	if out.ValuesCut > 0 {
-		limit(fmt.Sprintf("%s longer than %d bytes cut", plural(out.ValuesCut, "attribute value", "attribute values"), MaxValueBytes))
+	if n := out.ValuesCut + stats.ValuesCut; n > 0 {
+		limit(fmt.Sprintf("%s longer than %d bytes (or than what was left of %d bytes for all the values of their tag) cut",
+			plural(n, "attribute value", "attribute values"), MaxValueBytes, MaxTagBytes))
+	}
+	if stats.BindingsCut > 0 {
+		limit(fmt.Sprintf("%s not read: those in scope held %d bytes", plural(stats.BindingsCut, "namespace declaration", "namespace declarations"), xmlscan.MaxBindingBytes))
 	}
 	switch {
 	case out.Stopped:

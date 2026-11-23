@@ -115,6 +115,7 @@ type frame struct {
 	start  int64 // where its block starts
 	pieces int   // blocks already given for its text
 	anchor string
+	id     string // the element's own identifier, read at its start
 }
 
 type item struct {
@@ -170,13 +171,15 @@ func (g *Generic) StartElement(r *xmlread.Reader, e *xmlread.Element) {
 		g.emitOwner(e.Start)
 		g.flush(false)
 	}
-	g.stack = append(g.stack, frame{el: e})
+	// The element's attributes are readable only now: its identifier is
+	// kept for when it becomes a text element.
+	g.stack = append(g.stack, frame{el: e, id: g.anchorOf(e)})
 	f := &g.stack[len(g.stack)-1]
 	if g.owner > 0 {
 		f.state = inline
 		g.after = g.attrNotes(len(g.stack), g.after)
 		if o := g.frameAt(g.owner); o.anchor == "" && o.pieces == 0 {
-			o.anchor = g.anchorOf(e) // the identifier of an element in the block
+			o.anchor = f.id // the identifier of an element in the block
 		}
 		return
 	}
@@ -245,9 +248,7 @@ func (g *Generic) becomeText(d int, at int64) {
 	g.b.Reset()
 	g.after = g.after[:0]
 	f.pieces = 0
-	if f.el != nil {
-		f.anchor = g.anchorOf(f.el)
-	}
+	f.anchor = f.id
 	if f.state != undecided {
 		f.state, f.start = textual, at
 		g.pieceAt = at

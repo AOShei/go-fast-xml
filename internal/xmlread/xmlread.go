@@ -42,6 +42,10 @@ type Element struct {
 	Name  string // qualified, as written, prefix included
 	Local string
 	URI   string // namespace; empty for none
+	// Attrs are the element's attributes, valid during the handler's
+	// StartElement only: they are released when it returns, so that
+	// open elements hold little whatever the file. Names are cut to
+	// xmlscan.MaxNameKept bytes, values to xmlscan's MaxValueBytes.
 	Attrs []Attr
 	// Depth is 1 for the root.
 	Depth int
@@ -269,6 +273,10 @@ func (r *Reader) Run(h Handler) error {
 				r.Report.External[RefXInclude]++
 			}
 			h.StartElement(r, e)
+			// What an open element holds is bounded: its attributes are
+			// the handler's to read during StartElement only.
+			clear(e.Attrs)
+			e.Attrs = e.Attrs[:0]
 		case xmlscan.End:
 			e := r.Top()
 			if e == nil {
@@ -316,7 +324,7 @@ func (r *Reader) open() *Element {
 	}
 	for i := range s.NumAttr() {
 		uri, local, value := s.AttrAt(i)
-		a := Attr{Name: r.intern(s.AttrNameAt(i)), URI: r.intern(uri), Local: r.intern(local), Value: string(value)}
+		a := Attr{Name: r.intern(kept(s.AttrNameAt(i))), URI: r.intern(uri), Local: r.intern(kept(local)), Value: string(value)}
 		if a.URI == xmlscan.XMLNamespace && a.Local == "space" {
 			switch a.Value {
 			case "preserve":
@@ -329,6 +337,19 @@ func (r *Reader) open() *Element {
 	}
 	r.stack = append(r.stack, e)
 	return e
+}
+
+// kept cuts an attribute name as the scanner cuts element names, to
+// xmlscan.MaxNameKept bytes at a character boundary.
+func kept(b []byte) []byte {
+	if len(b) <= xmlscan.MaxNameKept {
+		return b
+	}
+	n := xmlscan.MaxNameKept
+	for n > 0 && b[n]&0xC0 == 0x80 {
+		n--
+	}
+	return b[:n]
 }
 
 func (r *Reader) close() {

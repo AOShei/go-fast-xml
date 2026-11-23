@@ -23,6 +23,55 @@ func (s *smallReads) Read(p []byte) (int, error) {
 	return s.r.Read(p[:min(len(p), s.n)])
 }
 
+// Finding 13: an attribute value is decoded once, and its expansion is
+// held only to the bound.
+func TestAttrDecodedOnce(t *testing.T) {
+	calls := 0
+	res := func(name []byte) ([]byte, Resolution) {
+		calls++
+		if string(name) == "e" {
+			return []byte(strings.Repeat("y", 1000)), Expand
+		}
+		return nil, Keep
+	}
+	src := `<r xmlns:p="&u;" a="` + strings.Repeat("&e;", 3000) + `"><p:x/></r>`
+	s := NewBytes([]byte(src), &Options{Resolve: res, ExpansionLimit: -1, MaxValueBytes: 100000})
+	if s.Next() != Start {
+		t.Fatal("no start")
+	}
+	for i := range s.NumAttr() {
+		s.AttrAt(i)
+		s.AttrAt(i)
+	}
+	_, _, v := s.AttrAt(1)
+	if len(v) != 100000 || len(s.attrBuf) > 101000 || s.Stats.ValuesCut != 1 {
+		t.Errorf("value %d, buffer %d, cut %d", len(v), len(s.attrBuf), s.Stats.ValuesCut)
+	}
+	// One lookup of u, and of e only as far as the bound.
+	if calls > 2+101 {
+		t.Errorf("%d lookups", calls)
+	}
+}
+
+// Finding 3: open elements keep bounded names, and offsets stay valid.
+func TestLongNamesKept(t *testing.T) {
+	long := strings.Repeat("n", 5000)
+	src := "<" + long + "1><" + long + "2><" + long + "2>t</" + long + "2></" + long + "2></" + long + "1>"
+	s := NewBytes([]byte(src), nil)
+	ends := 0
+	for k := s.Next(); k != EOF; k = s.Next() {
+		if len(s.names) > 3*MaxNameKept {
+			t.Fatalf("%d bytes of names", len(s.names))
+		}
+		if k == End {
+			ends++
+		}
+	}
+	if ends != 3 || s.Stats.Repairs != 0 || s.Stats.NamesCut != 3 {
+		t.Errorf("%d ends, %d repairs, %d cut", ends, s.Stats.Repairs, s.Stats.NamesCut)
+	}
+}
+
 // Finding 4: a long tag read in small pieces is not parsed again for
 // every piece.
 func TestLongTagSmallReads(t *testing.T) {

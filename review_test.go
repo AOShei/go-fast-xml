@@ -104,6 +104,14 @@ func TestUnclosedQuote(t *testing.T) {
 	}
 }
 
+// Finding 13: a namespace declaration's references are counted once.
+func TestUndeclaredCountedOnce(t *testing.T) {
+	doc := extract(t, `<r xmlns:p="urn:&u;" a="&v;"><p>&w;</p></r>`, nil)
+	if msg := warned(doc, WarnEntityUndeclared); !strings.HasPrefix(msg, "3 references") {
+		t.Errorf("message %q", msg)
+	}
+}
+
 // Finding 11: metadata values are cut at a character boundary and
 // counted; an xml:lang too long for the language is a note.
 func TestMetadataCut(t *testing.T) {
