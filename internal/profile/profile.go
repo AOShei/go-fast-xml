@@ -210,6 +210,16 @@ type Profile struct {
 	kept     []QName
 	tested   []QName
 	ofReads  map[QName][]QName
+	aliases  map[string]string
+}
+
+// ElementNamespace returns the namespace an element of namespace uri is
+// matched in: the target of "namespace_aliases", or uri itself.
+func (p *Profile) ElementNamespace(uri string) string {
+	if t, ok := p.aliases[uri]; ok {
+		return t
+	}
+	return uri
 }
 
 // MaxSteps returns the most steps of any selector.
@@ -299,7 +309,8 @@ type fileJSON struct {
 	Format           int               `json:"format"`
 	Namespaces       map[string]string `json:"namespaces"`
 	DefaultNamespace string            `json:"default_namespace"`
-	Match            []matchJSON       `json:"match"`
+	NamespaceAliases map[string]string `json:"namespace_aliases"`
+	Match          []matchJSON       `json:"match"`
 	HeadingBase      int               `json:"heading_base"`
 	Rules            []json.RawMessage `json:"rules"`
 }
@@ -349,6 +360,21 @@ func Load(r io.Reader, builtin bool) (*Profile, error) {
 	}
 	p := &Profile{Name: f.Profile, Title: f.Title, HeadingBase: f.HeadingBase,
 		byName: map[QName][]*Rule{}, ofReads: map[QName][]QName{}}
+	if len(f.NamespaceAliases) > 64 {
+		return nil, &Error{Msg: "more than 64 \"namespace_aliases\""}
+	}
+	for from, to := range f.NamespaceAliases {
+		if from == "" || from == to || from == "http://www.w3.org/XML/1998/namespace" {
+			return nil, &Error{Msg: fmt.Sprintf("namespace alias %q -> %q cannot be declared", from, to)}
+		}
+		if _, chained := f.NamespaceAliases[to]; chained {
+			return nil, &Error{Msg: fmt.Sprintf("namespace alias %q -> %q: the target is itself an alias", from, to)}
+		}
+		if p.aliases == nil {
+			p.aliases = map[string]string{}
+		}
+		p.aliases[from] = to
+	}
 	if p.HeadingBase == 0 {
 		p.HeadingBase = 1
 	}

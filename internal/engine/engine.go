@@ -389,7 +389,7 @@ func (e *Engine) parent() *frame {
 // StartElement implements xmlread.Handler.
 func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 	e.attrs = el.Attrs
-	e.frames = append(e.frames, frame{name: profile.QName{URI: el.URI, Local: el.Local}, qname: el.Name, start: el.Start})
+	e.frames = append(e.frames, frame{name: profile.QName{URI: e.p.ElementNamespace(el.URI), Local: el.Local}, qname: el.Name, start: el.Start})
 	f := e.top()
 	if kept := e.p.KeptAttrs(); len(kept) > 0 {
 		for _, a := range el.Attrs {
