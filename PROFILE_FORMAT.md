@@ -161,6 +161,12 @@ element so far) as well as those to come.
   the item's text and later blocks follow as blocks at the item's depth.
   Blocks inside another `block` are joined with `\n` the same way.
 - A `block` inside a `heading` or `label` is unwrapped (`Titre/Paragraphe`).
+- A `part` met inside an open block (a paragraph, heading, item) finishes
+  that block first: its text so far is a block in the part being left,
+  its `Loc` ending where the part starts. Text after the part, still in
+  the block's element, starts a new block (not `Continued`: it is in
+  another part) whose `Loc` begins at that text. Inside a cell or a value
+  read for a rule, a part is read into it as before.
 - Inline styles and links become `Spans` when `Options.Spans` is set (in a
   block split into `Continued` pieces, each span is on the piece that
   holds it, and a span across the cut is in both, with each piece's

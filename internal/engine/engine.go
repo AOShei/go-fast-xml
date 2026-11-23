@@ -87,6 +87,7 @@ type sink struct {
 	fresh    bool // a line was just started (an item's marker written)
 	auto     bool // the marker is an ordered list's number, not from the file
 	verbatim bool // white space kept as written (code)
+	restart  bool // a part broke the block: the next text starts a block
 	// structure captures
 	structure bool
 	sb        []byte
@@ -96,7 +97,7 @@ type sink struct {
 }
 
 func (s *sink) reset(kind sinkKind, start int64) {
-	s.kind, s.start, s.end, s.pieces, s.pieceAt, s.done = kind, start, start, 0, start, false
+	s.kind, s.start, s.end, s.pieces, s.pieceAt, s.done, s.restart = kind, start, start, 0, start, false, false
 	s.b.Reset()
 	s.spans, s.after, s.marker = s.spans[:0], nil, ""
 	s.structure, s.sb, s.levels, s.cut, s.href = false, s.sb[:0], s.levels[:0], false, ""
@@ -154,6 +155,9 @@ type frame struct {
 	kept    []xmlread.Attr
 	sink    *sink
 	prevCur *sink
+	// suspended: a part met inside an open block; prevCur is that block's
+	// sink, resumed when the part ends.
+	suspended bool
 
 	sections int
 	quotes   int
@@ -448,6 +452,14 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 	}
 	if rule.As == profile.AsInline {
 		e.startInline(f, el)
+		return
+	}
+	if rule.As == profile.AsPart && e.cur != nil && e.breakOpen(el.Start) {
+		// The open block is finished; the part is read on its own, and
+		// what follows it in the block starts a new block.
+		f.prevCur, e.cur, f.suspended = e.cur, nil, true
+		e.flushStray()
+		e.startRule(f, el)
 		return
 	}
 	if e.cur != nil {
@@ -1335,6 +1347,9 @@ func (e *Engine) Text(r *xmlread.Reader, t []byte, start, end int64) {
 	if s.cut {
 		return
 	}
+	if s.restart && !spaceOnly(t) {
+		s.restart, s.pieceAt = false, start
+	}
 	s.b.Append(t, preserve)
 	s.end = max(s.end, end)
 	if !spaceOnly(t) {
@@ -1358,6 +1373,19 @@ func spaceOnly(t []byte) bool {
 // far is given as a piece and the rest continues it; a value or a cell is
 // cut there.
 func (e *Engine) cutSink(s *sink, at int64) {
+	if !e.givePiece(s, at) {
+		if !s.cut {
+			s.cut = true
+			e.TextCut++
+		}
+		return
+	}
+	e.out.Splits++
+}
+
+// givePiece gives a block's text so far as a block of its own, when the
+// sink is one that makes a block; it reports whether it did.
+func (e *Engine) givePiece(s *sink, at int64) bool {
 	var f *frame
 	for i := len(e.frames) - 1; i >= 0; i-- {
 		if e.frames[i].sink == s {
@@ -1384,13 +1412,23 @@ func (e *Engine) cutSink(s *sink, at int64) {
 		}
 		e.piece(s, f, kind, gofastcore.OriginNative, at)
 	default:
-		if !s.cut {
-			s.cut = true
-			e.TextCut++
-		}
-		return
+		return false
 	}
-	e.out.Splits++
+	return true
+}
+
+// breakOpen finishes the open block before a part that starts inside it:
+// its text so far is a block, and text after the part starts a new block
+// (not a continued piece: it is in another part). It reports false for a
+// sink that makes no block of its own (a cell, a value), which the part
+// is then read into as before.
+func (e *Engine) breakOpen(at int64) bool {
+	s := e.cur
+	if s.structure || !e.givePiece(s, at) {
+		return false
+	}
+	s.pieces, s.restart = 0, true
+	return true
 }
 
 func (e *Engine) piece(s *sink, f *frame, kind gofastcore.Kind, origin gofastcore.Origin, at int64) {
@@ -1544,6 +1582,9 @@ func (e *Engine) EndElement(r *xmlread.Reader, el *xmlread.Element, start, end i
 	}
 	if e.label != nil && e.label.depth >= n-1 {
 		e.flushLabel() // a label whose container ends with no block after it
+	}
+	if f.suspended {
+		e.cur = f.prevCur
 	}
 	e.marks = e.marks[:min(f.marks, len(e.marks))]
 	e.anchors = e.anchors[:min(f.anchors, len(e.anchors))]
