@@ -38,6 +38,9 @@ const (
 	// AttrAnchorParent is the identifier of the nearest enclosing element
 	// a rule names with "anchor", on a block with no identifier of its own.
 	AttrAnchorParent = "anchor_parent"
+	// AttrHeaderSource is "profile" on a table whose header row is the
+	// profile's fixed text.
+	AttrHeaderSource = "header_source"
 	// AttrHref is the address of a link, on its record in the stored part.
 	AttrHref = "href"
 )
@@ -885,10 +888,16 @@ func (e *Engine) startRule(f *frame, el *xmlread.Element) {
 		f.ordered = e.test(r.Ordered)
 	case profile.AsTable:
 		f.table = newTable(r.Model, el.Start)
+		if len(r.HeaderText) > 0 {
+			e.headerRow(f.table, r.HeaderText)
+		}
 	case profile.AsRow:
 		if t := e.tableOf(); t != nil {
 			f.owner = t
 			t.startRow(e.test(r.Header))
+			if len(r.Cells) > 0 {
+				e.attrRow(t, r.Cells)
+			}
 		}
 	case profile.AsCell:
 		if t := e.tableOf(); t != nil {

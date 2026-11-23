@@ -68,6 +68,8 @@ const fuzzProfile = `{"profile": "fuzz", "format": 1, "match": [{"root": "r"}], 
   {"match": "i", "as": "item", "attrs": {"x.v": {"child": "v"}}},
   {"match": "lab", "as": "label"},
   {"match": "tb", "as": "table"},
+  {"match": "atb", "as": "table", "header": ["from", "to"]},
+  {"match": "ar", "as": "row", "cells": [{"attr": "from"}, {"attr": "to"}]},
   {"match": "cals", "as": "table", "model": "cals"},
   {"match": "tr", "as": "row", "header": {"attr": "h", "in": ["1"]}},
   {"match": "td", "as": "cell", "colspan": "cs", "rowspan": "rs"},
@@ -88,7 +90,8 @@ func FuzzProfile(f *testing.F) {
 			`<l t="1"><i>one<v>v</v><p>p</p><l><i>two</i></l></i></l><lab>L</lab><q>Q</q></s><tb><tr h="1"><td cs="2">a</td></tr><tr><td rs="3"><p>x</p><l><i>y</i></l></td><td>z</td></tr></tb>` +
 			`<cals><tgroup><colspec colname="a"/><colspec colname="b"/><thead><row><entry namest="a" nameend="b">h</entry></row></thead><tbody><row><entry morerows="2">x</entry></row></tbody></tgroup></cals>` +
 			`<img src="i"><alt>A</alt></img><u href="http://x"/><n>note</n><st>stored</st><hide h="1"><p>hid</p></hide><sk>gone</sk>stray<zz q="1">unmapped<b>in</b></zz>` +
-			`<part><pn>P2</pn><p>in part</p></part><fn><lab>1</lab><p>fn</p></fn><code>x  y</code></r>`,
+			`<part><pn>P2</pn><p>in part</p></part><fn><lab>1</lab><p>fn</p></fn><code>x  y</code>` +
+			`<atb><ar from="a" to="b"/><ar from="c"/><tr><td>t</td></tr><ar to="d">text</ar></atb></r>`,
 		`<r><s><s><s><s><s><s><s><h>deep</h></s></s></s></s></s></s></s></r>`,
 	} {
 		f.Add([]byte(s), true)

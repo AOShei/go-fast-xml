@@ -13,14 +13,19 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/AOShei/go-fast-core"
 )
 
 // MaxProfileBytes bounds the size of a profile file; MaxRules its rules.
+// MaxCells bounds the entries of a row's "cells" and a table's "header";
+// MaxHeaderBytes the text of one header cell.
 const (
 	MaxProfileBytes = 4 << 20
 	MaxRules        = 10000
+	MaxCells        = 64
+	MaxHeaderBytes  = 256
 )
 
 // As is a rule kind.
@@ -72,8 +77,8 @@ var (
 		AsBlock:       append(slices.Clone(common), "kind", "language", "notation", "marker", "value", "duplicate_of", "key"),
 		AsList:        append(slices.Clone(common), "ordered"),
 		AsItem:        append(slices.Clone(common), "marker"),
-		AsTable:       append(slices.Clone(common), "model"),
-		AsRow:         append(slices.Clone(common), "header"),
+		AsTable:       append(slices.Clone(common), "model", "header"),
+		AsRow:         append(slices.Clone(common), "header", "cells"),
 		AsCell:        append(slices.Clone(common), "header", "colspan", "rowspan"),
 		AsInline:      {"match", "as", "style", "link", "title", "attrs", "extra"},
 		AsLabel:       {"match", "as"},
@@ -170,6 +175,12 @@ type Rule struct {
 
 	Marker, Link, Title, ID, Alt, Name, Value, Anchor *Value
 	Attrs, Mark, Extra                                []KV
+
+	// Cells are the cells of a row made from its element's attributes
+	// ("cells", row). HeaderText is a header row of fixed text ("header",
+	// table).
+	Cells      []*Value
+	HeaderText []string
 
 	// Reads lists the attributes of the element the rule reads.
 	Reads []QName
@@ -433,7 +444,7 @@ func (r *Rule) values() []*Value {
 			vs = append(vs, kv.Value)
 		}
 	}
-	return vs
+	return append(vs, r.Cells...)
 }
 
 var blockKinds = map[string]gofastcore.Kind{
@@ -617,8 +628,35 @@ func compileRule(raw json.RawMessage, i int, f *fileJSON, builtin bool) (*Rule, 
 	if r.Ordered, err = c.test("ordered"); err != nil {
 		return nil, err
 	}
-	if r.Header, err = c.test("header"); err != nil {
+	if r.As == AsTable {
+		if v, ok := m["header"]; ok {
+			if err := json.Unmarshal(v, &r.HeaderText); err != nil || len(r.HeaderText) == 0 || len(r.HeaderText) > MaxCells {
+				return nil, fmt.Errorf("%s: a table's \"header\" is a list of 1 to %d strings", where, MaxCells)
+			}
+			for _, h := range r.HeaderText {
+				if len(h) > MaxHeaderBytes || !utf8.ValidString(h) {
+					return nil, fmt.Errorf("%s: \"header\" text %q is longer than %d bytes or not UTF-8", where, h, MaxHeaderBytes)
+				}
+			}
+		}
+	} else if r.Header, err = c.test("header"); err != nil {
 		return nil, err
+	}
+	if v, ok := m["cells"]; ok {
+		var raws []json.RawMessage
+		if err := json.Unmarshal(v, &raws); err != nil || len(raws) == 0 || len(raws) > MaxCells {
+			return nil, fmt.Errorf("%s: \"cells\" is a list of 1 to %d value sources", where, MaxCells)
+		}
+		for _, raw := range raws {
+			cv, err := c.value("cells", raw)
+			if err != nil {
+				return nil, err
+			}
+			if cv.IsLiteral || cv.Of != nil || cv.Claims() != nil {
+				return nil, fmt.Errorf("%s: a cell of \"cells\" is an attribute of the row's element, {\"attr\": \"name\"}", where)
+			}
+			r.Cells = append(r.Cells, cv)
+		}
 	}
 	for _, x := range []struct {
 		key string

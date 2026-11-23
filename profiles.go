@@ -60,6 +60,10 @@ const ExtraProfile = "xml.profile"
 // enclosing element a profile names with "anchor".
 const AttrAnchorParent = engine.AttrAnchorParent
 
+// AttrHeaderSource is "profile" on a table whose header row is the fixed
+// text of the profile's "header", not text of the file.
+const AttrHeaderSource = engine.AttrHeaderSource
+
 //go:embed profiles/*.json
 var profileFiles embed.FS
 

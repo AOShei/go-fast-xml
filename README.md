@@ -91,7 +91,9 @@ For the XML of Service-Public.fr published by DILA (schema Publication 3.5): the
 | `Image`, `Infographie`, `ImageIllustration` | `image` block: id from `@LienPublication`, alt from `TexteDeRemplacement`; `Legende` and `Infographie/Titre` captions; `Credits`, `Description` paragraphs |
 | `Public`, `Langue`, `Cout`, `Calendrier`, `Etapes`, `Documents`, ... (R files) | their blocks carry `Attrs["sp.field"]` = the element name |
 | `ItemArbo`, `ItemMenu`, `DatesModImp/Item` (index files) | a `list_item` at its depth with its `Titre`, anchor `@ID`, `sp.type`, `sp.date_modified`, `sp.file`, `sp.date_important` |
-| `Redirection`, `RedirectionExterne` | read generically (attribute notes): the format cannot make table cells from attributes |
+| `Redirections` with `Redirection`, `RedirectionExterne` | one `table` in file order: a header row `from`, `to`, `toUrl`, `date`, `audience`, `type`, `corpus` (the profile's text: `Origin: inferred`, `Attrs["header_source"]="profile"`), then a row per element from its attributes (`cells`), an absent attribute an empty cell; `Attrs["attribute"]` lists the attributes. Core's `Table` has no location per row: the table's `Loc` covers the root element |
+
+On the public corpus (Service-Public, 4,194 dev and 1,362 held-out files), every element has a rule: `xml.unmapped_elements` is empty on both sets. The only unmapped attributes on dev are `Colonne@largeur` and `Colonne@type` (3,558 each, column layout); held-out has 2,728 unmapped attributes in all.
 
 The `sp.*` keys are the profile's own (decision S9), so they cannot collide with core's keys.
 

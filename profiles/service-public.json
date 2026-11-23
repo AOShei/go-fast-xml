@@ -18,7 +18,9 @@
     {"match": "/ServiceComplementaire", "as": "transparent", "extra": {"sp.id": {"attr": "ID"}, "sp.type": {"attr": "type"}, "sp.url": {"attr": "spUrl"}, "sp.date_important": {"attr": "dateDerniereModificationImportante"}, "sp.profils_pro": {"attr": "profilsPro"}}},
     {"match": "/Arborescence", "as": "transparent"},
     {"match": "/Menu", "as": "transparent"},
-    {"match": "/Redirections", "as": "transparent"},
+    {"match": "/Redirections", "as": "table", "header": ["from", "to", "toUrl", "date", "audience", "type", "corpus"]},
+    {"match": "/Redirections/Redirection", "as": "row", "cells": [{"attr": "from"}, {"attr": "to"}, {"attr": "toUrl"}, {"attr": "date"}, {"attr": "audience"}, {"attr": "type"}, {"attr": "corpus"}]},
+    {"match": "/Redirections/RedirectionExterne", "as": "row", "cells": [{"attr": "from"}, {"attr": "to"}, {"attr": "toUrl"}, {"attr": "date"}, {"attr": "audience"}, {"attr": "type"}, {"attr": "corpus"}]},
     {"match": "/DatesModImp", "as": "transparent"},
     {"match": "/CentresDeContact", "as": "transparent"},
 

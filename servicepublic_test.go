@@ -279,7 +279,9 @@ func spSourceText(data []byte, used map[string]bool) (string, error) {
 var cellMarkerRE = regexp.MustCompile(`(^|\n)\d+\. `)
 
 // spDocText is the text of the body's blocks and cells in order, white
-// space removed: not stored data, not text from an attribute, not the
+// space removed: not stored data, not text from an attribute (a block
+// with Attrs["attribute"], the Redirections table among them, whose
+// cells are attributes and whose header is the profile's), not the
 // text of an image (its alt, see spOracleSkip), not the numbers of
 // ordered list items, which the file does not hold.
 func spDocText(doc *gofastcore.Document) string {

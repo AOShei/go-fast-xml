@@ -1,10 +1,13 @@
 package engine
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/AOShei/go-fast-core"
+	"github.com/AOShei/go-fast-xml/internal/generic"
+	"github.com/AOShei/go-fast-xml/internal/profile"
 	"github.com/AOShei/go-fast-xml/internal/xmlread"
 )
 
@@ -30,6 +33,49 @@ type table struct {
 	nextCol  int
 	inHead   bool
 	cut      bool
+	// cost is what the cells hold so far, against the text budget.
+	cost int64
+	// fromProfile: the header row is the profile's fixed text. attrNames
+	// are the attributes rows were made from, in order of first use.
+	fromProfile bool
+	attrNames   []string
+}
+
+// attrRow fills the row just started from its element's attributes
+// (a row rule's "cells"); an absent attribute gives an empty cell.
+func (e *Engine) attrRow(t *table, cells []*profile.Value) {
+	for _, cv := range cells {
+		v, _ := e.value(cv)
+		t.startCell(e, 1, 1, false)
+		t.endCell(v, "")
+		if n := cv.Attr.Local; !slices.Contains(t.attrNames, n) && len(t.attrNames) < profile.MaxCells {
+			t.attrNames = append(t.attrNames, n)
+		}
+	}
+	t.endRow()
+	e.tableCost(t)
+}
+
+// headerRow gives the table the profile's fixed header row.
+func (e *Engine) headerRow(t *table, text []string) {
+	t.startRow(true)
+	for _, h := range text {
+		t.startCell(e, 1, 1, true)
+		t.endCell(e.clean(h), "")
+	}
+	t.endRow()
+	t.fromProfile = true
+	e.tableCost(t)
+}
+
+// tableCost stops reading when the cells held so far are more than the
+// text budget has left: a row made from attributes holds more than its
+// element's bytes.
+func (e *Engine) tableCost(t *table) {
+	if t.cost > e.out.Budget.Left() {
+		e.out.Budget.Exhaust()
+		e.out.Stopped = true
+	}
 }
 
 func newTable(model string, start int64) *table {
@@ -104,6 +150,7 @@ func (t *table) endCell(text, href string) {
 		t.occ = append(t.occ, -1)
 	}
 	t.row[t.col] = text
+	t.cost += int64(gofastcore.CellCost + len(text))
 	r := len(t.rows)
 	for c := t.col; c < t.col+t.cs; c++ {
 		t.occ[c] = r + t.rs - 1
@@ -158,8 +205,20 @@ func (t *table) block(e *Engine, start, end int64) (gofastcore.Block, bool) {
 	if e.opts.Spans {
 		tb.Cells = t.cells
 	}
-	return gofastcore.Block{Kind: gofastcore.KindTable, Table: tb,
-		Loc: gofastcore.Location{Offset: start, Length: max(end-start, 0)}}, true
+	b := gofastcore.Block{Kind: gofastcore.KindTable, Table: tb,
+		Loc: gofastcore.Location{Offset: start, Length: max(end-start, 0)}}
+	if t.fromProfile || len(t.attrNames) > 0 {
+		b.Attrs = map[string]string{}
+	}
+	if t.fromProfile {
+		// The header row is the profile's text, not the file's.
+		b.Origin = gofastcore.OriginInferred
+		b.Attrs[AttrHeaderSource] = "profile"
+	}
+	if len(t.attrNames) > 0 {
+		b.Attrs[generic.AttrAttribute] = strings.Join(t.attrNames, " ")
+	}
+	return b, true
 }
 
 // calsTable returns the innermost open CALS table when the element just

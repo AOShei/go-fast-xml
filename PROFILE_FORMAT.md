@@ -91,8 +91,8 @@ in no namespace. The prefix `xml` is predefined.
 | `heading` | A heading block | `level`: a number, `"nesting"` (`heading_base` + number of enclosing `section`s - 1), or `{"attr": "level"}`; `marker`; `duplicate_of` and `key` **(added)** |
 | `block` | One block of `kind` `paragraph`, `quote`, `code`, `caption`, `footnote`, `formula` | `kind`; for `code`, `language`; for `formula`, `notation` (`latex`, `unicodemath`, `plain`); `marker`; `value` **(added)**; `duplicate_of` and `key` **(added)** |
 | `list`, `item` | A list and its items; depth from nesting | `ordered`: `true`, `false` or an attribute test `{"attr": "type", "in": ["numero"]}`; on `item`: `marker` |
-| `table` | A table | `model`: `rows` (default) or `cals` |
-| `row`, `cell` | In the `rows` model | `row`: `header` (`true` or an attribute test); `cell`: `header`, `colspan`, `rowspan` (attribute names) |
+| `table` | A table | `model`: `rows` (default) or `cals`; `header` **(added)** |
+| `row`, `cell` | In the `rows` model | `row`: `header` (`true` or an attribute test), `cells` **(added)**; `cell`: `header`, `colspan`, `rowspan` (attribute names) |
 | `inline` | Text that stays inside its block | `style`: `bold`, `italic`, `superscript`, `subscript`, `code`; `link`: a value source for the address; `title` and `attrs` **(added)** |
 | `label` | Its text becomes the `Marker` of the block it belongs to (the parent block, or the next block in the same container) | |
 | `image` | An image block | `id` (value source for the address or identifier), `alt` (value source) |
@@ -123,7 +123,9 @@ Keys any block-making or container rule may carry:
   `Metadata.Extra`, for values of an element that has a rule of another
   kind (the root's attributes).
 
-A profile cannot add words to the text. Text comes only from the file.
+A profile cannot add words to the text. Text comes only from the file,
+with one exception: a table's `header` row, which is marked as the
+profile's (section 7).
 
 ## 4. Value sources
 
@@ -206,3 +208,5 @@ for; none changes what an existing key means.
 | `extra` | any rule but `label`, `skip` | Root attributes (`ID`, `spUrl`) into `Metadata.Extra` (C1) while the root stays `transparent` |
 | `join` | `metadata` | The separator of repeated values of one `Extra` key (` > ` for the breadcrumb, C1); default a line break |
 | `value` | `block`, `note` | A block whose text is an attribute (`RessourceWeb@URL`, C4); it carries `Attrs["attribute"]` |
+| `cells` | `row` | A row whose data is in its element's attributes (`Redirection@from`, `@to`, ...): `"cells": [{"attr": "from"}, {"attr": "to"}]`, one cell per entry in order, 1 to 64 entries. Each entry is `{"attr": "name"}` of the row's own element (no literal, `of`, `child` or `structure`: a cell holds only what the element holds). An absent attribute gives an empty cell. The table carries the names, space-separated in order of first use, in `Attrs["attribute"]` |
+| `header` | `table` | A header row of fixed text: `"header": ["from", "to"]` (1 to 64 strings of at most 256 bytes). It is the profile's text, not the file's, so the table is `Origin: inferred` and carries `Attrs["header_source"]="profile"` (core prescribes nothing for text a file does not hold; this is the library's choice). It is the table's first row and counts in `HeaderRows`. On a `row` or `cell`, `header` keeps its meaning (a test) |
