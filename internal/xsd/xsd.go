@@ -97,7 +97,7 @@ type Problem struct {
 
 // Set is a schema: its documents and global components.
 type Set struct {
-	Docs                                   []*Doc
+	Docs                                            []*Doc
 	Elements, Types, Groups, AttrGroups, Attributes map[QName]*Node
 	// Order lists the global elements in the order they were read.
 	Order    []QName
