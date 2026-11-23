@@ -1,6 +1,7 @@
 package gofastxml
 
 import (
+	"context"
 	"strings"
 	"testing"
 )
@@ -23,5 +24,41 @@ func TestProfileNamespaceAliases(t *testing.T) {
 		if _, err := LoadProfile(strings.NewReader(p)); err == nil {
 			t.Errorf("%s loaded", bad)
 		}
+	}
+}
+
+// TestProfileOutOfLine: a footnote met inside a paragraph is a block of
+// its own, before the paragraph (made where the footnote ends), and the
+// paragraph keeps its waiting label and the rest of its text. In a cell
+// it stays in the cell.
+func TestProfileOutOfLine(t *testing.T) {
+	prof := head("ool", `{"root": "doc"}`) + `"rules": [
+		{"match": "/doc", "as": "transparent"},
+		{"match": "sec", "as": "section", "anchor": {"attr": "id"}},
+		{"match": "num", "as": "label"},
+		{"match": "p", "as": "block", "kind": "paragraph"},
+		{"match": "fn", "as": "block", "kind": "footnote", "out_of_line": true, "marker": {"attr": "n"}, "anchor": {"attr": "id"}},
+		{"match": "t", "as": "table"}, {"match": "tr", "as": "row"}, {"match": "td", "as": "cell"}]}`
+	src := `<doc><sec id="s1"><num>(1)</num><p>Before<fn n="1" id="f1"><p>Note one.</p><p>Second.</p></fn> after.</p>` +
+		`<t><tr><td>In<fn n="2">inline</fn></td></tr></t></sec></doc>`
+	// Not extractWith: the paragraph's span holds the note's text too.
+	doc, err := (&Extractor{Profiles: []*Profile{mustLoad(t, prof)}}).Extract(context.Background(), strings.NewReader(src), int64(len(src)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := doc.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	wantBrief(t, doc, "footnote(1):Note one.\nSecond.\nparagraph((1)):Before after.\ntable:\n")
+	bs := blocks(doc)
+	if bs[0].Loc.Anchor != "f1" || bs[1].Attrs[AttrAnchorParent] != "s1" {
+		t.Errorf("anchors %+v %+v", bs[0].Loc, bs[1].Attrs)
+	}
+	if c := bs[2].Table.Rows[0][0]; c != "In\ninline" {
+		t.Errorf("cell %q", c)
+	}
+	bad := head("ool", `{"root": "doc"}`) + `"rules": [{"match": "x", "as": "heading", "level": 1, "out_of_line": true}]}`
+	if _, err := LoadProfile(strings.NewReader(bad)); err == nil {
+		t.Error("out_of_line on a heading loaded")
 	}
 }

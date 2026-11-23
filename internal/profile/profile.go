@@ -74,8 +74,8 @@ var (
 	allowed = map[As][]string{
 		AsSection:     common,
 		AsHeading:     append(slices.Clone(common), "level", "marker", "duplicate_of", "key"),
-		AsBlock:       append(slices.Clone(common), "kind", "language", "notation", "marker", "value", "duplicate_of", "key"),
-		AsList:        append(slices.Clone(common), "ordered"),
+		AsBlock:       append(slices.Clone(common), "kind", "language", "notation", "marker", "value", "duplicate_of", "key", "out_of_line"),
+		AsList:       append(slices.Clone(common), "ordered"),
 		AsItem:        append(slices.Clone(common), "marker"),
 		AsTable:       append(slices.Clone(common), "model", "header"),
 		AsRow:         append(slices.Clone(common), "header", "cells"),
@@ -83,7 +83,7 @@ var (
 		AsInline:      {"match", "as", "style", "link", "title", "attrs", "extra"},
 		AsLabel:       {"match", "as"},
 		AsImage:       append(slices.Clone(common), "id", "alt"),
-		AsNote:        append(slices.Clone(common), "type", "value"),
+		AsNote:        append(slices.Clone(common), "type", "value", "out_of_line"),
 		AsMetadata:    {"match", "as", "field", "key", "value", "also_heading", "join", "extra"},
 		AsPart:        append(slices.Clone(common), "kind", "name"),
 		AsStored:      {"match", "as", "kind", "extra"},
@@ -165,6 +165,7 @@ type Rule struct {
 	Join        string
 	AlsoHeading int
 	DuplicateOf string
+	OutOfLine   bool // a block or note met inside an open block is a block of its own
 
 	Level   Level
 	Ordered *Test
@@ -635,6 +636,11 @@ func compileRule(raw json.RawMessage, i int, f *fileJSON, builtin bool) (*Rule, 
 	}
 	if r.Key != "" && !validKey(r.Key) {
 		return nil, fmt.Errorf("%s: \"key\" %q is empty, too long or has white space", where, r.Key)
+	}
+	if v, ok := m["out_of_line"]; ok {
+		if err := json.Unmarshal(v, &r.OutOfLine); err != nil {
+			return nil, fmt.Errorf("%s: \"out_of_line\" must be true or false", where)
+		}
 	}
 	if v, ok := m["also_heading"]; ok {
 		if err := json.Unmarshal(v, &r.AlsoHeading); err != nil || r.AlsoHeading < 1 || r.AlsoHeading > 6 {

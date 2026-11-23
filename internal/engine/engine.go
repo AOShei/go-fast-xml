@@ -160,6 +160,10 @@ type frame struct {
 	// suspended: a part met inside an open block; prevCur is that block's
 	// sink, resumed when the part ends.
 	suspended bool
+	// outOfLine: an out_of_line rule's element read beside an open block,
+	// whose waiting label it does not take; resume is that block's sink.
+	outOfLine bool
+	resume    *sink
 
 	sections int
 	quotes   int
@@ -460,6 +464,14 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 		// what follows it in the block starts a new block.
 		f.prevCur, e.cur, f.suspended = e.cur, nil, true
 		e.flushStray()
+		e.startRule(f, el)
+		return
+	}
+	if rule.OutOfLine && e.cur != nil && (e.cur.kind == skBlock || e.cur.kind == skHeading || e.cur.kind == skItem) {
+		// An out-of-line note: a block of its own, made where it ends
+		// (before the block it stands in, which is made at its end);
+		// the open block goes on after it.
+		f.resume, e.cur, f.outOfLine = e.cur, nil, true
 		e.startRule(f, el)
 		return
 	}
@@ -1132,7 +1144,8 @@ func (e *Engine) add(b gofastcore.Block, f *frame, own bool) blockRef {
 			}
 		}
 	}
-	if e.label != nil && b.Kind != gofastcore.KindNote && b.Kind != gofastcore.KindTable && b.Kind != gofastcore.KindImage {
+	if e.label != nil && b.Kind != gofastcore.KindNote && b.Kind != gofastcore.KindTable && b.Kind != gofastcore.KindImage &&
+		!(own && f != nil && f.outOfLine) {
 		if b.Marker == "" {
 			b.Marker = e.label.text
 		}
@@ -1583,6 +1596,9 @@ func (e *Engine) EndElement(r *xmlread.Reader, el *xmlread.Element, start, end i
 	}
 	if f.suspended {
 		e.cur = f.prevCur
+	}
+	if f.outOfLine {
+		e.cur = f.resume
 	}
 	e.marks = e.marks[:min(f.marks, len(e.marks))]
 	e.anchors = e.anchors[:min(f.anchors, len(e.anchors))]
