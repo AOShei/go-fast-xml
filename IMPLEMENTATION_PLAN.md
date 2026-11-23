@@ -20,9 +20,9 @@ This file tracks its phases (section 7) in this repository.
 | Step | Status |
 |---|---|
 | Scanner (`internal/xmlscan`): namespaces, offsets, comments, PIs, DOCTYPE, recovery, bounded entity expansion | done |
-| Encoding: BOM, XML declaration, UTF-8/16, windows-1252, `internal/charset` | |
-| DOCTYPE internal subset, entities, external references | |
-| Generic reader: blocks, attributes, comments, metadata | |
+| Encoding: BOM, XML declaration, UTF-8/16, windows-1252, `internal/charset` | done |
+| DOCTYPE internal subset, entities, external references | done |
+| Generic reader: blocks, attributes, comments, metadata; oracle test against `encoding/xml` | done |
 | Limits and worst cases | |
 | Command `cmd/gofastxml` | |
 | Fuzz targets | |

@@ -134,6 +134,9 @@ type Options struct {
 	// of references, all expansions together. Zero means no expansion at
 	// all; negative means no limit.
 	ExpansionLimit int64
+	// BaseOffset is the offset of the first byte read, added to every
+	// offset the scanner reports.
+	BaseOffset int64
 }
 
 // Defaults for Options.
@@ -297,7 +300,7 @@ func (s *Scanner) configure(opts *Options) {
 	if opts == nil {
 		return
 	}
-	s.spaces, s.resolve = opts.Spaces, opts.Resolve
+	s.spaces, s.resolve, s.base = opts.Spaces, opts.Resolve, opts.BaseOffset
 	if opts.MaxDepth > 0 {
 		s.maxDepth = opts.MaxDepth
 	}
