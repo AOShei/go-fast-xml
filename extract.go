@@ -142,7 +142,7 @@ func Extract(ctx context.Context, r io.ReaderAt, size int64, opts *gofastcore.Op
 
 // ExtractBytes extracts a document held in memory with default settings.
 func ExtractBytes(ctx context.Context, data []byte, opts *gofastcore.Options) (*gofastcore.Document, error) {
-	return (&Extractor{}).Extract(ctx, bytes.NewReader(data), int64(len(data)), opts)
+	return (&Extractor{}).extract(ctx, bytes.NewReader(data), int64(len(data)), opts, data)
 }
 
 // ExtractFile opens the named file and extracts it with default settings.
@@ -186,6 +186,12 @@ func (e *Extractor) ExtractFile(ctx context.Context, path string, opts *gofastco
 //     a tag before any element is larger than MaxTagBytes.
 //   - ErrNoPartsSelected: Options.Parts does not select part 1.
 func (e *Extractor) Extract(ctx context.Context, r io.ReaderAt, size int64, opts *gofastcore.Options) (*gofastcore.Document, error) {
+	return e.extract(ctx, r, size, opts, nil)
+}
+
+// extract is Extract; mem, when not nil, is the input r reads, held in
+// memory, which is read in place and never written.
+func (e *Extractor) extract(ctx context.Context, r io.ReaderAt, size int64, opts *gofastcore.Options, mem []byte) (*gofastcore.Document, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -206,12 +212,17 @@ func (e *Extractor) Extract(ctx context.Context, r io.ReaderAt, size int64, opts
 	if err != nil {
 		return nil, err
 	}
-	sample := make([]byte, min(size, xmlenc.SampleSize))
-	if n, err := r.ReadAt(sample, 0); n < len(sample) {
-		if err == nil {
-			err = io.ErrUnexpectedEOF
+	var sample []byte
+	if n := min(size, xmlenc.SampleSize); mem != nil {
+		sample = mem[:n:n] // in memory: read in place, not copied
+	} else {
+		sample = make([]byte, n)
+		if n, err := r.ReadAt(sample, 0); n < len(sample) {
+			if err == nil {
+				err = io.ErrUnexpectedEOF
+			}
+			return nil, fmt.Errorf("gofastxml: reading the input: %w", err)
 		}
-		return nil, fmt.Errorf("gofastxml: reading the input: %w", err)
 	}
 	enc, err := xmlenc.Sniff(sample)
 	if err != nil {

@@ -60,6 +60,21 @@ func TestOutputDigests(t *testing.T) {
 				}
 				got[rel+" "+c.name] = hex.EncodeToString(h.Sum(nil))
 			}
+			// ExtractBytes gives what ExtractFile gives.
+			data, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			h := sha256.New()
+			if doc, err := ExtractBytes(context.Background(), data, nil); err != nil {
+				fmt.Fprintf(h, "error: %v", err)
+			} else {
+				doc.Source.Name = rel
+				json.NewEncoder(h).Encode(doc)
+			}
+			if sum := hex.EncodeToString(h.Sum(nil)); sum != got[rel+" auto"] {
+				t.Errorf("%s: ExtractBytes differs from ExtractFile", rel)
+			}
 		}
 	}
 	f, err := os.Open(file)
