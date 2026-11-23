@@ -112,6 +112,15 @@ func TestUndeclaredCountedOnce(t *testing.T) {
 	}
 }
 
+// Finding 10: under xml:space="preserve", white space between children
+// before the element's own text is kept as written.
+func TestPreserveBeforeText(t *testing.T) {
+	doc := extract(t, "<r><p xml:space=\"preserve\"><b>a</b>\n\n<b>b</b>\t tail</p></r>", nil)
+	if got := doc.Parts[0].Blocks[0].Text; got != "a\n\nb\t tail" {
+		t.Errorf("text %q", got)
+	}
+}
+
 // Finding 11: metadata values are cut at a character boundary and
 // counted; an xml:lang too long for the language is a note.
 func TestMetadataCut(t *testing.T) {

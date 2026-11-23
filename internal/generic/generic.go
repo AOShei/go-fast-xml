@@ -218,8 +218,21 @@ func (g *Generic) Text(r *xmlread.Reader, t []byte, start, end int64) {
 		d := len(g.stack)
 		f := g.frameAt(d)
 		if spaceOnly(t) {
-			if f.state == undecided && len(g.queue) > f.qStart && !g.queue[len(g.queue)-1].space {
-				g.enqueue(item{space: true})
+			if f.state == undecided && len(g.queue) > f.qStart {
+				last := &g.queue[len(g.queue)-1]
+				switch {
+				case preserve && last.space:
+					// White space kept as written waits as it is.
+					last.block.Text += string(t)
+					g.qSize += len(t)
+				case preserve:
+					g.enqueue(item{space: true, block: gofastcore.Block{Text: string(t)}})
+				case !last.space:
+					g.enqueue(item{space: true})
+				}
+				if g.overBound() {
+					g.flush(false)
+				}
 			}
 			return
 		}
@@ -259,6 +272,8 @@ func (g *Generic) becomeText(d int, at int64) {
 	for _, it := range g.queue[f.qStart:] {
 		g.qSize -= len(it.block.Text) + gofastcore.BlockCost
 		switch {
+		case it.space && it.block.Text != "":
+			g.b.Append([]byte(it.block.Text), true)
 		case it.space:
 			g.b.Space()
 		case it.para:
