@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE map PUBLIC "-//OASIS//DTD DITA Map//EN" "map.dtd">
+<map id="guide">
+<title>Guide</title>
+<topicref href="install.dita" navtitle="Install"><topicmeta><navtitle>Installing</navtitle></topicmeta>
+<topicref href="sub/more.dita" scope="local"/></topicref>
+<keydef keys="site" href="https://example.org" scope="external"/>
+</map>

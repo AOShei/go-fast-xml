@@ -107,6 +107,9 @@ type jatsOracleCase struct {
 	// gap is an Attrs key and value marking blocks whose text is in their
 	// span in order but with gaps (see jatsCiteCheck).
 	gap []string
+	// prep, if set, adjusts a document before the oracles see it (blocks
+	// whose text or Marker the profile takes from an attribute).
+	prep func(doc *gofastcore.Document)
 }
 
 func (c *jatsOracleCase) skipped(stack []string) (string, bool) {
@@ -304,6 +307,9 @@ func (c *jatsOracleCase) oracles(t *testing.T) {
 		src, err := c.sourceText(data, used)
 		if err != nil {
 			t.Fatalf("%s: encoding/xml: %v", path, err)
+		}
+		if c.prep != nil {
+			c.prep(doc)
 		}
 		got := jatsDocText(doc)
 		if got != src {
