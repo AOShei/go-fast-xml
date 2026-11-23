@@ -355,7 +355,7 @@ func (w *writer) write() []byte {
 		fmt.Fprintf(&b, "    \"missing_components\": %s,\n", list(capped(missing, 200), "      "))
 	}
 	if w.in.Model.Cut {
-		fmt.Fprintf(&b, "    \"cut\": %s,\n", enc(fmt.Sprintf("more than %d element declarations; the rest are not in the draft", w.in.Model.MaxDecls)))
+		fmt.Fprintf(&b, "    \"cut\": %s,\n", enc(fmt.Sprintf("more than %d element declarations or %d children of content models; the rest are not in the draft", w.in.Model.MaxDecls, xsd.MaxChildren)))
 	}
 	und := w.undecided()
 	b.WriteString("    \"undecided\": [")
