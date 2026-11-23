@@ -5,8 +5,9 @@
 ### Phase 2: profiles
 
 - Fixes after review: a row's `cells` from its element's attributes and
-  a table's fixed `header` (`Origin: inferred`,
-  `Attrs["header_source"]="profile"`); Service-Public `Redirections` read
+  a table's fixed `header` (`Attrs["header_source"]="profile"`; the
+  table is `Origin: native` since phase 3, every row and cell being
+  declared by the file); Service-Public `Redirections` read
   as one table (no unmapped element on dev). Spans kept on each piece of
   a split block. A `part` inside an open block finishes the block first.
   A link's stored record has the link's text, its title in

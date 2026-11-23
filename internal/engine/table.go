@@ -211,8 +211,9 @@ func (t *table) block(e *Engine, start, end int64) (gofastcore.Block, bool) {
 		b.Attrs = map[string]string{}
 	}
 	if t.fromProfile {
-		// The header row is the profile's text, not the file's.
-		b.Origin = gofastcore.OriginInferred
+		// The header row is the profile's text, not the file's; the
+		// table is still native: every row and cell is declared by the
+		// file, nothing is guessed (core's inferred).
 		b.Attrs[AttrHeaderSource] = "profile"
 	}
 	if len(t.attrNames) > 0 {

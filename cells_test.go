@@ -25,7 +25,9 @@ func TestProfileCellsFromAttributes(t *testing.T) {
 	if got := mustJSON(b.Table.Rows); got != mustJSON(want) {
 		t.Errorf("rows %s", got)
 	}
-	if b.Table.HeaderRows != 1 || b.Origin != gofastcore.OriginInferred || b.Attrs[AttrHeaderSource] != "profile" {
+	// Every row and cell is the file's: the table is native; only its
+	// header row's text is the profile's.
+	if b.Table.HeaderRows != 1 || b.Origin != gofastcore.OriginNative || b.Attrs[AttrHeaderSource] != "profile" {
 		t.Errorf("header: rows %d origin %v attrs %v", b.Table.HeaderRows, b.Origin, b.Attrs)
 	}
 	if b.Attrs[AttrAttribute] != "from to toUrl" {

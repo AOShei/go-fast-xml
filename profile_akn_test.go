@@ -469,7 +469,7 @@ func TestAknSample(t *testing.T) {
 		fmt.Fprintf(&b, "[%s %s]\n%s", p.Kind, p.Name, brief(p.Blocks))
 	}
 	want := `[body ]
-table~:
+table:
 [chapter preface]
 paragraph:The Sample Act 2026
 [chapter preamble]
