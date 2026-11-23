@@ -1,0 +1,3 @@
+go test fuzz v1
+[]byte("<r id=\"1\"><t>T</t><k><v>a</v></k><s id=\"s>P <b>b<y=\"1\"/></c><h>H</h><hh n=\"3\">H</hh><p n=\"1.\"\"><c><x /b> 囇m<a href=/sk>stray<zz q=\"1\">unmapped<b>in</b></zz><part><pn>P2</pn><p>in part</p></part><fn><lab>1</lab><p>fn</p></fn><code>x  y</code></r>")
+bool(true)

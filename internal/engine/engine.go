@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/AOShei/go-fast-core"
 	"github.com/AOShei/go-fast-xml/internal/generic"
@@ -76,6 +77,9 @@ const (
 type structLevel struct{ open, items bool }
 
 type sink struct {
+	// gen counts the sink's uses: a frame holding a sink that has since
+	// been finished and reused for another block sees another gen.
+	gen      uint64
 	kind     sinkKind
 	b        generic.Builder
 	spans    []gofastcore.Span
@@ -100,6 +104,7 @@ type sink struct {
 }
 
 func (s *sink) reset(kind sinkKind, start int64) {
+	s.gen++
 	s.kind, s.start, s.end, s.pieces, s.pieceAt, s.done, s.restart = kind, start, start, 0, start, false, false
 	s.b.Reset()
 	s.word.OK = false
@@ -204,6 +209,7 @@ type frame struct {
 	lastRef   blockRef
 
 	span      *sink
+	spanGen   uint64 // span.gen when the inline began
 	spanStart int
 	href      string
 	title     string
@@ -473,12 +479,17 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 		f.role = roleInline
 		if s := e.cur; s != nil && s.structure {
 			e.structStart(s, el)
-		} else if r := e.lookup(); r == nil {
+		} else if rule := e.lookup(); rule == nil {
 			e.count(e.unmapped, el.Name)
-		} else if r.As == profile.AsInline && r.Space && s != nil {
-			s.b.Space()
-			f.spaced = s
-		} else if r.As == profile.AsBreak && s != nil {
+		} else if rule.As == profile.AsInline && s != nil {
+			if rule.Space {
+				s.b.Space()
+				f.spaced = s
+			}
+			if rule.Value != nil {
+				e.inlineValue(r, rule, el)
+			}
+		} else if rule.As == profile.AsBreak && s != nil {
 			// A value is one line: a break in it is a space.
 			s.b.Space()
 		}
@@ -516,6 +527,9 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 	}
 	if rule.As == profile.AsInline {
 		e.startInline(f, el)
+		if rule.Value != nil {
+			e.inlineValue(r, rule, el)
+		}
 		return
 	}
 	if rule.As == profile.AsBreak {
@@ -834,12 +848,45 @@ func (e *Engine) value(v *profile.Value) (string, bool) {
 			}
 		}
 		return "", true
+	case v.Codepoint:
+		s, ok := e.Attr(0, v.Attr)
+		if !ok {
+			return "", true
+		}
+		if c, ok := codepoint(s); ok {
+			return string(c), true
+		}
+		// Not a character: nothing is written, and the attribute is
+		// counted as not read.
+		for _, a := range e.attrs {
+			if a.Local == v.Attr.Local && a.URI == v.Attr.URI {
+				e.count(e.unmappedAttrs, e.top().qname+"@"+a.Name)
+				break
+			}
+		}
+		return "", true
 	default:
 		if s, ok := e.Attr(0, v.Attr); ok {
 			return e.clean(s), true
 		}
 		return "", true
 	}
+}
+
+// codepoint reads a code point written in hexadecimal (Formex
+// QUOT.START@CODE="2018"): 1 to 6 digits, white space around them
+// allowed. Surrogates, values past U+10FFFF and controls (category Cc)
+// are not characters to write.
+func codepoint(s string) (rune, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" || len(s) > 6 {
+		return 0, false
+	}
+	n, err := strconv.ParseUint(s, 16, 32)
+	if err != nil || n > unicode.MaxRune || n >= 0xD800 && n <= 0xDFFF || unicode.IsControl(rune(n)) {
+		return 0, false
+	}
+	return rune(n), true
 }
 
 // resolve resolves v now, or registers a slot for it on f.
@@ -863,7 +910,7 @@ func (e *Engine) startInline(f *frame, el *xmlread.Element) {
 		s.b.Space()
 		f.spaced = s
 	}
-	f.span, f.spanStart = s, s.b.Pos()
+	f.span, f.spanGen, f.spanStart = s, s.gen, s.b.Pos()
 	if r.Link != nil {
 		f.href, _ = e.resolve(f, r.Link, "", useLink)
 	}
@@ -1747,7 +1794,7 @@ func (e *Engine) cutSpans(s *sink, n, took int, all bool) []gofastcore.Span {
 	}
 	s.spans = rest
 	for i := range e.frames {
-		if f := &e.frames[i]; f.span == s {
+		if f := &e.frames[i]; f.span == s && f.spanGen == s.gen {
 			// An inline element still open: its text so far is a span of
 			// this piece; the rest of it will be one of the next.
 			if r := f.rule; e.opts.Spans && r != nil && (r.Style != 0 || f.href != "") && f.spanStart < n && len(out) < 100000 {
@@ -1861,9 +1908,20 @@ func (e *Engine) EndElement(r *xmlread.Reader, el *xmlread.Element, start, end i
 	e.frames = e.frames[:n-1]
 }
 
+// inlineValue writes an inline rule's "value", an attribute of its own
+// element, in place in the open block's text, as the element's text
+// would be (TEI p/pb@n, Formex QUOT.START@CODE).
+func (e *Engine) inlineValue(r *xmlread.Reader, rule *profile.Rule, el *xmlread.Element) {
+	if v, _ := e.value(rule.Value); v != "" {
+		e.Text(r, []byte(v), el.Start, el.Start)
+	}
+}
+
 func (e *Engine) endInline(f *frame, end int64) {
 	s := f.span
-	if s == nil || f.rule == nil {
+	if s == nil || f.rule == nil || s.gen != f.spanGen {
+		// No sink, or the block the inline began in was finished (its
+		// sink is now another block's).
 		return
 	}
 	s.end = max(s.end, end)

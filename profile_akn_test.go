@@ -8,11 +8,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+	"unicode"
 
 	"github.com/AOShei/go-fast-core"
 )
@@ -129,6 +131,36 @@ type aknOracleSpec struct {
 	// attrText: elements whose marker comes from an attribute, which is
 	// written in the text when they stand inside a block.
 	attrText map[string]string
+	// attrChar: elements an inline rule's "value" writes in the text as
+	// the character whose code point their attribute holds in hex
+	// (Formex QUOT.START@CODE), wherever they stand. Each must be met on
+	// dev; codepointTagRE must name the same elements.
+	attrChar map[string]string
+}
+
+// codepointTagRE is a tag of an attrChar element, for the cite check,
+// whose span text is stripped of markup.
+var codepointTagRE = regexp.MustCompile(`<(?:QUOT\.START|QUOT\.END)\b[^>]*\bCODE="([0-9A-Fa-f]{1,6})"[^>]*>`)
+
+// expandCodepoints writes the character an attrChar element names in
+// place of its tag.
+func expandCodepoints(s string) string {
+	if !strings.Contains(s, "CODE=") {
+		return s
+	}
+	return codepointTagRE.ReplaceAllStringFunc(s, func(tag string) string {
+		return hexChar(codepointTagRE.FindStringSubmatch(tag)[1])
+	})
+}
+
+// hexChar is the character of a hex code point, or "" for one the
+// engine refuses (surrogates, past U+10FFFF, controls).
+func hexChar(h string) string {
+	n, err := strconv.ParseUint(strings.TrimSpace(h), 16, 32)
+	if err != nil || n > unicode.MaxRune || n >= 0xD800 && n <= 0xDFFF || unicode.IsControl(rune(n)) {
+		return ""
+	}
+	return string(rune(n))
 }
 
 func (s *aknOracleSpec) name(n xml.Name) string {
@@ -187,6 +219,14 @@ func (s *aknOracleSpec) sourceText(data []byte, used map[string]bool) (string, e
 				continue
 			case noteDepth > 0:
 				noteDepth++
+				if a, ok := s.attrChar[name]; ok {
+					for _, at := range tk.Attr {
+						if at.Name.Local == a {
+							note = append(note, noSpace(hexChar(at.Value))...)
+							used["@"+name] = true
+						}
+					}
+				}
 				continue
 			}
 			if k, ok := s.skipped(stack); ok {
@@ -201,6 +241,14 @@ func (s *aknOracleSpec) sourceText(data []byte, used map[string]bool) (string, e
 				noteDepth = 1
 				note = note[:0]
 				continue
+			}
+			if a, ok := s.attrChar[name]; ok {
+				for _, at := range tk.Attr {
+					if at.Name.Local == a {
+						b = append(b, noSpace(hexChar(at.Value))...)
+						used["@"+name] = true
+					}
+				}
 			}
 			if a, ok := s.attrText[name]; ok && (blockAt >= 0 || cellDepth > 0) {
 				// An item inside a block or cell: its marker, from an
@@ -361,7 +409,7 @@ func aknCiteCheck(src []byte, doc *gofastcore.Document) string {
 			}
 			piece = append(piece, src[at:l.Offset+l.Length]...)
 			text := noSpace(gofastcore.ExpandLigatures(b.Text))
-			if !strings.Contains(noSpace(stripMarkup(string(piece))), text) {
+			if !strings.Contains(noSpace(stripMarkup(expandCodepoints(string(piece)))), text) {
 				return "block " + strconv.Itoa(bi) + " text " + strconv.Quote(b.Text) + " not in its span " + strconv.Quote(string(src[l.Offset:l.Offset+l.Length]))
 			}
 		}
@@ -408,6 +456,11 @@ func aknOracles(t *testing.T, format string, spec *aknOracleSpec) {
 	for k := range spec.skip {
 		if !used[k] {
 			unmet = append(unmet, k)
+		}
+	}
+	for k := range spec.attrChar {
+		if !used["@"+k] {
+			unmet = append(unmet, "@"+k)
 		}
 	}
 	sort.Strings(unmet)

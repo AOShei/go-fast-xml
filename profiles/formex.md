@@ -31,7 +31,8 @@ roots `CONS.ACT`, `CONS.ANNEX`, `CONS.OTH`, `GENERAL`.
 | `NOTE` | `footnote`, `out_of_line`, anchor `@NOTE.ID`; `fx.note_type`, `fx.numbering`, `fx.note_ref` |
 | `ANNOTATION` | paragraph (`fx.element`) |
 | `INCL.ELEMENT` | image, id `@FILEREF`, `fx.type` |
-| `HT@TYPE` `BOLD`, `ITALIC`, `SUP`, `SUB`; `FT@TYPE=CODE` | inline styles; other `HT`, `FT`, `DATE`, `REF.DOC.OJ`, `IE`, `EXPR`, `IND`, `QUOT.START`, `QUOT.END` inline |
+| `HT@TYPE` `BOLD`, `ITALIC`, `SUP`, `SUB`; `FT@TYPE=CODE` | inline styles; other `HT`, `FT`, `DATE`, `REF.DOC.OJ`, `IE`, `EXPR`, `IND` inline |
+| `QUOT.START`, `QUOT.END` | inline; the quotation mark whose code point `@CODE` holds in hex (`2018` gives U+2018) written in place (`value` with `codepoint`) |
 
 ## Citing a block
 
@@ -48,9 +49,12 @@ page) that cites "Article 1(2)". Notes carry `NOTE.ID` in `Loc.Anchor`.
   inferred paragraphs.
 
 `QUOT.START`/`QUOT.END` stand for quotation marks by character code
-(`@CODE="2018"`); the profile cannot write the mark (a profile adds no
-text), so a quoted passage has no quote characters around it. `CELL@COL`
-is not needed (cells are in order).
+(`@CODE="2018"`); the mark is written in the text where the element
+stands. It is attribute-borne: in the block's span it is the `CODE`
+attribute, not character data. A `CODE` that is not a character (a
+surrogate, past U+10FFFF, a control) writes nothing and is counted in
+`xml.unmapped_attributes`. `CELL@COL` is not needed (cells are in
+order).
 
 ## Versions
 

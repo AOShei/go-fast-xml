@@ -100,7 +100,7 @@ in no namespace. The prefix `xml` is predefined.
 | `list`, `item` | A list and its items; depth from nesting | `ordered`: `true`, `false` or an attribute test `{"attr": "type", "in": ["numero"]}`; on `item`: `marker` |
 | `table` | A table | `model`: `rows` (default) or `cals`; `header` **(added)** |
 | `row`, `cell` | In the `rows` model | `row`: `header` (`true` or an attribute test), `cells` **(added)**; `cell`: `header`, `colspan`, `rowspan` (attribute names) |
-| `inline` | Text that stays inside its block | `style`: `bold`, `italic`, `superscript`, `subscript`, `code`; `link`: a value source for the address; `title` and `attrs` **(added)**; `space` **(added)** |
+| `inline` | Text that stays inside its block | `style`: `bold`, `italic`, `superscript`, `subscript`, `code`; `link`: a value source for the address; `title` and `attrs` **(added)**; `space` **(added)**; `value` **(added)** |
 | `break` **(added)** | A line break written as an element (`br`, `lb`, `eol`): a `\n` in the block it stands in | |
 | `label` | Its text becomes the `Marker` of the block it belongs to (the parent block, or the next block in the same container) | |
 | `image` | An image block | `id` (value source for the address or identifier), `alt` (value source) |
@@ -133,7 +133,9 @@ Keys any block-making or container rule may carry:
 
 A profile cannot add words to the text. Text comes only from the file,
 with one exception: a table's `header` row, which is marked as the
-profile's (section 7).
+profile's (section 7). Text from the file includes attribute values a
+rule names: a block's or note's `value`, and an inline's `value`, which
+is written in place in the block's text (section 7).
 
 ## 4. Value sources
 
@@ -146,6 +148,7 @@ Where a rule takes a value:
 | `{"attr": "name", "of": "Ancestor"}` | The attribute of the nearest ancestor of that name |
 | `{"child": "selector"}` | The text of the first matching child, which is then not emitted again. The selector is relative: `Theme/Titre` is a `Titre` in a `Theme` child |
 | `{"attr": "name", "child": "selector"}` **(added)** | The attribute of the first matching child (`templateId@root`, `patient/administrativeGenderCode@code`). The child is still read by its own rule (or generically); the attribute is then not counted as unread nor made a note |
+| `{"attr": "name", "codepoint": "hex"}` **(added)** | The character whose code point the attribute of this element holds in hexadecimal (Formex `QUOT.START@CODE="2018"` gives U+2018). A value that is not 1 to 6 hex digits, a surrogate, past U+10FFFF or a control (category Cc) gives nothing, and the attribute is counted in `xml.unmapped_attributes` |
 | `{"structure": "selector"}` | A matching child written as an outline of its element names and attributes, e.g. `ou(estVrai(var=T1), estIndefini(var=T2))`, for machine-readable subtrees with no text; the child is then not emitted again |
 
 A value read from a child is known when the child ends; the engine gives
@@ -262,3 +265,4 @@ for; none changes what an existing key means.
 | `value` | `item` | Phase 3 integration (DITA `topicref@href`): the item's text when its element gives none of its own (an empty `topicref`, or one whose children are only other items); it then carries `Attrs["attribute"]`. It is not the `Marker` (a marker is the item's number or bullet) |
 | (header cells) | `cell` with `header` | Phase 3 integration (AKN and HTML-like `th`): a row with no `header` of its own whose cells all match a cell rule whose `header` test is true counts in `HeaderRows` when it is among the leading rows (no body row before it) |
 | (label inside a block) | `label` | Phase 3 (AKN `num` in a `quotedStructure` inside a paragraph, `num` in a table cell): a label met inside a paragraph or item that already has text, a marker or a waiting label, or inside a cell, is read as text of that block, after a space. It was the block's marker only if it had none, and was dropped otherwise. A label as the first thing in a block is its marker as before. An `out_of_line` note inside a label is a block of its own as inside a paragraph |
+| `value` | `inline` | Phase 6 (TEI `p/pb@n`, Formex `QUOT.START`/`QUOT.END`): an attribute of the inline's own element (`{"attr": "n"}` or `{"attr": "CODE", "codepoint": "hex"}`; no literal, `of`, `child` or `structure`) written where the element stands in the open block's text (or the value being read), as if it were the element's text: with `space`, set off by white space. The block's `Loc` still covers its element; this text is in the span as an attribute, not as character data. An absent attribute writes nothing. With `attrs` the record in the stored part has this text |

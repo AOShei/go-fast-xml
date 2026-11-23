@@ -104,6 +104,10 @@ type jatsOracleCase struct {
 	// the end of the element's path ("a/b/name", "name"); a leading "/"
 	// anchors it at the root. Each must be met on dev.
 	skip map[string]string
+	// attrText lists the elements an inline rule's "value" writes in the
+	// text (TEI p/pb@n), path as in skip, to the attribute: its value is
+	// text of the file where the element stands. Each must be met on dev.
+	attrText map[string]string
 	// gap is an Attrs key and value marking blocks whose text is in their
 	// span in order but with gaps (see jatsCiteCheck).
 	gap []string
@@ -113,8 +117,26 @@ type jatsOracleCase struct {
 }
 
 func (c *jatsOracleCase) skipped(stack []string) (string, bool) {
+	return pathMatch(c.skip, stack)
+}
+
+// expandAttrText writes the attribute-borne text of attrText's elements
+// (empty elements) in place of their tags in a piece of source, whose
+// start may lie inside a block's element.
+func (c *jatsOracleCase) expandAttrText(span string) string {
+	for k, a := range c.attrText {
+		name := k[strings.LastIndexByte(k, '/')+1:]
+		re := regexp.MustCompile(`<` + regexp.QuoteMeta(name) + `\b[^>]*\b` + regexp.QuoteMeta(a) + `="([^"]*)"[^>]*/>`)
+		span = re.ReplaceAllString(span, " $1 ")
+	}
+	return span
+}
+
+// pathMatch finds the key of m ("a/b/name", "/name") that matches the
+// end of stack; the least key when several do.
+func pathMatch(m map[string]string, stack []string) (string, bool) {
 	best := ""
-	for k := range c.skip {
+	for k := range m {
 		steps := strings.Split(strings.TrimPrefix(k, "/"), "/")
 		n := len(steps)
 		if n > len(stack) || strings.HasPrefix(k, "/") && n != len(stack) {
@@ -165,7 +187,8 @@ func (c *jatsOracleCase) sourceText(data []byte, used map[string]bool) (string, 
 			break
 		}
 		if err != nil {
-			return "", err
+			// The text so far: a block's span may end inside its element.
+			return b.String(), err
 		}
 		switch tk := tok.(type) {
 		case xml.StartElement:
@@ -175,6 +198,13 @@ func (c *jatsOracleCase) sourceText(data []byte, used map[string]bool) (string, 
 			} else if k, ok := c.skipped(stack); ok {
 				skip = 1
 				used[k] = true
+			} else if k, ok := pathMatch(c.attrText, stack); ok {
+				for _, a := range tk.Attr {
+					if a.Name.Local == c.attrText[k] {
+						b.WriteString(noSpace(a.Value))
+						used["@"+k] = true
+					}
+				}
 			}
 		case xml.EndElement:
 			stack = stack[:len(stack)-1]
@@ -342,6 +372,11 @@ func (c *jatsOracleCase) oracles(t *testing.T) {
 			t.Errorf("exception %q is met nowhere in the dev set", k)
 		}
 	}
+	for k := range c.attrText {
+		if !used["@"+k] {
+			t.Errorf("attribute-borne text %q is met nowhere in the dev set", k)
+		}
+	}
 }
 
 var jatsNumberRE = regexp.MustCompile(`\d+\.`)
@@ -434,12 +469,15 @@ func (c *jatsOracleCase) cite(src []byte, doc *gofastcore.Document) string {
 		span := src[b.Loc.Offset : b.Loc.Offset+b.Loc.Length]
 		text := noSpace(gofastcore.ExpandLigatures(strings.TrimSpace(cellMarkerRE.ReplaceAllString(b.Text, "$1"))))
 		ok := false
-		if s, err := c.sourceText(span, map[string]bool{}); err == nil {
+		if s, _ := c.sourceText(span, map[string]bool{}); s != "" {
 			s, text := jatsNumberRE.ReplaceAllString(s, ""), jatsNumberRE.ReplaceAllString(text, "")
 			ok = strings.Contains(s, text) || jatsEntityRE.MatchString(s) && jatsInOrder(text, jatsEntityRE.Split(s, -1))
 		}
 		// An undeclared entity is kept as written: the raw span holds it.
 		ok = ok || strings.Contains(noSpace(stripMarkup(strings.ReplaceAll(string(span), "&", "&amp;"))), text)
+		// Text written from an attribute (attrText) is in the span as
+		// that attribute.
+		ok = ok || len(c.attrText) > 0 && strings.Contains(noSpace(stripMarkup(c.expandAttrText(string(span)))), text)
 		if !ok {
 			return bad
 		}
