@@ -122,6 +122,9 @@ type aknOracleSpec struct {
 	cellNumbers bool
 	// attrMarker: block kinds whose Marker comes from an attribute.
 	attrMarker map[gofastcore.Kind]bool
+	// attrText: elements whose marker comes from an attribute, which is
+	// written in the text when they stand inside a block.
+	attrText map[string]string
 }
 
 func (s *aknOracleSpec) name(n xml.Name) string {
@@ -193,6 +196,15 @@ func (s *aknOracleSpec) sourceText(data []byte, used map[string]bool) (string, e
 				noteDepth = 1
 				note = note[:0]
 				continue
+			}
+			if a, ok := s.attrText[name]; ok && (blockAt >= 0 || cellDepth > 0) {
+				// An item inside a block or cell: its marker, from an
+				// attribute, is a line of the block's text.
+				for _, at := range tk.Attr {
+					if at.Name.Local == a {
+						b = append(b, noSpace(at.Value)...)
+					}
+				}
 			}
 			if s.labels[name] && anyLabel == 0 {
 				anyLabel = len(stack)
