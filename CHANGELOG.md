@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Phase 4: drafting a profile from an XSD
+
+- `gofastxml -draft-profile schema.xsd [-o draft.json]` and
+  `DraftProfile(ctx, path) (*Draft, error)`: read an XML Schema with the
+  module's own reader (`internal/xsd`; includes, imports and redefines
+  on disk only, nothing fetched, bounded, fuzzed) and write a draft
+  profile whose rules are suggestions from the content model, each with
+  `"review": true` and a `"note"` saying why. Undecided elements and the
+  parts of the schema not read are listed in the draft's `notes`.
+- Profile format: top-level `notes` and rule `note` (unread);
+  `LoadProfile` refuses a rule with `"review": true`.
+
 ### Phase 2: profiles
 
 - Fixes after review: a row's `cells` from its element's attributes and

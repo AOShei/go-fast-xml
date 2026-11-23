@@ -97,6 +97,35 @@ On the public corpus (Service-Public, 4,194 dev and 1,362 held-out files), every
 
 The `sp.*` keys are the profile's own (decision S9), so they cannot collide with core's keys.
 
+## Drafting a profile from an XSD
+
+```
+gofastxml -draft-profile schema.xsd [-o draft.json]
+```
+
+or `gofastxml.DraftProfile(ctx, path)`, which returns a `*Draft` (the JSON, the schema files read, and warnings), reads an XML Schema (XSD 1.0) and writes a **draft** profile for a person to finish. It is not a profile: every rule carries `"review": true`, and `LoadProfile` refuses a file that still has one (`a draft from -draft-profile, not a profile`). Check each rule, change or delete it, and remove the mark; then the file loads.
+
+What it reads, with this module's own XML reader: global and local elements, named and anonymous complex types, simple types, `complexContent` and `simpleContent` extension (the base's content and attributes are added) and restriction, `group` and `attributeGroup` references, `sequence`, `choice`, `all`, `mixed`, `ref`, substitution groups (the members stand wherever the head may; an abstract head does not), `any`, attributes with their types (`xs:ID`, `xs:IDREF`, `xs:anyURI` and types derived from them, `xml:lang`, `xml:id`), the target namespace, `elementFormDefault` and `form`, chameleon includes. `xs:include`, `xs:import` and `xs:redefine` are followed **on disk only**, at locations relative to the file that names them. A location that is a URL, an absolute path, missing, or naming no file is not opened: nothing is fetched. Such parts are listed in the draft's `notes.not_read`, references to components they would have held in `notes.missing_components`, and the call returns an `input.external_reference` warning. Reading is bounded (512 files, includes 32 deep, 32 MiB in all, 400,000 schema elements, 100,000 element declarations); what a bound leaves out is a `limit.exceeded` warning and a note. Type cycles (`section` in `section`) are normal and followed once.
+
+Not read: DTDs and RELAX NG schemas (use the XSD edition of a schema where there is one); identity constraints, facets and default values; XSD 1.1 (assertions, open content, `override`); `xs:notation`; `xsi:type` in documents.
+
+What it writes, for each element the schema declares, from its content model first and its name only to break a tie:
+
+| Shape | Suggestion |
+|---|---|
+| Elements only, a text first child (or a title-named one), and it nests or repeats | `section`, the child as `heading` with `"level": "nesting"` |
+| Mixed content among elements-only content, or text content beside such siblings | `block`, `paragraph` |
+| Mixed or text content inside mixed content | `inline`; with an `xs:anyURI` attribute, `link` |
+| One child, repeated | `list`, the child as `item` |
+| A repeated child whose children repeat (three levels), or CALS/XHTML names | `table`, `row`, `cell` |
+| Empty with an `xs:anyURI` attribute | `image` with that attribute as `id` |
+| An `xs:ID` attribute | `anchor` on the rule |
+| Elements only, nothing more said | `transparent` |
+
+Where one local element name has declarations that would get different suggestions, the draft writes one rule per parent (`Parent/name`). Elements with no suggestion are listed under `notes.undecided` with their content, parents, children and attributes; they are read generically. Each rule's `"note"` says why it was suggested; `rests on the name` marks a suggestion the name decided (title, titre, para, list, item, table, row, cell, fn, img and the like, in English and French). `match` is drafted from the global elements no other element contains and the target namespace. Metadata, labels, notes, parts and stored content are not drafted. Name guessing happens only here, never during extraction. The output is the same for the same schema.
+
+On the public schemas (`go test -run TestDraft -v`, with `../.testdata/schemas`), the draft's rule kinds against the hand-written profiles, element by local name: Service-Public `Publication.xsd` same kind 55, different 60, no rule 2 of 117; Akoma Ntoso 3.0 179, 56, 14 of 249; JATS Publishing 1.3 150, 117, 13 of 280. Each draft is made in under 20 ms.
+
 ## How XML maps without a profile
 
 One part of kind `body`, number 1.
