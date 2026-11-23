@@ -7,8 +7,10 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"unicode/utf16"
 
 	"github.com/AOShei/go-fast-core"
+	"github.com/AOShei/go-fast-xml/internal/charset"
 )
 
 // testEntities are the internal entities the generated documents declare.
@@ -168,6 +170,59 @@ func genDoc(r *rand.Rand, big bool) []byte {
 	}
 	b.WriteString("</r>" + nl)
 	return []byte(b.String())
+}
+
+// encodeAs rewrites a generated UTF-8 document in another encoding: it
+// names the encoding in the declaration and writes "é" as the encoding
+// does (Shift_JIS has no é: it writes "あ" there).
+func encodeAs(src []byte, enc charset.Encoding) []byte {
+	s := strings.TrimPrefix(string(src), "\xEF\xBB\xBF")
+	switch enc {
+	case charset.UTF16LE, charset.UTF16BE:
+		s = strings.Replace(s, `version="1.0"?>`, `version="1.0" encoding="UTF-16"?>`, 1)
+		out := []byte{0xFE, 0xFF}
+		if enc == charset.UTF16LE {
+			out = []byte{0xFF, 0xFE}
+		}
+		for _, u := range utf16.Encode([]rune(s)) {
+			if enc == charset.UTF16LE {
+				out = append(out, byte(u), byte(u>>8))
+			} else {
+				out = append(out, byte(u>>8), byte(u))
+			}
+		}
+		return out
+	case charset.Windows1252:
+		s = strings.Replace(s, `version="1.0"?>`, `version="1.0" encoding="windows-1252"?>`, 1)
+		return []byte(strings.ReplaceAll(s, "é", "\xE9"))
+	case charset.ShiftJIS:
+		s = strings.Replace(s, `version="1.0"?>`, `version="1.0" encoding="Shift_JIS"?>`, 1)
+		return []byte(strings.ReplaceAll(s, "é", "\x82\xA0"))
+	}
+	panic("encoding")
+}
+
+// Item A: locations are offsets in the file in every encoding: the
+// bytes at a block's location, decoded, hold its text.
+func TestLocationsInEncodings(t *testing.T) {
+	for _, enc := range []charset.Encoding{charset.UTF16LE, charset.UTF16BE, charset.Windows1252, charset.ShiftJIS} {
+		r := rand.New(rand.NewPCG(3, uint64(enc)))
+		for i := range 40 {
+			big := i == 0 && !testing.Short()
+			src := encodeAs(genDoc(r, big), enc)
+			doc, err := ExtractBytes(context.Background(), src, nil)
+			if err != nil {
+				t.Fatalf("%s doc %d: %v", enc, i, err)
+			}
+			if got := doc.Metadata.Extra[ExtraEncoding]; got != enc.String() {
+				t.Fatalf("%s doc %d read as %s", enc, i, got)
+			}
+			checkLocations(t, fmt.Sprintf("%s doc %d", enc, i), src, doc, func(b []byte) string {
+				out, _, _ := charset.DecodeChunk(nil, b, enc, true)
+				return string(out)
+			})
+		}
+	}
 }
 
 // Item B: every block's location holds its text, in documents with

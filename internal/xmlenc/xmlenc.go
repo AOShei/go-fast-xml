@@ -14,6 +14,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
+	"sort"
 	"unicode/utf8"
 
 	"github.com/AOShei/go-fast-xml/internal/charset"
@@ -194,7 +196,15 @@ type Reader struct {
 	eof     bool
 	err     error
 	invalid int
+
+	// The map back to the source: where each decoded chunk starts, in
+	// the decoded text and in the source. One entry per 32 KiB of
+	// source.
+	cps             []checkpoint
+	decSum, usedSum int64
 }
+
+type checkpoint struct{ dec, src int64 }
 
 // NewReader returns a reader of r, which starts after the bytes Sniff
 // said to skip, that gives UTF-8.
@@ -208,6 +218,58 @@ func NewReader(r io.Reader, res Result) *Reader {
 func (d *Reader) Invalid() int { return d.invalid }
 
 const chunk = 32 << 10
+
+// Map replaces offsets in the decoded text, sorted in increasing order,
+// by the offsets in the source of the characters that start at or cover
+// them; an offset at the end of what was decoded gives the end of the
+// source read. src is the source, the text starting at offset base. Only
+// what is needed is read again, a decoded chunk at a time, in one pass.
+// Input read as UTF-8 needs no map: its offsets are kept.
+func (d *Reader) Map(src io.ReaderAt, base int64, offs []int64) error {
+	if d.utf8 || len(d.cps) == 0 {
+		return nil
+	}
+	ci := -1
+	var buf []byte
+	var dpos int64
+	var bi, limit int
+	for k, off := range offs {
+		i := sort.Search(len(d.cps), func(i int) bool { return d.cps[i].dec > off }) - 1
+		if i < 0 {
+			i = 0
+		}
+		if i != ci {
+			ci = i
+			from, to := d.cps[i].src, d.usedSum
+			if i+1 < len(d.cps) {
+				to = d.cps[i+1].src
+			}
+			limit = int(to - from)
+			// The bytes after the chunk that its decoding looked at.
+			end := to + charset.MaxChar - 1
+			buf = slices.Grow(buf[:0], int(end-from))[:end-from]
+			n, err := src.ReadAt(buf, base+from)
+			if n < limit {
+				if err == nil {
+					err = io.ErrUnexpectedEOF
+				}
+				return err
+			}
+			buf = buf[:n]
+			dpos, bi = d.cps[i].dec, 0
+		}
+		for dpos < off && bi < limit {
+			dn, n := charset.Step(buf, bi, d.enc)
+			if dpos+int64(dn) > off {
+				break
+			}
+			dpos += int64(dn)
+			bi += n
+		}
+		offs[k] = d.cps[ci].src + int64(bi)
+	}
+	return nil
+}
 
 func (d *Reader) Read(p []byte) (int, error) {
 	if d.utf8 {
@@ -233,6 +295,9 @@ func (d *Reader) Read(p []byte) (int, error) {
 		}
 		var used, bad int
 		d.out, used, bad = charset.DecodeChunk(d.out[:0], d.src[:d.n], d.enc, d.eof)
+		d.cps = append(d.cps, checkpoint{d.decSum, d.usedSum})
+		d.decSum += int64(len(d.out))
+		d.usedSum += int64(used)
 		d.off = 0
 		d.invalid += bad
 		d.n = copy(d.src, d.src[used:d.n])

@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/AOShei/go-fast-core"
@@ -248,10 +249,46 @@ func (e *Extractor) Extract(ctx context.Context, r io.ReaderAt, size int64, opts
 
 	metadata(doc, rep, enc, out)
 	docWarnings(doc, rep, enc, dec, stats)
-	partWarnings(&part, g, out, rep, dec, stats, runErr, rd.Offset(), size)
+	at := rd.Offset()
+	if !enc.UTF8 {
+		var err error
+		if at, err = sourceOffsets(&part, dec, r, enc.Skip, at); err != nil {
+			part.Warn(gofastcore.SeverityError, gofastcore.WarnPartFailed,
+				fmt.Sprintf("reading the input again to map locations to it failed (%v); locations are offsets in the text decoded to UTF-8", err))
+		}
+	}
+	partWarnings(&part, g, out, rep, dec, stats, runErr, at, size)
 	part.Finish()
 	doc.Parts = append(doc.Parts, part)
 	return doc, nil
+}
+
+// sourceOffsets turns the locations of the blocks, and at, from offsets
+// in the decoded text into offsets in the file, for input not read as
+// UTF-8. The offsets are mapped in increasing order, in one pass over the
+// part of the input they reach.
+func sourceOffsets(part *gofastcore.Part, dec *xmlenc.Reader, r io.ReaderAt, skip int, at int64) (int64, error) {
+	offs := make([]int64, 0, 2*len(part.Blocks)+1)
+	for _, b := range part.Blocks {
+		offs = append(offs, b.Loc.Offset, b.Loc.Offset+b.Loc.Length)
+	}
+	offs = append(offs, at)
+	slices.Sort(offs)
+	offs = slices.Compact(offs)
+	src := slices.Clone(offs)
+	if err := dec.Map(r, int64(skip), src); err != nil {
+		return at, err
+	}
+	get := func(o int64) int64 {
+		i, _ := slices.BinarySearch(offs, o)
+		return src[i] + int64(skip)
+	}
+	for i := range part.Blocks {
+		l := &part.Blocks[i].Loc
+		start, end := get(l.Offset), get(l.Offset+l.Length)
+		l.Offset, l.Length = start, end-start
+	}
+	return get(at), nil
 }
 
 // tagBytes is MaxTagBytes; tests lower it.
