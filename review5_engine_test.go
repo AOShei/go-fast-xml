@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -235,7 +234,7 @@ func TestReview5OverlappingMerges(t *testing.T) {
 // not consulted: a hostile schema hangs -draft-profile.
 func TestReview5DraftIncludeFIFOHangs(t *testing.T) {
 	dir := t.TempDir()
-	if err := syscall.Mkfifo(filepath.Join(dir, "pipe.xsd"), 0o600); err != nil {
+	if err := mkfifo(filepath.Join(dir, "pipe.xsd")); err != nil {
 		t.Skip("no FIFO:", err)
 	}
 	schema := `<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"><xs:include schemaLocation="pipe.xsd"/><xs:element name="a" type="xs:string"/></xs:schema>`
