@@ -69,3 +69,29 @@ func TestNumeric(t *testing.T) {
 		}
 	}
 }
+
+func TestClassic(t *testing.T) {
+	names := strings.Fields(classicNames)
+	if len(names) != 252 {
+		t.Fatalf("%d classic names, want HTML 4's 252", len(names))
+	}
+	seen := map[string]bool{}
+	for _, n := range names {
+		if seen[n] {
+			t.Errorf("%s twice", n)
+		}
+		seen[n] = true
+		if _, ok := Classic(n); !ok {
+			t.Errorf("%s is not in the table", n)
+		}
+	}
+	if r, ok := Classic("eacute"); !ok || r != "é" {
+		t.Errorf("eacute: %q %v", r, ok)
+	}
+	// Names the HTML standard has that HTML 4 did not.
+	for _, n := range []string{"eg", "percnt", "lsqb", "nosuchname"} {
+		if r, ok := Classic(n); ok {
+			t.Errorf("%s found as %q", n, r)
+		}
+	}
+}

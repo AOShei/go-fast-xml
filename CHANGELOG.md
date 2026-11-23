@@ -48,7 +48,7 @@
   declaration and its `encoding`; streaming decoder to UTF-8.
 - Document type declaration: external identifiers and the internal
   subset's general entities; nothing is loaded. Undeclared entities in a
-  file with an external DTD subset read from the W3C/HTML list
+  file with an external DTD subset read as HTML 4's 252 character entities
   (`xml.entities_assumed`), otherwise kept as written
   (`xml.entity_undeclared`).
 - Generic reading: text elements as inferred paragraphs with their

@@ -152,7 +152,7 @@ A file that declares no encoding and whose first MiB is not valid UTF-8 is read 
 - **The internal subset** is read for general entity declarations only. Element, attribute-list (default attribute values included) and notation declarations are passed over; parameter entities are never expanded.
 - **Internal entities** are expanded where referenced, their replacement read as markup (an entity may hold elements), in text and in attribute values. Nesting is bounded (`MaxEntityDepth`, 16), and so are the bytes all expansions produce together: `EntityExpansionBase` (1 MiB) plus `EntityExpansionRatio` (8) times the input size, and never more than the decode budget (`Limits.MaxDecodedBytes`, shared with embedding documents) has left. A reference past either bound is kept as written, and so is every expanding reference after the first one refused; the part carries `limit.exceeded`. A billion-laughs file and the quadratic-blowup variant finish in milliseconds. A reference to an entity inside its own replacement is kept as written and counted in `input.repaired`.
 - **The five predefined entities and character references** always work. A character reference to a control character other than tab, line feed and carriage return is removed with `text.control_characters_removed`; one to a surrogate or beyond U+10FFFF is U+FFFD.
-- **Undeclared entities** (`&eacute;` in a DocBook 4 or JATS file whose DTD is not loaded): if the file has an external DTD subset and the name is in the W3C/HTML character entity list (go-fast-html's table), the character is written and the part carries `xml.entities_assumed` (info) with the count. Otherwise the reference stays in the text as written (`&name;`) and the part carries `xml.entity_undeclared` (warning) with the count. A reference to an external entity also stays as written.
+- **Undeclared entities** (`&eacute;` in a DocBook 4 or JATS file whose DTD is not loaded): if the file has an external DTD subset and the name is one of the 252 character entities of HTML 4 (the names that mean the same in every vocabulary), the character is written and the part carries `xml.entities_assumed` (info) with the count. Otherwise the reference stays in the text as written (`&name;`) and the part carries `xml.entity_undeclared` (warning) with the count. A reference to an external entity also stays as written.
 
 ## Damaged input
 
@@ -171,7 +171,7 @@ Processing instructions other than the XML declaration and `xml-stylesheet` are 
 | `input.repaired` | warning | document | damaged markup read leniently, with the count |
 | `input.external_reference` | warning | document | one per kind of reference a conforming processor would load, with the count; nothing was loaded |
 | `input.unread_content` | warning | document | processing instructions, with the count |
-| `xml.entities_assumed` | info | part | undeclared entities read from the W3C/HTML list, with the count |
+| `xml.entities_assumed` | info | part | undeclared entities read as the HTML 4 character entities of those names, with the count |
 | `xml.entity_undeclared` | warning | part | undeclared entities kept as written, with the count |
 | `part.no_text` | warning | part | the document has no block |
 | `part.failed` | error | part | reading stopped on an I/O error; what was read is kept |
