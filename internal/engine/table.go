@@ -39,8 +39,14 @@ type table struct {
 	nextCol  int
 	inHead   bool
 	cut      bool
-	// cost is what the cells hold so far, against the text budget.
+	// cost is what the table's block will cost the text budget so far:
+	// the text of its cells, and core's cell cost for every cell of the
+	// grid it will be, each row padded to the widest (ncols). It grows as
+	// rows end and as the width grows, so that a table the budget cannot
+	// take stops before its grid is padded (over).
 	cost int64
+	over bool
+	e    *Engine
 	// fromProfile: the header row is the profile's fixed text. attrNames
 	// are the attributes rows were made from, in order of first use.
 	fromProfile bool
@@ -77,15 +83,34 @@ func (e *Engine) headerRow(t *table, text []string) {
 // tableCost stops reading when the cells held so far are more than the
 // text budget has left: a row made from attributes holds more than its
 // element's bytes.
-func (e *Engine) tableCost(t *table) {
-	if t.cost > e.out.Budget.Left() {
-		e.out.Budget.Exhaust()
-		e.out.Stopped = true
+func (e *Engine) tableCost(t *table) { t.check() }
+
+// check stops reading (limit.exceeded through the spent budget) when the
+// table's block would cost more than the text budget has left.
+func (t *table) check() {
+	if t.over || t.e == nil {
+		return
+	}
+	if t.cost > t.e.out.Budget.Left() {
+		t.over = true
+		t.e.out.Budget.Exhaust()
+		t.e.out.Stopped = true
 	}
 }
 
-func newTable(model string, start int64) *table {
-	return &table{model: model}
+// widen records that the table is now n columns wide: every row already
+// held will be padded to n.
+func (t *table) widen(n int) {
+	if n <= t.ncols {
+		return
+	}
+	t.cost += int64(n-t.ncols) * int64(len(t.rows)) * gofastcore.CellCost
+	t.ncols = n
+	t.check()
+}
+
+func newTable(e *Engine, model string) *table {
+	return &table{model: model, e: e}
 }
 
 // tableOf returns the table of the innermost open table element.
@@ -157,7 +182,7 @@ func (t *table) endCell(text, href string) {
 		t.occ = append(t.occ, -1)
 	}
 	t.row[t.col] = text
-	t.cost += int64(gofastcore.CellCost + len(text))
+	t.cost += int64(len(text))
 	r := len(t.rows)
 	for c := t.col; c < t.col+t.cs; c++ {
 		t.occ[c] = r + t.rs - 1
@@ -169,8 +194,8 @@ func (t *table) endCell(text, href string) {
 		t.cells = append(t.cells, gofastcore.CellDetail{Row: r, Col: t.col, Href: href})
 	}
 	t.col += t.cs
-	t.ncols = max(t.ncols, t.col)
 	t.cs = 0
+	t.widen(t.col)
 }
 
 func (t *table) endRow() {
@@ -178,6 +203,9 @@ func (t *table) endRow() {
 		return
 	}
 	t.inRow = false
+	if t.over {
+		return
+	}
 	if !t.rowHead {
 		if t.rowCells > 0 && t.rowAllHeadCells && !t.body {
 			t.header++
@@ -190,14 +218,20 @@ func (t *table) endRow() {
 			t.row = append(t.row, "")
 		}
 	}
-	t.ncols = max(t.ncols, len(t.row))
+	t.widen(len(t.row))
+	t.cost += int64(t.ncols) * gofastcore.CellCost
+	t.check()
+	if t.over {
+		return
+	}
 	t.rows = append(t.rows, append([]string(nil), t.row...))
 }
 
-// block returns the table's block; ok is false for a table with no cells.
+// block returns the table's block; ok is false for a table with no cells,
+// and for one the text budget cannot take (reading has stopped).
 func (t *table) block(e *Engine, start, end int64) (gofastcore.Block, bool) {
 	t.endRow()
-	if len(t.rows) == 0 || t.ncols == 0 {
+	if t.over || e.out.Stopped || len(t.rows) == 0 || t.ncols == 0 {
 		return gofastcore.Block{}, false
 	}
 	for i, r := range t.rows {

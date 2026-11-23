@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Phase 5: fixes after review
+
+- A table is charged core's cell cost for every cell of its padded grid
+  as its rows end and as it widens; one the text budget cannot take
+  stops with `limit.exceeded` before its rows are padded (20,000 empty
+  rows under one 1,024-column row no longer allocate 1.2 GB).
+
 ### Phase 4: drafting a profile from an XSD
 
 - `gofastxml -draft-profile schema.xsd [-o draft.json]` and

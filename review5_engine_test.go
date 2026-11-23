@@ -174,6 +174,9 @@ func TestReview5TablePaddingBeforeBudget(t *testing.T) {
 	wide := `<r><rt><tr><td cs="1024">x</td></tr>` + strings.Repeat("<tr/>", n) + `</rt></r>`
 	narrow := `<r><rt><tr><td cs="1">x</td></tr>` + strings.Repeat("<tr/>", n) + `</rt></r>`
 	opts := &gofastcore.Options{Limits: gofastcore.Limits{MaxTextBytes: 1 << 20}}
+	// Warm up: the first reading loads the built-in profiles once, which
+	// would be counted against whichever table is measured first.
+	r5Extract(t, r5Prof, narrow, opts)
 	w := r5Alloc(t, r5Prof, wide, opts)
 	nw := r5Alloc(t, r5Prof, narrow, opts)
 	if w > 16*nw {

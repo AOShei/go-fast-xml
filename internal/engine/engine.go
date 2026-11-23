@@ -1025,7 +1025,7 @@ func (e *Engine) startRule(f *frame, el *xmlread.Element) {
 		f.inItem = false
 		f.ordered = e.test(r.Ordered)
 	case profile.AsTable:
-		f.table = newTable(r.Model, el.Start)
+		f.table = newTable(e, r.Model)
 		if len(r.HeaderText) > 0 {
 			e.headerRow(f.table, r.HeaderText)
 		}
