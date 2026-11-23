@@ -1396,10 +1396,12 @@ func (e *Engine) cutSink(s *sink, at int64) {
 func (e *Engine) piece(s *sink, f *frame, kind gofastcore.Kind, origin gofastcore.Origin, at int64) {
 	for s.b.Len() > generic.MaxBlockBytes || s.b.Size() > 0 {
 		var text string
+		took, all := 0, false
 		if s.b.Len() > generic.MaxBlockBytes {
-			text = s.b.Split(generic.MaxBlockBytes)
+			text, took = s.b.SplitAt(generic.MaxBlockBytes)
 		} else {
-			text = s.b.String()
+			text, all = s.b.String(), true
+			took = len(text)
 			s.b.Reset()
 		}
 		if text == "" {
@@ -1407,6 +1409,7 @@ func (e *Engine) piece(s *sink, f *frame, kind gofastcore.Kind, origin gofastcor
 		}
 		b := gofastcore.Block{Kind: kind, Origin: origin, Text: text, Marker: s.marker, Continued: s.pieces > 0,
 			Loc: gofastcore.Location{Offset: s.pieceAt, Length: max(at-s.pieceAt, 0)}}
+		b.Spans = e.cutSpans(s, len(text), took, all)
 		if origin == gofastcore.OriginInferred {
 			b.Attrs = map[string]string{generic.AttrElement: e.pathTo(f)}
 		}
@@ -1425,10 +1428,45 @@ func (e *Engine) piece(s *sink, f *frame, kind gofastcore.Kind, origin gofastcor
 		s.pieces++
 		s.pieceAt = at
 	}
-	s.spans = s.spans[:0]
+	if s.b.Size() == 0 {
+		s.spans = s.spans[:0]
+	}
 	if s.kind == skItem {
 		s.done = true
 	}
+}
+
+// cutSpans returns the spans of a sink's piece of n bytes, the first took
+// bytes of its text (all of it when all is set), and moves the spans and
+// open inline elements of the rest to the rest's offsets. A span across
+// the cut is in both pieces.
+func (e *Engine) cutSpans(s *sink, n, took int, all bool) []gofastcore.Span {
+	var out []gofastcore.Span
+	rest := s.spans[:0]
+	for _, sp := range s.spans {
+		if p := (gofastcore.Span{Start: sp.Start, End: min(sp.End, n), Style: sp.Style, Href: sp.Href, Display: sp.Display}); p.Start < p.End {
+			out = append(out, p)
+		}
+		sp.Start, sp.End = max(sp.Start-took, 0), sp.End-took
+		if !all && sp.Start < sp.End {
+			rest = append(rest, sp)
+		}
+	}
+	s.spans = rest
+	for i := range e.frames {
+		if f := &e.frames[i]; f.span == s {
+			// An inline element still open: its text so far is a span of
+			// this piece; the rest of it will be one of the next.
+			if r := f.rule; e.opts.Spans && r != nil && (r.Style != 0 || f.href != "") && f.spanStart < n && len(out) < 100000 {
+				out = append(out, gofastcore.Span{Start: f.spanStart, End: n, Style: r.Style, Href: f.href})
+			}
+			f.spanStart = max(f.spanStart-took, 0)
+			if all {
+				f.spanStart = 0
+			}
+		}
+	}
+	return out
 }
 
 // Comment implements xmlread.Handler: a comment is a note marked stored,

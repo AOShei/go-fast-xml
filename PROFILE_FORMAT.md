@@ -161,7 +161,10 @@ element so far) as well as those to come.
   the item's text and later blocks follow as blocks at the item's depth.
   Blocks inside another `block` are joined with `\n` the same way.
 - A `block` inside a `heading` or `label` is unwrapped (`Titre/Paragraphe`).
-- Inline styles and links become `Spans` when `Options.Spans` is set; in a
+- Inline styles and links become `Spans` when `Options.Spans` is set (in a
+  block split into `Continued` pieces, each span is on the piece that
+  holds it, and a span across the cut is in both, with each piece's
+  offsets); in a
   table, a cell's link goes to `Table.Cells` (also with `Options.Spans`,
   as core defines).
 - An item of an ordered list with no `marker` has its number (`1.`) as
