@@ -6,6 +6,9 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -59,6 +62,61 @@ func BenchmarkExtractNoAttributes(b *testing.B) {
 		if _, err := x.Extract(context.Background(), bytes.NewReader(src), int64(len(src)), nil); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+// BenchmarkServicePublic reads a fixed list of 200 Service-Public dev
+// files (every n-th of the sorted list, the index files left out) with
+// the service-public profile and with generic reading. One op is the 200
+// files; allocs/file is allocs/op divided by 200.
+func BenchmarkServicePublic(b *testing.B) {
+	dir := spDir("dev")
+	if dir == "" {
+		b.Skip("no Service-Public dev corpus")
+	}
+	var all []string
+	for _, f := range spFiles(dir) {
+		if base := filepath.Base(f); base[0] >= 'A' && base[0] <= 'Z' {
+			all = append(all, f)
+		}
+	}
+	const n = 200
+	if len(all) < n {
+		b.Skip("fewer than 200 files")
+	}
+	var data [][]byte
+	total := 0
+	for i := range n {
+		d, err := os.ReadFile(all[i*len(all)/n])
+		if err != nil {
+			b.Fatal(err)
+		}
+		data = append(data, d)
+		total += len(d)
+	}
+	for _, c := range []struct {
+		name    string
+		profile string
+	}{{"profile", ""}, {"generic", ProfileNone}} {
+		b.Run(c.name, func(b *testing.B) {
+			x := &Extractor{Profile: c.profile}
+			b.SetBytes(int64(total))
+			b.ReportAllocs()
+			var m runtime.MemStats
+			runtime.ReadMemStats(&m)
+			before := m.Mallocs
+			ops := 0
+			for b.Loop() {
+				for _, d := range data {
+					if _, err := x.Extract(context.Background(), bytes.NewReader(d), int64(len(d)), nil); err != nil {
+						b.Fatal(err)
+					}
+				}
+				ops++
+			}
+			runtime.ReadMemStats(&m)
+			b.ReportMetric(float64(m.Mallocs-before)/float64(ops*n), "allocs/file")
+		})
 	}
 }
 
