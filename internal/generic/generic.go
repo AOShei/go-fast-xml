@@ -146,6 +146,7 @@ type Generic struct {
 
 	paths   map[string]string
 	scratch []byte
+	peak    int // the longest the queue has been, for tests
 }
 
 // New returns a generic consumer writing to out.
@@ -186,6 +187,9 @@ func (g *Generic) StartElement(r *xmlread.Reader, e *xmlread.Element) {
 	}
 	f = &g.stack[len(g.stack)-1]
 	f.qStart = n + len(notes)
+	if g.overBound() {
+		g.flush(false)
+	}
 }
 
 // EndElement implements xmlread.Handler.
@@ -369,6 +373,12 @@ func (g *Generic) comment(text string, end int64) {
 func (g *Generic) enqueue(it item) {
 	g.queue = append(g.queue, it)
 	g.qSize += len(it.block.Text) + gofastcore.BlockCost
+	g.peak = max(g.peak, len(g.queue))
+}
+
+// overBound reports whether the queue has passed its bound.
+func (g *Generic) overBound() bool {
+	return g.qSize > MaxPendingBytes || len(g.queue) > MaxPendingBlocks
 }
 
 // flush writes out the blocks no undecided element can still take in. It
@@ -387,7 +397,7 @@ func (g *Generic) flush(force bool) {
 		}
 	}
 	if u >= 0 {
-		if force || g.qSize > MaxPendingBytes || len(g.queue) > MaxPendingBlocks {
+		if force || g.overBound() {
 			for i := u; i < len(g.stack); i++ {
 				if g.stack[i].state == undecided {
 					g.stack[i].state = container
@@ -434,14 +444,28 @@ func (g *Generic) Finish(end int64) {
 }
 
 // path returns Attrs["element"] for the element at depth d.
+// The paths of the ancestors are made first, from the outermost one not
+// yet made, in a loop: nesting does not recurse.
 func (g *Generic) path(d int) string {
+	from := d
+	for from > 1 && !g.stack[from-2].pathOK {
+		from--
+	}
+	for i := from; i < d; i++ {
+		g.pathOf(i)
+	}
+	return g.pathOf(d)
+}
+
+// pathOf makes the path of the element at depth d, its parent's made.
+func (g *Generic) pathOf(d int) string {
 	f := &g.stack[d-1]
 	if f.pathOK {
 		return f.path
 	}
 	var parent string
 	if d > 1 {
-		parent = g.path(d - 1)
+		parent = g.stack[d-2].path
 	}
 	name := f.el.Name
 	if len(name) > MaxNameBytes {
