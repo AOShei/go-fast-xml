@@ -76,6 +76,34 @@ func TestCancelWhileSkipping(t *testing.T) {
 	}
 }
 
+// Finding 6: a missing closing quote is repaired, and the rest of the
+// file is read.
+func TestUnclosedQuote(t *testing.T) {
+	for _, c := range []struct{ src, want string }{
+		{"<!DOCTYPE note SYSTEM \"note.dtd>\n<note>hi</note>", "paragraph \"hi\" (note)\n"},
+		{`<r><p a="x>one</p><p>two</p></r>`, "@a \"x\" (r/p)\nparagraph \"one\" (r/p)\nparagraph \"two\" (r/p)\n"},
+		{`<r><p a='x b="y">one</p><p>two</p></r>`, "@a \"x b=\\\"y\\\"\" (r/p)\nparagraph \"one\" (r/p)\nparagraph \"two\" (r/p)\n"},
+		{`<r><p a="x<b>one</b></p><p>two</p></r>`, "@a \"x\" (r/p)\nparagraph \"one\" (r/p/b)\nparagraph \"two\" (r/p)\n"},
+		{`<r><p a="x>one`, "@a \"x\" (r/p)\nparagraph \"one\" (r/p)\n"},
+		{`<r><p a="ok>still">one</p></r>`, "@a \"ok>still\" (r/p)\nparagraph \"one\" (r/p)\n"},
+	} {
+		doc := extract(t, c.src, nil)
+		if got := lines(doc); got != c.want {
+			t.Errorf("%q:\n%s", c.src, got)
+		}
+		if c.src != `<r><p a="ok>still">one</p></r>` && warned(doc, gofastcore.WarnInputRepaired) == "" {
+			t.Errorf("%q: no repair", c.src)
+		}
+	}
+	// Past the bound on tags, a missing quote does not stop reading.
+	lowTags(t, 4096)
+	src := `<r><p a="x>one</p>` + strings.Repeat("<p>two</p>", 1000) + `</r>`
+	doc := extract(t, src, nil)
+	if n := len(doc.Parts[0].Blocks); n != 1002 || warned(doc, gofastcore.WarnLimitExceeded) != "" {
+		t.Errorf("%d blocks, %+v", n, doc.Parts[0].Warnings)
+	}
+}
+
 // Finding 11: metadata values are cut at a character boundary and
 // counted; an xml:lang too long for the language is a note.
 func TestMetadataCut(t *testing.T) {

@@ -921,12 +921,15 @@ func (s *Scanner) markup() scanStatus {
 			s.mode = modeCDATA
 			return skipped
 		case len(b) >= len(doctypeOpen) && bytes.EqualFold(b[:len(doctypeOpen)], doctypeOpen):
-			n := doctypeEnd(b)
+			n, repaired := doctypeEnd(b)
 			if n < 0 {
 				return needMore
 			}
+			if repaired {
+				s.Stats.Repairs++
+			}
 			s.tokStart = s.here()
-			s.text = b[len(doctypeOpen) : n-1]
+			s.text = bytes.TrimSuffix(b[len(doctypeOpen):n], []byte(">"))
 			s.pos += n
 			s.tokEnd = s.hereEnd()
 			s.kind = Doctype
@@ -944,29 +947,48 @@ func (s *Scanner) markup() scanStatus {
 // doctypeEnd returns the length of the document type declaration at the
 // start of b, or -1 if it does not end in b. Quoted strings, comments and
 // processing instructions in its internal subset may hold '>'.
-func doctypeEnd(b []byte) int {
+//
+// Outside the internal subset a literal (a public or system identifier)
+// holds no '<': one that runs into a '<' lacks its closing quote, and the
+// declaration ends at the first '>' after the quote, or else before the
+// '<'; repaired reports that.
+func doctypeEnd(b []byte) (n int, repaired bool) {
 	depth := 0
 	for i := len(doctypeOpen); i < len(b); i++ {
 		switch c := b[i]; c {
 		case '"', '\'':
 			j := bytes.IndexByte(b[i+1:], c)
+			if depth == 0 {
+				lit := b[i+1:]
+				if j >= 0 {
+					lit = lit[:j]
+				}
+				if lt := bytes.IndexByte(lit, '<'); lt >= 0 {
+					if gt := bytes.IndexByte(lit[:lt], '>'); gt >= 0 {
+						return i + 1 + gt + 1, true
+					}
+					return i + 1 + lt, true
+				}
+			}
 			if j < 0 {
-				return -1
+				return -1, false
 			}
 			i += j + 1
 		case '<':
 			if bytes.HasPrefix(b[i:], commentOpen) {
 				j := bytes.Index(b[i+4:], []byte("-->"))
 				if j < 0 {
-					return -1
+					return -1, false
 				}
 				i += 4 + j + 2
 			} else if i+1 < len(b) && b[i+1] == '?' {
 				j := bytes.Index(b[i+2:], []byte("?>"))
 				if j < 0 {
-					return -1
+					return -1, false
 				}
 				i += 2 + j + 1
+			} else if depth == 0 {
+				return i, true // cut off by the next tag
 			}
 		case '[':
 			depth++
@@ -976,11 +998,11 @@ func doctypeEnd(b []byte) int {
 			}
 		case '>':
 			if depth == 0 {
-				return i + 1
+				return i + 1, false
 			}
 		}
 	}
-	return -1
+	return -1, false
 }
 
 // pi scans a processing instruction.
@@ -1154,18 +1176,38 @@ func (s *Scanner) startTag(b []byte) scanStatus {
 			// Most values are a few bytes long: look by hand first, and
 			// only call out for the long ones.
 			n, limit := 0, min(len(b)-i, 24)
-			for n < limit && b[i+n] != quote {
+			for n < limit && b[i+n] != quote && b[i+n] != '<' {
 				n++
 			}
 			if n == limit {
 				m := bytes.IndexByte(b[i+n:], quote)
 				if m < 0 {
+					m = len(b) - i - n
+				}
+				if lt := bytes.IndexByte(b[i+n:i+n+m], '<'); lt >= 0 {
+					m = lt
+				} else if i+n+m == len(b) && !s.eof {
 					return needMore
 				}
 				n += m
 			}
-			value = b[i : i+n]
-			i += n + 1
+			if i+n < len(b) && b[i+n] == quote {
+				value = b[i : i+n]
+				i += n + 1
+			} else {
+				// A value can hold no '<': the closing quote is missing.
+				// The value ends at the first '>', which ends the tag,
+				// or else where the next tag begins.
+				repairs++
+				if gt := bytes.IndexByte(b[i:i+n], '>'); gt >= 0 {
+					n = gt
+				}
+				value = b[i : i+n]
+				i += n
+				if i == len(b) {
+					return needMore // at the end of the input: Next keeps it as text
+				}
+			}
 		} else {
 			repairs++ // a value without quotes runs to white space or '>'
 			v := i
