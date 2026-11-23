@@ -3,6 +3,8 @@ package gofastxml
 import (
 	"strings"
 	"testing"
+
+	"github.com/AOShei/go-fast-core"
 )
 
 // Tests of the phase 3 integration: what the three profile branches'
@@ -132,6 +134,49 @@ func TestProfileNothingDropped(t *testing.T) {
 	for _, w := range doc.AllWarnings() {
 		if w.Code == WarnUnmappedAttributes && strings.Contains(w.Message, "gender@code") {
 			t.Errorf("read attribute counted unread: %s", w.Message)
+		}
+	}
+}
+
+// TestXIncludeReported: an xi:include element raises core's
+// input.external_reference in generic reading and in profile reading
+// (with and without a rule for it), as phase 1 reports external DTDs and
+// stylesheets; nothing is fetched and the href is kept as text.
+func TestXIncludeReported(t *testing.T) {
+	const xi = `xmlns:xi="http://www.w3.org/2001/XInclude"`
+	src := `<doc ` + xi + `><p>t</p><xi:include href="chapter2.xml" parse="xml"/></doc>`
+	withRule := head("xin", `{"root": "doc"}`) + `"namespaces": {"xi": "http://www.w3.org/2001/XInclude"}, "rules": [
+		{"match": "doc", "as": "transparent"},
+		{"match": "p", "as": "block", "kind": "paragraph"},
+		{"match": "xi:include", "as": "block", "kind": "paragraph", "value": {"attr": "href"}, "attrs": {"x.parse": {"attr": "parse"}}}]}`
+	noRule := head("xin2", `{"root": "doc"}`) + `"rules": [
+		{"match": "doc", "as": "transparent"},
+		{"match": "p", "as": "block", "kind": "paragraph"}]}`
+	docs := map[string]*gofastcore.Document{
+		"generic":   extract(t, src, nil),
+		"rule":      extractWith(t, withRule, src, nil),
+		"no rule":   extractWith(t, noRule, src, nil),
+		"in a cell": extractWith(t, noRule, `<doc `+xi+`><p>t <xi:include href="chapter2.xml"/></p></doc>`, nil),
+	}
+	for name, doc := range docs {
+		n := 0
+		for _, w := range doc.AllWarnings() {
+			if w.Code == gofastcore.WarnInputExternalReference && strings.Contains(w.Message, "XInclude element (1)") {
+				n++
+				if w.Severity != gofastcore.SeverityWarning {
+					t.Errorf("%s: severity %v", name, w.Severity)
+				}
+			}
+		}
+		if n != 1 {
+			t.Errorf("%s: %d XInclude warnings: %v", name, n, doc.AllWarnings())
+		}
+		found := false
+		for _, b := range blocks(doc) {
+			found = found || b.Text == "chapter2.xml"
+		}
+		if !found {
+			t.Errorf("%s: href not kept:\n%s", name, dump(doc))
 		}
 	}
 }

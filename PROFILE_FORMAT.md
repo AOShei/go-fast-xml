@@ -182,6 +182,12 @@ element so far) as well as those to come.
   ends the paragraph there (content stays in file order); with
   `out_of_line` (notes only: a footnote written inside its sentence) it
   is a block made just before the paragraph, which goes on unbroken.
+- An `xi:include` (XInclude 2001 or its 2003 draft) is never followed:
+  with or without a rule it raises core's `input.external_reference`
+  (warning, once per document with the count), as in generic reading
+  and as external DTDs and stylesheets are reported. Its `href` stays as
+  text: the block of its rule (DocBook reads it as a paragraph whose
+  text is the `href`), or an attribute note when it has no rule.
 - Inline styles and links become `Spans` when `Options.Spans` is set (in a
   block split into `Continued` pieces, each span is on the piece that
   holds it, and a span across the cut is in both, with each piece's
