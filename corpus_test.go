@@ -22,10 +22,7 @@ import (
 // a panic, a Validate failure or a timeout. The whole run stops after two
 // minutes. Its shape follows go-fast-odf's corpus test.
 func TestCorpus(t *testing.T) {
-	root := os.Getenv("GOFAST_CORPUS")
-	if root == "" {
-		root = filepath.Join("..", ".testdata", "corpus")
-	}
+	root := corpusRoot()
 	if _, err := os.Stat(root); err != nil {
 		t.Skip("no corpus at", root)
 	}

@@ -142,7 +142,7 @@ func Extract(ctx context.Context, r io.ReaderAt, size int64, opts *gofastcore.Op
 
 // ExtractBytes extracts a document held in memory with default settings.
 func ExtractBytes(ctx context.Context, data []byte, opts *gofastcore.Options) (*gofastcore.Document, error) {
-	return (&Extractor{}).Extract(ctx, bytes.NewReader(data), int64(len(data)), opts)
+	return (&Extractor{}).extract(ctx, bytes.NewReader(data), int64(len(data)), opts, data)
 }
 
 // ExtractFile opens the named file and extracts it with default settings.
@@ -186,6 +186,12 @@ func (e *Extractor) ExtractFile(ctx context.Context, path string, opts *gofastco
 //     a tag before any element is larger than MaxTagBytes.
 //   - ErrNoPartsSelected: Options.Parts does not select part 1.
 func (e *Extractor) Extract(ctx context.Context, r io.ReaderAt, size int64, opts *gofastcore.Options) (*gofastcore.Document, error) {
+	return e.extract(ctx, r, size, opts, nil)
+}
+
+// extract is Extract; mem, when not nil, is the input r reads, held in
+// memory, which is read in place and never written.
+func (e *Extractor) extract(ctx context.Context, r io.ReaderAt, size int64, opts *gofastcore.Options, mem []byte) (*gofastcore.Document, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -206,16 +212,29 @@ func (e *Extractor) Extract(ctx context.Context, r io.ReaderAt, size int64, opts
 	if err != nil {
 		return nil, err
 	}
-	sample := make([]byte, min(size, xmlenc.SampleSize))
-	if n, err := r.ReadAt(sample, 0); n < len(sample) {
-		if err == nil {
-			err = io.ErrUnexpectedEOF
+	var sample []byte
+	if n := min(size, xmlenc.SampleSize); mem != nil {
+		sample = mem[:n:n] // in memory: read in place, not copied
+	} else {
+		sample = make([]byte, n)
+		if n, err := r.ReadAt(sample, 0); n < len(sample) {
+			if err == nil {
+				err = io.ErrUnexpectedEOF
+			}
+			return nil, fmt.Errorf("gofastxml: reading the input: %w", err)
 		}
-		return nil, fmt.Errorf("gofastxml: reading the input: %w", err)
 	}
 	enc, err := xmlenc.Sniff(sample)
 	if err != nil {
 		return nil, fmt.Errorf("gofastxml: %w: %w", err, gofastcore.ErrUnsupported)
+	}
+	// When the sample holds the whole input, it is UTF-8 and smaller than
+	// the window, the scanner reads the sample in place: it would read
+	// the same bytes into a window that holds them all, with the same
+	// tokens, so no window is made and nothing is read twice.
+	var whole []byte
+	if enc.UTF8 && int64(len(sample)) == size && len(sample)-enc.Skip < min(xmlscan.DefaultBufferSize, tagBytes) {
+		whole = sample[enc.Skip:]
 	}
 	sample = nil
 
@@ -235,12 +254,17 @@ func (e *Extractor) Extract(ctx context.Context, r io.ReaderAt, size int64, opts
 	if enc.UTF8 {
 		scan.BaseOffset = int64(enc.Skip)
 	}
-	rd := xmlread.New(ctx, dec, xmlread.Options{Scan: scan})
+	var rd *xmlread.Reader
+	if whole != nil {
+		rd = xmlread.NewBytes(ctx, whole, xmlread.Options{Scan: scan})
+	} else {
+		rd = xmlread.New(ctx, dec, xmlread.Options{Scan: scan})
+	}
 
 	doc := gofastcore.New("xml")
 	doc.Source.Name, doc.Source.Size, doc.Source.MIME = o.Name, size, "application/xml"
 	part := &gofastcore.Part{Kind: gofastcore.PartBody, Number: 1}
-	out := &generic.Out{Part: part, Budget: text}
+	out := &generic.Out{Part: part, Budget: text, Hint: generic.BlocksHint(size)}
 	g := generic.New(out, generic.Options{NoAttributes: e.Attributes == AttributesNone})
 	d := &dispatch{x: e, out: out, g: g, h: g, forced: forced, none: none,
 		opts: engineOptions(&o)}

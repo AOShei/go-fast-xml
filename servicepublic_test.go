@@ -20,11 +20,7 @@ import (
 
 // spDir returns the Service-Public directory of a corpus set, or "".
 func spDir(set string) string {
-	root := os.Getenv("GOFAST_CORPUS")
-	if root == "" {
-		root = filepath.Join("..", ".testdata", "corpus")
-	}
-	dir := filepath.Join(root, set, "xml-servicepublic")
+	dir := filepath.Join(corpusRoot(), set, "xml-servicepublic")
 	if _, err := os.Stat(dir); err != nil {
 		return ""
 	}

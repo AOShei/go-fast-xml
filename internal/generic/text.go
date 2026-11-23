@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"unicode"
 	"unicode/utf8"
+	"unsafe"
 
 	"github.com/AOShei/go-fast-core"
 )
@@ -203,9 +204,14 @@ func (b *Builder) SplitAt(limit int) (string, int) {
 
 // Clean returns s with the text conventions applied, white space
 // collapsed and trimmed, and the counts of what was removed.
+// When nothing changes, s itself is returned.
 func Clean(s string, preserve bool, b *Builder) string {
 	b.Reset()
-	b.Append([]byte(s), preserve)
+	// Append only reads its argument: s is read in place, not copied.
+	b.Append(unsafe.Slice(unsafe.StringData(s), len(s)), preserve)
+	if string(b.buf) == s {
+		return s
+	}
 	return b.String()
 }
 

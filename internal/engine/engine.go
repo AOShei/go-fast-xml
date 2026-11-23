@@ -1298,7 +1298,7 @@ func (e *Engine) add(b gofastcore.Block, f *frame, own bool) blockRef {
 		e.out.Stopped = true
 		return blockRef{}
 	}
-	e.out.Part.Blocks = append(e.out.Part.Blocks, b)
+	e.out.Append(b)
 	return blockRef{e.out.Part, len(e.out.Part.Blocks) - 1}
 }
 

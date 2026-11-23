@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Phase 5: allocation and speed
+
+Output unchanged (digests of every dev file of every corpus). On the
+Service-Public dev batch through `ExtractFile`, one thread: 1,296 to
+899 MB allocated, 6.86 to 5.52 million allocations, about 84 to 91 MB/s.
+
+- A UTF-8 input smaller than the 64 KiB window is scanned in place from
+  the encoding sample: no window, nothing read twice.
+- `ExtractBytes` reads the caller's bytes in place (never written).
+- The first part gets room for its blocks from the input size (one per
+  128 bytes, at most 4,096); the generic reader grows a part once per
+  flush.
+- Values the text conventions leave unchanged are not copied.
+- `BenchmarkBatch` (the whole batch, with user CPU), `TestOutputDigests`.
+
 ### Phase 4: drafting a profile from an XSD
 
 - `gofastxml -draft-profile schema.xsd [-o draft.json]` and

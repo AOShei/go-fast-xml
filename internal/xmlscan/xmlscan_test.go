@@ -43,6 +43,30 @@ func dump(s *Scanner) string {
 
 // merged is dump with adjacent Text and Comment pieces joined, so that
 // scans that cut text in different places compare equal.
+// exact records every token as given, in its pieces, with its span, the
+// scanner's offset and depth, and the accessors before the first token.
+func exact(s *Scanner) string {
+	var b strings.Builder
+	for {
+		start, end := s.Span()
+		fmt.Fprintf(&b, "%d %q %q %q %q %v [%d %d] @%d d%d e%v\n", s.Kind(), s.Name(), s.Local(), s.Text(), s.Target(),
+			s.Final(), start, end, s.Offset(), s.Depth(), s.InEntity())
+		if s.Kind() == Start {
+			for i := range s.NumAttr() {
+				uri, local, v := s.AttrAt(i)
+				fmt.Fprintf(&b, " %s{%s}%s=%q", s.AttrNameAt(i), uri, local, v)
+			}
+		}
+		if s.Kind() == Start || s.Kind() == End {
+			fmt.Fprintf(&b, " {%s}\n", s.URI())
+		}
+		if s.Next() == EOF {
+			fmt.Fprintf(&b, "EOF %v @%d\n", s.Err(), s.Offset())
+			return b.String()
+		}
+	}
+}
+
 func merged(s *Scanner) string {
 	var b strings.Builder
 	var text, comment []byte
@@ -301,6 +325,14 @@ func FuzzScanner(f *testing.F) {
 		opts := func(buf int) *Options {
 			return &Options{BufferSize: buf, MaxTokenBytes: 1 << 16, MaxDepth: 64,
 				Resolve: resolver(map[string]string{"x": "<b>y</b>&x;", "y": "&x;&x;"}), ExpansionLimit: 1 << 12}
+		}
+		// Input smaller than the window reads the same, token for
+		// token, from memory and from a reader: gofastxml relies on it.
+		if len(data) < 1<<16 {
+			a, b := NewBytes(data, opts(0)), New(bytes.NewReader(data), opts(1<<16))
+			if x, y := exact(a), exact(b); x != y || a.Stats != b.Stats {
+				t.Fatalf("scan from a reader differs:\n%s\nwant\n%s", y, x)
+			}
 		}
 		whole := NewBytes(data, opts(0))
 		want := merged(whole)
