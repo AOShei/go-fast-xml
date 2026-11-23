@@ -88,6 +88,9 @@ offset inside a block.
 
 ## Left to generic reading
 
+Dev set: 139 elements with no rule (`xml.unmapped_elements`), unchanged
+by the phase 3 integration (`lb` had a rule before it became `break`).
+
 `gap` (an empty element: generic reading writes its `reason`, `extent`,
 `unit` as attribute notes, which is what it says); `standOff` contents
 (`listEvent/event`, `desc`, `listRelation/relation`); ELTeC's

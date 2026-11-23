@@ -47,6 +47,9 @@ the paragraph's text is its element's text without the note.
 
 ## Left to generic reading
 
+Dev set: 124 elements with no rule (`xml.unmapped_elements`); 256 before
+`br`, `eol` and `eop` became `break` rules (phase 3 integration).
+
 - `analysis` and its children (`activeModifications`, `textualMod`,
   `source`, `destination`, `otherAnalysis`, ...), `temporalData`,
   `presentation`, vendor elements in `proprietary` (MODS, `confersPower`,

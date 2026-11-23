@@ -47,6 +47,11 @@ Document: `cda.id_root` + `cda.id_extension` (with `cda.set_id_*` and
 
 ## Left to generic reading
 
+Dev set: 19,699 elements with no rule (`xml.unmapped_elements`), nearly
+all inside `entry`; unchanged by the phase 3 integration (the header
+participants' children are read for their text and attributes, still
+counted).
+
 Everything inside `entry` (by choice, above). Unmapped attributes kept
 out: `td@ID`/`th@ID` (core has no anchor for a cell), `content@styleCode`
 values other than Bold/Italics, `xsi:type`, `reference@value` of a

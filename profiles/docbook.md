@@ -85,6 +85,9 @@ carry their section's (chapter's, figure's...) id in
 
 ## Left to generic reading
 
+Dev set: 9 elements with no rule (`xml.unmapped_elements`), unchanged by
+the phase 3 integration.
+
 `choose`, `when`, `otherwise`, `sequence`, `message`, `sup` inside
 `fieldsynopsis/initializer` in the xslTNG reference (XSLT written as
 DocBook content in another vocabulary): generic reading keeps their text

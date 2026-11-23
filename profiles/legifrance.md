@@ -34,8 +34,9 @@ version, link and structure entry carries the target's id in
 
 ## Left to generic reading
 
-- Nothing now: `br` (13,457 in the dev set) is a `break` rule, a `\n`
-  inside the block. Légifrance writes most of its body text as `div`
+- Nothing: the dev set has no element with no rule
+  (`xml.unmapped_elements` 0; it was 13,457, all `br`, before `br`
+  became a `break` rule, a `\n` inside the block). Légifrance writes most of its body text as `div`
   text broken by `br`, so such a paragraph holds the printed lines, one
   per line.
 

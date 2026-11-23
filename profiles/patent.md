@@ -110,6 +110,9 @@ EPO documents repeat the claims in three languages: tell them apart with
 
 ## Left to generic reading
 
+Dev set: 64 elements with no rule (`xml.unmapped_elements`), unchanged by
+the phase 3 integration.
+
 - EPO search report internals (`srep-*`, `patent-family`,
   `family-member`, `priority-application`, the `citation` inside
   `srep-citations`): the samples hold one; read generically, text kept.
