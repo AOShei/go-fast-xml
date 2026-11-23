@@ -172,6 +172,7 @@ func BenchmarkBatch(b *testing.B) {
 	b.Run("file", func(b *testing.B) {
 		b.SetBytes(total)
 		b.ReportAllocs()
+		defer userCPU(b)()
 		for b.Loop() {
 			for _, f := range files {
 				if _, err := ExtractFile(ctx, f, nil); err != nil {
@@ -183,6 +184,7 @@ func BenchmarkBatch(b *testing.B) {
 	b.Run("bytes", func(b *testing.B) {
 		b.SetBytes(total)
 		b.ReportAllocs()
+		defer userCPU(b)()
 		var buf bytes.Buffer
 		for b.Loop() {
 			for _, f := range files {
@@ -206,6 +208,7 @@ func BenchmarkBatch(b *testing.B) {
 		x := &Extractor{Profile: ProfileNone}
 		b.SetBytes(total)
 		b.ReportAllocs()
+		defer userCPU(b)()
 		for b.Loop() {
 			for _, f := range files {
 				if _, err := x.ExtractFile(ctx, f, nil); err != nil {
@@ -217,6 +220,7 @@ func BenchmarkBatch(b *testing.B) {
 	b.Run("encodingxml", func(b *testing.B) {
 		b.SetBytes(total)
 		b.ReportAllocs()
+		defer userCPU(b)()
 		for b.Loop() {
 			for _, f := range files {
 				fh, err := os.Open(f)
