@@ -64,7 +64,23 @@ func TestCommand(t *testing.T) {
 		t.Errorf("-o wrote %q, %v", b, err)
 	}
 
-	for _, bad := range [][]string{{}, {"-format", "pdf", a}, {"-exclude-display=nonsense", a}, {"-stored=nonsense", a}} {
+	out.Reset()
+	if code := run(context.Background(), []string{"-profiles"}, &out, &errs); code != 0 || !strings.HasPrefix(out.String(), "service-public\t") {
+		t.Errorf("-profiles: exit %d, %q", code, out.String())
+	}
+	prof := filepath.Join(dir, "p.json")
+	os.WriteFile(prof, []byte(`{"profile": "mine", "format": 1, "match": [{"root": "x"}], "rules": [{"match": "title", "as": "heading", "level": 1}, {"match": "/doc", "as": "transparent"}]}`), 0o644)
+	for _, args := range [][]string{{"-profile", prof, "-format", "markdown", a}, {"-profile", "none", "-format", "markdown", a}} {
+		out.Reset()
+		code := run(context.Background(), args, &out, &errs)
+		heading := strings.Contains(out.String(), "# Title")
+		if code != 0 || heading != (args[1] == prof) {
+			t.Errorf("%v: exit %d, %q", args, code, out.String())
+		}
+	}
+	os.WriteFile(filepath.Join(dir, "bad.json"), []byte(`{"profile": "bad", "format": 1, "match": [{"root": "x"}], "rules": [{"match": "a", "as": "nonsense"}]}`), 0o644)
+	for _, bad := range [][]string{{}, {"-format", "pdf", a}, {"-exclude-display=nonsense", a}, {"-stored=nonsense", a},
+		{"-profile", "no-such-profile", a}, {"-profile", filepath.Join(dir, "bad.json"), a}} {
 		if code := run(context.Background(), bad, &out, &errs); code != 2 {
 			t.Errorf("%v: exit %d", bad, code)
 		}
