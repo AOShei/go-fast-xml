@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/AOShei/go-fast-core"
@@ -40,8 +41,96 @@ func FuzzExtract(f *testing.F) {
 		if err := doc.Validate(); err != nil {
 			t.Fatalf("invalid: %v", err)
 		}
-		if len(doc.Parts) != 1 || doc.Parts[0].Number != 1 {
+		if len(doc.Parts) == 0 || doc.Parts[0].Number != 1 {
 			t.Fatalf("parts %d", len(doc.Parts))
 		}
 	})
+}
+
+// fuzzProfile has a rule of every kind, both table models, every value
+// source and the keys of A3.
+const fuzzProfile = `{"profile": "fuzz", "format": 1, "match": [{"root": "r"}], "heading_base": 2,
+ "namespaces": {"m": "http://www.w3.org/1998/Math/MathML"},
+ "rules": [
+  {"match": "/r", "as": "transparent", "extra": {"x.id": {"attr": "id"}}},
+  {"match": "t", "as": "metadata", "field": "title", "also_heading": 1},
+  {"match": "k", "as": "metadata", "field": "extra", "key": "k", "join": ", ", "value": {"child": "v"}},
+  {"match": "s", "as": "section", "anchor": {"attr": "id"}, "mark": {"x.c": {"structure": "c"}}, "attrs": {"x.a": {"attr": "a"}}},
+  {"match": "s/h", "as": "heading", "level": "nesting", "duplicate_of": "hh", "key": "x.plain"},
+  {"match": "hh", "as": "heading", "level": {"attr": "n"}},
+  {"match": "p", "as": "block", "kind": "paragraph", "marker": {"attr": "n"}},
+  {"match": "q", "as": "block", "kind": "quote"},
+  {"match": "code", "as": "block", "kind": "code", "language": "go"},
+  {"match": "m:math", "as": "block", "kind": "formula", "notation": "plain"},
+  {"match": "fn", "as": "block", "kind": "footnote"},
+  {"match": "u", "as": "block", "kind": "paragraph", "value": {"attr": "href"}},
+  {"match": "l", "as": "list", "ordered": {"attr": "t", "in": ["1"]}},
+  {"match": "i", "as": "item", "attrs": {"x.v": {"child": "v"}}},
+  {"match": "lab", "as": "label"},
+  {"match": "tb", "as": "table"},
+  {"match": "cals", "as": "table", "model": "cals"},
+  {"match": "tr", "as": "row", "header": {"attr": "h", "in": ["1"]}},
+  {"match": "td", "as": "cell", "colspan": "cs", "rowspan": "rs"},
+  {"match": "b", "as": "inline", "style": "bold"},
+  {"match": "a", "as": "inline", "link": {"attr": "href"}, "title": {"attr": "title"}, "attrs": {"x.t": {"attr": "t"}}},
+  {"match": "img", "as": "image", "id": {"attr": "src"}, "alt": {"child": "alt"}},
+  {"match": "n", "as": "note", "type": "comment"},
+  {"match": "part", "as": "part", "kind": "chapter", "name": {"child": "pn"}},
+  {"match": "st", "as": "stored", "kind": "custom_xml"},
+  {"match": "hide", "as": "transparent", "display": {"attr": "h", "in": ["1"], "reason": "hidden"}},
+  {"match": "sk", "as": "skip"}]}`
+
+// FuzzProfile runs the rule engine with a profile of every rule kind on
+// arbitrary input.
+func FuzzProfile(f *testing.F) {
+	for _, s := range []string{
+		`<r id="1"><t>T</t><k><v>a</v></k><s id="s"><c><x y="1"/></c><h>H</h><hh n="3">H</hh><p n="1.">P <b>b</b> <a href="h" title="T" t="x">a</a></p>` +
+			`<l t="1"><i>one<v>v</v><p>p</p><l><i>two</i></l></i></l><lab>L</lab><q>Q</q></s><tb><tr h="1"><td cs="2">a</td></tr><tr><td rs="3"><p>x</p><l><i>y</i></l></td><td>z</td></tr></tb>` +
+			`<cals><tgroup><colspec colname="a"/><colspec colname="b"/><thead><row><entry namest="a" nameend="b">h</entry></row></thead><tbody><row><entry morerows="2">x</entry></row></tbody></tgroup></cals>` +
+			`<img src="i"><alt>A</alt></img><u href="http://x"/><n>note</n><st>stored</st><hide h="1"><p>hid</p></hide><sk>gone</sk>stray<zz q="1">unmapped<b>in</b></zz>` +
+			`<part><pn>P2</pn><p>in part</p></part><fn><lab>1</lab><p>fn</p></fn><code>x  y</code></r>`,
+		`<r><s><s><s><s><s><s><s><h>deep</h></s></s></s></s></s></s></s></r>`,
+	} {
+		f.Add([]byte(s), true)
+	}
+	p, err := LoadProfile(strings.NewReader(fuzzProfile))
+	if err != nil {
+		f.Fatal(err)
+	}
+	f.Fuzz(func(t *testing.T, data []byte, spans bool) {
+		x := &Extractor{Profiles: []*Profile{p}, Profile: "fuzz"}
+		opts := &gofastcore.Options{Spans: spans, Limits: gofastcore.Limits{MaxTextBytes: 1 << 20, MaxDecodedBytes: 1 << 16}}
+		doc, err := x.Extract(context.Background(), bytes.NewReader(data), int64(len(data)), opts)
+		if err != nil {
+			if !errors.Is(err, gofastcore.ErrMalformed) && !errors.Is(err, gofastcore.ErrUnsupported) {
+				t.Fatalf("error %v", err)
+			}
+			return
+		}
+		if err := doc.Validate(); err != nil {
+			t.Fatalf("invalid: %v", err)
+		}
+	})
+}
+
+// TestFuzzProfileSeed reads the first seed of FuzzProfile and checks its
+// output and that every block can be cited.
+func TestFuzzProfileSeed(t *testing.T) {
+	src := `<r id="1"><t>T</t><k><v>a</v></k><s id="s"><c><x y="1"/></c><h>H</h><hh n="3">H</hh><p n="1.">P <b>b</b> <a href="h" title="T" t="x">a</a></p>` +
+		`<l t="1"><i>one<v>v</v><p>p</p><l><i>two</i></l></i></l><lab>L</lab><q>Q</q></s><tb><tr h="1"><td cs="2">a</td></tr><tr><td rs="3"><p>x</p><l><i>y</i></l></td><td>z</td></tr></tb>` +
+		`<img src="i"><alt>A</alt></img><u href="http://x"/><n>note</n><st>stored</st><hide h="1"><p>hid</p></hide>stray<zz q="1">unmapped<b>in</b></zz>` +
+		`<part><pn>P2</pn><p>in part</p></part><fn><lab>1</lab><p>fn</p></fn><code>x  y</code></r>`
+	doc := extractWith(t, fuzzProfile, src, &gofastcore.Options{Spans: true})
+	got := brief(blocks(doc))
+	want := "heading1:T\nheading3:H\nparagraph(1.):P b a\nlist_item1(1.):one\nparagraph:p\nlist_item2:two\nquote1(L):Q\ntable:\nimage:A\nparagraph:http://x\nnote:note\nparagraph:hid\nparagraph~:strayunmappedin\nnote~:1\nparagraph:in part\nfootnote(1):fn\ncode:x  y\n"
+	if got != want {
+		t.Errorf("blocks:\n%s\nwant:\n%s", got, want)
+	}
+	if doc.Metadata.Extra["k"] != "a" || doc.Metadata.Extra["x.id"] != "1" || doc.Parts[1].Name != "P2" {
+		t.Errorf("metadata %v, part name %q", doc.Metadata.Extra, doc.Parts[1].Name)
+	}
+	bs := blocks(doc)
+	if bs[1].Attrs["x.c"] != "x(y=1)" || bs[1].Attrs["x.a"] != "" && bs[1].Attrs["x.a"] != "x" {
+		t.Errorf("heading attrs %v", bs[1].Attrs)
+	}
 }

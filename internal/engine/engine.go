@@ -71,18 +71,19 @@ const (
 type structLevel struct{ open, items bool }
 
 type sink struct {
-	kind    sinkKind
-	b       generic.Builder
-	spans   []gofastcore.Span
-	after   []gofastcore.Block
-	marker  string
-	start   int64
-	end     int64
-	pieces  int
-	pieceAt int64
-	done    bool // an item has its text
-	fresh   bool // a line was just started (an item's marker written)
-	auto    bool // the marker is an ordered list's number, not from the file
+	kind     sinkKind
+	b        generic.Builder
+	spans    []gofastcore.Span
+	after    []gofastcore.Block
+	marker   string
+	start    int64
+	end      int64
+	pieces   int
+	pieceAt  int64
+	done     bool // an item has its text
+	fresh    bool // a line was just started (an item's marker written)
+	auto     bool // the marker is an ordered list's number, not from the file
+	verbatim bool // white space kept as written (code)
 	// structure captures
 	structure bool
 	sb        []byte
@@ -96,7 +97,7 @@ func (s *sink) reset(kind sinkKind, start int64) {
 	s.b.Reset()
 	s.spans, s.after, s.marker = s.spans[:0], nil, ""
 	s.structure, s.sb, s.levels, s.cut, s.href = false, s.sb[:0], s.levels[:0], false, ""
-	s.fresh, s.auto = false, false
+	s.fresh, s.auto, s.verbatim = false, false, false
 }
 
 type blockRef struct {
@@ -152,6 +153,7 @@ type frame struct {
 	prevCur *sink
 
 	sections int
+	quotes   int
 	ld       int
 	inItem   bool
 	ordered  bool
@@ -392,7 +394,7 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 	}
 	p := e.parent()
 	if p != nil {
-		f.sections, f.ld, f.inItem, f.display = p.sections, p.ld, p.inItem, p.display
+		f.sections, f.ld, f.inItem, f.display, f.quotes = p.sections, p.ld, p.inItem, p.display, p.quotes
 		f.capture, f.captureOf = p.capture, p.captureOf
 		if p.role == roleSkip {
 			f.role = roleSkip
@@ -844,6 +846,9 @@ func (e *Engine) startRule(f *frame, el *xmlread.Element) {
 			return
 		}
 		kind := skBlock
+		if r.Kind == gofastcore.KindQuote {
+			f.quotes++
+		}
 		if r.As == profile.AsHeading {
 			kind = skHeading
 			if r.Level.Attr != nil {
@@ -851,6 +856,7 @@ func (e *Engine) startRule(f *frame, el *xmlread.Element) {
 			}
 		}
 		e.openSink(f, kind, el.Start)
+		f.sink.verbatim = r.Kind == gofastcore.KindCode // code is verbatim
 		if r.Marker != nil {
 			f.sink.marker, _ = e.resolve(f, r.Marker, "", useMarker)
 		}
@@ -1216,6 +1222,13 @@ func (e *Engine) orderedItem(f *frame) bool {
 }
 
 func (e *Engine) kindAttrs(b *gofastcore.Block, f *frame) {
+	if b.Kind == gofastcore.KindQuote {
+		q := 1
+		if f != nil {
+			q = f.quotes
+		}
+		b.Level = uint8(min(max(q, 1), 255))
+	}
 	if f == nil || f.rule == nil {
 		return
 	}
@@ -1303,9 +1316,9 @@ func (e *Engine) Text(r *xmlread.Reader, t []byte, start, end int64) {
 		e.boundStruct(s)
 		return
 	}
-	preserve := false
+	preserve := s.verbatim
 	if el := r.Top(); el != nil {
-		preserve = el.Preserve
+		preserve = preserve || el.Preserve
 	}
 	if s.b.Size() > 0 && s.b.Size()+len(t) > generic.MaxBlockBytes {
 		e.cutSink(s, start)
@@ -1883,7 +1896,7 @@ func (e *Engine) flushLabel() {
 	}
 	e.label = nil
 	var f *frame
-	if l.depth < len(e.frames) {
+	if l.depth >= 0 && l.depth < len(e.frames) {
 		f = &e.frames[l.depth]
 	}
 	e.add(gofastcore.Block{Kind: gofastcore.KindParagraph, Text: l.text,
@@ -2026,7 +2039,8 @@ func names(m map[string]int) string {
 		if i == 0 {
 			sep = ": "
 		}
-		fmt.Fprintf(&b, "%s%s (%d)", sep, generic.CutString(x.n, generic.MaxNameBytes), x.c)
+		var clean generic.Builder
+		fmt.Fprintf(&b, "%s%s (%d)", sep, generic.CleanName(strings.ToValidUTF8(generic.CutString(x.n, generic.MaxNameBytes), "�"), &clean), x.c)
 	}
 	return b.String()
 }

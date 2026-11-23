@@ -1,0 +1,3 @@
+go test fuzz v1
+[]byte("n><lab>1\"><t>T</t><k>$Q\xe5RleB}<v\"1t=\"x$Q\xe5\">a<<s id=\"s\"><c><x y=\"1\"/></c><h>H</h><hh n=\"3\">H</hh><p n= <b>b</b> <a hrefl>h\" title=\"T\" t=\"x\">a</a></p><l t=&<______ \"><i>one<v>v</v><p>p</p><l><i>two</i></l></i></=\"<lab>L</\xecab><q>Q<\">H</hh><p n= _b>bpn><p>in part</p></part><f<r(id=\"1<>lab><\x80>fn</p></fn><code>x  y</code></r>")
+bool(true)
