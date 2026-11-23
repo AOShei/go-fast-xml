@@ -119,6 +119,25 @@ func TestReview5LongParagraphPieces(t *testing.T) {
 	}
 }
 
+// Rules are still chosen right under ancestors whose tested values are
+// long (looked up afresh) and short (cached), in either order.
+func TestReview5LookupLongValueRight(t *testing.T) {
+	prof := `{"profile":"review5v","format":1,"match":[{"root":"r"}],"rules":[
+ {"match":"r","as":"transparent"},{"match":"d","as":"transparent"},
+ {"match":"d[@c='x']/p","as":"heading","level":2},
+ {"match":"p","as":"block","kind":"paragraph"}]}`
+	long := strings.Repeat("x", 200)
+	src := `<r><d c="x"><p>h1</p></d><d c="` + long + `"><p>p1</p><p>p2</p></d><d c="x"><p>h2</p></d><d c="` + long + `x"><p>p3</p></d></r>`
+	doc := r5Extract(t, prof, src, nil)
+	got := ""
+	for _, b := range doc.Parts[0].Blocks {
+		got += b.Kind.String() + ":" + b.Text + " "
+	}
+	if want := "heading:h1 paragraph:p1 paragraph:p2 heading:h2 paragraph:p3 "; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
 // Values of one Extra key are joined in order, and the joined value stops
 // growing at MaxValueBytes.
 func TestReview5ExtraJoinOrder(t *testing.T) {

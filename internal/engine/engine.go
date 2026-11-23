@@ -367,7 +367,12 @@ func (e *Engine) active() *sink {
 func (e *Engine) lookup() *profile.Rule {
 	key := e.keybuf[:0]
 	n := min(len(e.frames), e.p.MaxSteps())
+	// The key holds tested attribute values of up to 128 bytes; a longer
+	// one makes the element's rule be looked up afresh, without building
+	// the rest of the key, so that the cost per element does not grow
+	// with the values its ancestors hold.
 	cacheable := true
+keyLoop:
 	for i := range n {
 		q := e.Name(i)
 		key = append(key, q.URI...)
@@ -378,6 +383,7 @@ func (e *Engine) lookup() *profile.Rule {
 			if v, ok := e.Attr(i, t); ok {
 				if len(v) > 128 {
 					cacheable = false
+					break keyLoop
 				}
 				key = append(key, t.Local...)
 				key = append(key, 1)

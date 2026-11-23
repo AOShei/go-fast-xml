@@ -20,6 +20,8 @@
   read, not where an inline tag starts in the middle of a word (profile
   and generic reading); only a run with no white space is cut where it
   stands.
+- Choosing a rule under ancestors with long tested attribute values no
+  longer costs time in proportion to those values for every element.
 
 ### Phase 4: drafting a profile from an XSD
 
