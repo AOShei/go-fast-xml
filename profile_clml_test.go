@@ -29,6 +29,7 @@ var clmlSpec = &aknOracleSpec{
 	labels:     map[string]bool{"Pnumber": true},
 	items:      map[string]bool{"ListItem": true},
 	closers:    map[string]bool{"UnorderedList": true, "OrderedList": true, "html:table": true},
+	splits:     map[string]bool{"html:table": true, "Image": true},
 	cells:      map[string]bool{"html:td": true, "html:th": true},
 	attrMarker: map[gofastcore.Kind]bool{gofastcore.KindListItem: true},
 	attrText:   map[string]string{"ListItem": "NumberOverride"},

@@ -25,6 +25,7 @@ var formexSpec = &aknOracleSpec{
 	labels:     map[string]bool{"NO.P": true, "NO.PARAG": true},
 	items:      map[string]bool{"ITEM": true, "CONSID": true, "DLIST.ITEM": true},
 	closers:    map[string]bool{"LIST": true, "DLIST": true, "TBL": true},
+	splits:     map[string]bool{"TBL": true, "INCL.ELEMENT": true},
 	cells:      map[string]bool{"CELL": true},
 	attrMarker: map[gofastcore.Kind]bool{},
 }

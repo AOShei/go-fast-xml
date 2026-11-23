@@ -117,6 +117,10 @@ type aknOracleSpec struct {
 	// labels: elements read as "label"; items: elements read as "item";
 	// closers: lists and tables, which end the block of an item.
 	labels, items, closers map[string]bool
+	// splits: tables and images, which met inside a paragraph-like block
+	// (not an item's, not in a cell) end it; text after them, still in
+	// the block's element, starts a new block.
+	splits map[string]bool
 	// cellNumbers: cells may hold ordered lists, whose numbers the file
 	// does not hold.
 	cellNumbers bool
@@ -163,6 +167,7 @@ func (s *aknOracleSpec) sourceText(data []byte, used map[string]bool) (string, e
 	blockAt, blockDepth, labelAt, labelCont, labelDepth := -1, 0, -1, 0, 0
 	inItem, itemText, anyLabel := false, false, 0
 	noteDepth := 0
+	splitDepth, splitBlock := 0, 0
 	var b, note []byte
 	for {
 		tok, err := d.Token()
@@ -219,6 +224,11 @@ func (s *aknOracleSpec) sourceText(data []byte, used map[string]bool) (string, e
 					blockAt, blockDepth, inItem = len(b), len(stack), false
 				}
 			}
+			if s.splits[name] && blockAt >= 0 && cellDepth == 0 && !inItem && splitDepth == 0 {
+				// The block ends here; what follows the table in its
+				// element starts another.
+				splitDepth, splitBlock, blockAt = len(stack), blockDepth, -1
+			}
 			if s.labels[name] && blockAt < 0 && cellDepth == 0 {
 				// A label waits for the block it marks, before which
 				// the notes of that block come.
@@ -252,6 +262,12 @@ func (s *aknOracleSpec) sourceText(data []byte, used map[string]bool) (string, e
 			}
 			if s.cells[name] {
 				cellDepth--
+			}
+			if splitDepth > 0 && len(stack)+1 == splitDepth {
+				splitDepth = 0
+				if len(stack) >= splitBlock {
+					blockAt, blockDepth, labelAt = len(b), splitBlock, -1
+				}
 			}
 			if blockAt >= 0 && len(stack)+1 == blockDepth {
 				blockAt = -1
@@ -418,6 +434,7 @@ var aknSpec = &aknOracleSpec{
 	labels:     map[string]bool{"num": true, "from": true},
 	items:      map[string]bool{"item": true, "li": true, "tocItem": true},
 	closers:    map[string]bool{"blockList": true, "ul": true, "ol": true, "toc": true, "table": true, "html:table": true},
+	splits:     map[string]bool{"table": true, "html:table": true, "img": true, "html:img": true},
 	cells:      map[string]bool{"td": true, "th": true, "html:td": true, "html:th": true},
 	attrMarker: map[gofastcore.Kind]bool{gofastcore.KindFootnote: true},
 }

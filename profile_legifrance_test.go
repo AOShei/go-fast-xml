@@ -26,6 +26,7 @@ var legifranceSpec = &aknOracleSpec{
 	labels:     map[string]bool{},
 	items:      map[string]bool{"li": true},
 	closers:    map[string]bool{"ul": true, "ol": true, "table": true},
+	splits:     map[string]bool{"table": true},
 	cells:      map[string]bool{"td": true, "th": true},
 	attrMarker: map[gofastcore.Kind]bool{},
 }

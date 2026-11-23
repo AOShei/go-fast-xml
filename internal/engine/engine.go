@@ -1482,7 +1482,17 @@ func (e *Engine) givePiece(s *sink, at int64) bool {
 // is then read into as before.
 func (e *Engine) breakOpen(at int64) bool {
 	s := e.cur
-	if s.structure || !e.givePiece(s, at) {
+	if s.structure {
+		return false
+	}
+	if s.b.Size() == 0 && s.marker != "" && !s.auto && s.kind != skCell && s.kind != skCapture && s.kind != skStray {
+		// A label that marks a block with no text yet (the block's text
+		// so far is empty, as after an earlier break) is its text: the
+		// piece made here holds it, so it is not lost.
+		s.b.Append([]byte(s.marker), false)
+		s.marker = ""
+	}
+	if !e.givePiece(s, at) {
 		return false
 	}
 	s.pieces, s.restart = 0, true
