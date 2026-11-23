@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        go: ['1.25', 'stable']
+    runs-on: ${{ matrix.os }}
+    steps:
+      # Check files out as committed, with LF line ends, on Windows too:
+      # the source-hygiene tests and the fixtures depend on exact bytes.
+      - name: Keep line ends as committed
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Format
+        if: matrix.os == 'ubuntu-latest'
+        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+
+      - name: Vet
+        run: go vet ./...
+
+      # Tests that need the public corpus skip themselves when it is
+      # absent, as here. The large worst cases are skipped with -short
+      # under the race detector.
+      - name: Test
+        run: go test -race -short ./...
+
+      - name: Test, worst cases
+        if: matrix.os == 'ubuntu-latest'
+        run: go test ./...
+
+      # Systems the tests do not run on, among them ones where an int is
+      # 32 bits: the code must at least build and pass vet there.
+      - name: Other systems
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          for target in linux/386 linux/arm linux/arm64 freebsd/amd64 js/wasm; do
+            echo "$target"
+            GOOS=${target%/*} GOARCH=${target#*/} go vet ./...
+          done
+
+      - name: Test, 32-bit
+        if: matrix.os == 'ubuntu-latest'
+        run: GOARCH=386 go test -short ./...
+
+      - name: Fuzz smoke
+        if: matrix.os == 'ubuntu-latest' && matrix.go == 'stable'
+        run: |
+          go test -run '^$' -fuzz '^FuzzExtract$' -fuzztime 20s -fuzzminimizetime 0s .
+          go test -run '^$' -fuzz '^FuzzScanner$' -fuzztime 20s -fuzzminimizetime 0s ./internal/xmlscan
+          go test -run '^$' -fuzz '^FuzzParse$' -fuzztime 20s -fuzzminimizetime 0s ./internal/dtd
+
+  dependencies:
+    # The series rule: the standard library and go-fast modules only.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Only go-fast modules may be required
+        run: |
+          extra=$(go list -m all | awk 'NR>1 {print $1}' | grep -v '^github.com/AOShei/go-fast-' || true)
+          if [ -n "$extra" ]; then echo "unexpected modules:"; echo "$extra"; exit 1; fi
+      - name: The library imports only go-fast-core
+        run: |
+          pkgs=$(go list ./... | grep -v '/cmd/')
+          extra=$(go list -deps -test -f '{{if not .Standard}}{{.ImportPath}}{{end}}' $pkgs | grep -v '^github.com/AOShei/go-fast-core$' | grep -vE '^github.com/AOShei/go-fast-xml([/_. ]|$)' || true)
+          if [ -n "$extra" ]; then echo "unexpected packages:"; echo "$extra"; exit 1; fi
