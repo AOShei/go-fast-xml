@@ -31,7 +31,7 @@ Root `ClinicalDocument` in the namespace `urn:hl7-org:v3`. A
 | `linkHtml` | link to `href` (its `title` in the record) |
 | `footnote` | footnote block (anchor = `ID`); `footnoteRef` superscript link to `IDREF` |
 | `renderMultiMedia` | image whose `Image.ID` is `referencedObject`, alt text its `caption` |
-| `sub`, `sup` | inline styles; `br` inline (no line break) |
+| `sub`, `sup` | inline styles; `br` a line break (`break`: `\n` in the block) |
 | `section/entry` | **generic notes, for every entry**: the entry's structured data (acts, observations, codes, values, times) is read generically, so every attribute value is a `note` of type `attribute` at its place (`Origin: inferred`) and text (`originalText`) an inferred paragraph; every block carries `cda.part=entry` and `cda.entry_type` (`typeCode`). Chosen over `stored` because the stored part keeps only an element's text, and an entry's data is almost all in attributes |
 | `section/author`, `section/informant`, `section/subject` | `Extra["cda.section_author"]` etc. |
 | `nonXMLBody` | `Extra["cda.body"]="nonXMLBody"` |

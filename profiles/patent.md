@@ -26,7 +26,7 @@ By root element (no namespace): `us-patent-grant`, `us-patent-application`,
 | `p` | paragraph; **anchor = `num`** (the paragraph number cited as "[0023]"); `id` in `pat.id` |
 | `ul`, `ol`, `li` | list, items (`li` anchor = `num`, `id` in `pat.id`). Both are unordered in the model: ST.36 and USPTO write the item labels (`(i)`, `a)`) in the text, so no number is added. `pat.list_style`, `pat.list=ol` |
 | `dl/dt`, `dl/dd` | list items with `pat.dl` `term` / `definition` |
-| `b`, `i`, `sup`, `sub`, `sup2`, `sub2` | inline styles; `u`, `o`, `smallcaps`, `br` inline with no style (core has no underline; a `br` gives no line break) |
+| `b`, `i`, `sup`, `sub`, `sup2`, `sub2` | inline styles; `u`, `o`, `smallcaps` inline with no style (core has no underline); `br` a line break (`break`) |
 | `figref`, `crossref`, `claim-ref`, pap `cross-reference` | links to `idref` (`target`) |
 | `claims`, pap `subdoc-claims` | list (`pat.section=claims`, `pat.lang`) |
 | `claim` | one list item per claim; **anchor = `num`**; `id` in `pat.id` (the `claim-ref` link target). Nested `claim-text` stays in the claim's text (one item per claim) |

@@ -120,6 +120,7 @@
     {"match": "CONTENU", "as": "transparent"},
     {"match": "div", "as": "transparent", "attrs": {"lf.align": {"attr": "align"}}},
     {"match": "p", "as": "block", "kind": "paragraph", "attrs": {"lf.align": {"attr": "align"}}},
+    {"match": "br", "as": "break"},
     {"match": "blockquote", "as": "block", "kind": "quote"},
     {"match": "table", "as": "table", "attrs": {"lf.border": {"attr": "border"}, "lf.align": {"attr": "align"}}},
     {"match": "tbody", "as": "transparent"},

@@ -50,13 +50,14 @@ const (
 	AsStored
 	AsTransparent
 	AsSkip
+	AsBreak
 )
 
 var asNames = map[string]As{
 	"section": AsSection, "heading": AsHeading, "block": AsBlock, "list": AsList, "item": AsItem,
 	"table": AsTable, "row": AsRow, "cell": AsCell, "inline": AsInline, "label": AsLabel,
 	"image": AsImage, "note": AsNote, "metadata": AsMetadata, "part": AsPart, "stored": AsStored,
-	"transparent": AsTransparent, "skip": AsSkip,
+	"transparent": AsTransparent, "skip": AsSkip, "break": AsBreak,
 }
 
 func (a As) String() string {
@@ -89,6 +90,7 @@ var (
 		AsStored:      {"match", "as", "kind", "extra"},
 		AsTransparent: append(slices.Clone(common), "split"),
 		AsSkip:        {"match", "as"},
+		AsBreak:       {"match", "as"},
 	}
 	allKeys = map[string]bool{}
 )

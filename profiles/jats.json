@@ -285,7 +285,7 @@
     {"match": "td", "as": "cell", "colspan": "colspan", "rowspan": "rowspan"},
     {"match": "th", "as": "cell", "header": true, "colspan": "colspan", "rowspan": "rowspan"},
     {"match": "oasis:table", "as": "table", "model": "cals", "anchor": {"attr": "id"}},
-    {"match": "break", "as": "inline", "space": true},
+    {"match": "break", "as": "break"},
     {"match": "hr", "as": "inline"},
 
     {"match": "disp-formula", "as": "transparent", "split": true, "anchor": {"attr": "id"}},

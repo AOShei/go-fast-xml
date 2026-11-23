@@ -80,7 +80,7 @@
     {"match": "content[@revised='delete']", "as": "inline", "attrs": {"cda.revised": "delete"}},
     {"match": "sub", "as": "inline", "style": "subscript"},
     {"match": "sup", "as": "inline", "style": "superscript"},
-    {"match": "br", "as": "inline"},
+    {"match": "br", "as": "break"},
     {"match": "linkHtml", "as": "inline", "link": {"attr": "href"}, "attrs": {"cda.title": {"attr": "title"}}},
     {"match": "footnote", "as": "block", "split": true, "kind": "footnote", "anchor": {"attr": "ID"}},
     {"match": "footnoteRef", "as": "inline", "style": "superscript", "link": {"attr": "IDREF"}},

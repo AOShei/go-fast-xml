@@ -44,9 +44,24 @@ func (b *Builder) Space() {
 	if !b.started {
 		b.lead, b.started = true, true
 	}
-	if len(b.pending) == 0 || b.pending[len(b.pending)-1] != ' ' {
+	if len(b.pending) == 0 || b.pending[len(b.pending)-1] != ' ' && b.pending[len(b.pending)-1] != '\n' {
 		b.pending = append(b.pending, ' ')
 	}
+}
+
+// LineBreak appends a line break written in the markup (HTML's <br>):
+// white space held before it is dropped and a "\n" is added, so that two
+// breaks give two. Like other white space it is dropped at the ends, and
+// white space after it is not added.
+func (b *Builder) LineBreak() {
+	if !b.started {
+		b.lead, b.started = true, true
+	}
+	n := len(b.pending)
+	for n > 0 && b.pending[n-1] == ' ' {
+		n--
+	}
+	b.pending = append(b.pending[:n], '\n')
 }
 
 // Break appends a hard line break: the white space held before it becomes

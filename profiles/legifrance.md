@@ -34,10 +34,10 @@ version, link and structure entry carries the target's id in
 
 ## Left to generic reading
 
-- `br` (13,457 in the dev set): no rule writes a line break, so the text
-  on either side is joined with no space where the file has none.
-  Légifrance writes most of its body text as `div` text broken by `br`,
-  so a paragraph often runs several of the printed lines together.
+- Nothing now: `br` (13,457 in the dev set) is a `break` rule, a `\n`
+  inside the block. Légifrance writes most of its body text as `div`
+  text broken by `br`, so such a paragraph holds the printed lines, one
+  per line.
 
 `td@align`, `td@valign` are not in the output.
 

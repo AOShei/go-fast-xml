@@ -47,8 +47,6 @@ the paragraph's text is its element's text without the note.
 
 ## Left to generic reading
 
-- `br`, `eol`, `eop`: no rule kind writes a line break; the text either
-  side is joined with no space (`EDI<br/>über` gives `EDIüber`).
 - `analysis` and its children (`activeModifications`, `textualMod`,
   `source`, `destination`, `otherAnalysis`, ...), `temporalData`,
   `presentation`, vendor elements in `proprietary` (MODS, `confersPower`,

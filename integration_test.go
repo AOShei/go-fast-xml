@@ -58,6 +58,36 @@ func TestProfileSplit(t *testing.T) {
 	}
 }
 
+// TestProfileBreak: a "break" rule writes a line break inside a block as
+// core's hard break "\n", as go-fast-html does for <br>: white space
+// around it dropped, two breaks two "\n", none at a block's ends; in a
+// cell too; in a metadata value or a label a space; between blocks
+// nothing.
+func TestProfileBreak(t *testing.T) {
+	prof := head("brk", `{"root": "doc"}`) + `"rules": [
+		{"match": "doc", "as": "transparent"},
+		{"match": "title", "as": "metadata", "field": "title"},
+		{"match": "p", "as": "block", "kind": "paragraph"},
+		{"match": "num", "as": "label"},
+		{"match": "br", "as": "break"},
+		{"match": "table", "as": "table"},
+		{"match": "tr", "as": "row"},
+		{"match": "td", "as": "cell"}]}`
+	src := `<doc><title>Two<br/>lines</title><br/><p><br/>EDI<br/>über <br/> x<br/><br/>y<br/></p>` +
+		`<p><num>1<br/>a</num>text</p><table><tr><td>c<br/>d</td></tr></table></doc>`
+	doc := extractWith(t, prof, src, nil)
+	wantBrief(t, doc, "paragraph:EDI\nüber\nx\n\ny\nparagraph(1 a):text\ntable:\n")
+	if doc.Metadata.Title != "Two lines" {
+		t.Errorf("title %q", doc.Metadata.Title)
+	}
+	if got := blocks(doc)[2].Table.Rows[0][0]; got != "c\nd" {
+		t.Errorf("cell %q", got)
+	}
+	if _, err := LoadProfile(strings.NewReader(head("bad", `{"root": "doc"}`) + `"rules": [{"match": "br", "as": "break", "style": "bold"}]}`)); err == nil {
+		t.Error("a break with a style loaded")
+	}
+}
+
 // TestProfileNoteInTableInBlock: an out_of_line note inside a table that
 // split a paragraph is in file order: the table's caption, the note, the
 // table, then the paragraph's text after the table.

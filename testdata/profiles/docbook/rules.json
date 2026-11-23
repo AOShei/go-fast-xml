@@ -269,7 +269,7 @@
     {"match": "cmdsynopsis", "as": "block", "kind": "paragraph", "anchor": {"attr": "id"}, "attrs": {"db.field": "cmdsynopsis"}},
     {"match": "arg", "as": "inline", "space": true},
     {"match": "group", "as": "inline", "space": true},
-    {"match": "sbr", "as": "inline", "space": true},
+    {"match": "sbr", "as": "break"},
     {"match": "classsynopsis", "as": "block", "kind": "paragraph", "anchor": {"attr": "id"}, "attrs": {"db.field": "classsynopsis"}},
     {"match": "methodsynopsis", "as": "block", "kind": "paragraph", "anchor": {"attr": "id"}, "attrs": {"db.field": "methodsynopsis"}},
     {"match": "methodparam", "as": "inline", "space": true},

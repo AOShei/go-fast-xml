@@ -31,7 +31,7 @@ for each `TEI` in turn. `text` and `group` are transparent.
 | `castList`, `castGroup`, `castItem` | lists and items |
 | `note` | footnote, `Marker` from `@n`, `tei.type`, `tei.place`; inside a `p` or `l` it ends the block there (`split`) and text after it is a new block |
 | `pb`, `cb`, `milestone` | between blocks: a `note` of type `attribute` whose text is `@n` (`Attrs["attribute"]=n`, `tei.milestone=pb`); inside a `p`, `l`, `ab`, `head`, `stage`, `note`, `item` or `quote`: a record in the stored part (`custom_property`, name `pb`, `href` = `@n`, `tei.milestone`, `tei.facs`) at the pb's offset. Never block text |
-| `lb` | a space in the text (`lb@n` not read) |
+| `lb` | a line break (`break`: `\n` in the block; a space in a value); `lb[@break='no']`, a break inside a word, adds nothing; `lb@n` not read |
 | `choice` | every alternative stays in the text, in the file's order (`teh the`); each of `sic`, `corr`, `orig`, `reg`, `abbr`, `expan` also gives a record in the stored part saying which it is (`tei.choice`) |
 | `app`, `lem`, `rdg` | in the text; records with `tei.app` = `lem`/`rdg` and `tei.wit` |
 | `add`, `del` | in the text; records with `tei.edit` = `add`/`del` |

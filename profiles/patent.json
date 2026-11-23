@@ -170,7 +170,7 @@
     {"match": "sub", "as": "inline", "style": "subscript"},
     {"match": "sup2", "as": "inline", "style": "superscript"},
     {"match": "sub2", "as": "inline", "style": "subscript"},
-    {"match": "br", "as": "inline"},
+    {"match": "br", "as": "break"},
     {"match": "figref", "as": "inline", "link": {"attr": "idref"}},
     {"match": "crossref", "as": "inline", "link": {"attr": "idref"}},
     {"match": "claim-ref", "as": "inline", "link": {"attr": "idref"}},

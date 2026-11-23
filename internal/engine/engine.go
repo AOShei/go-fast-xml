@@ -431,6 +431,9 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 		} else if r.As == profile.AsInline && r.Space && s != nil {
 			s.b.Space()
 			f.spaced = s
+		} else if r.As == profile.AsBreak && s != nil {
+			// A value is one line: a break in it is a space.
+			s.b.Space()
 		}
 		return
 	}
@@ -466,6 +469,20 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 	}
 	if rule.As == profile.AsInline {
 		e.startInline(f, el)
+		return
+	}
+	if rule.As == profile.AsBreak {
+		// A line break inside a block is a "\n" (core's hard break); in
+		// a value, a label or a metadata field, a space; between blocks,
+		// nothing.
+		f.role = roleInline
+		if s := e.active(); s != nil && !s.structure {
+			if s.kind == skCapture {
+				s.b.Space()
+			} else {
+				s.b.LineBreak()
+			}
+		}
 		return
 	}
 	if e.cur != nil && (rule.As == profile.AsPart ||
