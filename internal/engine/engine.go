@@ -41,6 +41,8 @@ const (
 	// AttrHeaderSource is "profile" on a table whose header row is the
 	// profile's fixed text.
 	AttrHeaderSource = "header_source"
+	// AttrTitle is a link's title ("title") in its stored record.
+	AttrTitle = "title"
 	// AttrHref is the address of a link, on its record in the stored part.
 	AttrHref = "href"
 )
@@ -196,7 +198,6 @@ type frame struct {
 	spanStart int
 	href      string
 	title     string
-	titleAttr string
 	valAttr   string
 
 	val    string
@@ -704,9 +705,6 @@ func (e *Engine) startInline(f *frame, el *xmlread.Element) {
 	}
 	if r.Title != nil {
 		f.title, _ = e.resolve(f, r.Title, "", useTitle)
-		if r.Title.Claims() == nil && r.Title.Of == nil && !r.Title.IsLiteral {
-			f.titleAttr = r.Title.Attr.Local
-		}
 	}
 	for _, x := range r.Attrs {
 		if v, ok := e.resolve(f, x.Value, x.Key, useAttr); ok && v != "" {
@@ -1620,15 +1618,16 @@ func (e *Engine) endInline(f *frame, end int64) {
 	}
 	if f.title != "" || len(f.own) > 0 {
 		// What a link has besides its address: a record in the stored
-		// part (S6: core's Span has no field for it).
-		text := f.title
+		// part (S6: core's Span has no field for it). Its text is the
+		// link's own text (its address when it has none); the title is an
+		// attr of its own.
 		attrs := map[string]string{gofastcore.AttrStored: gofastcore.StoredCustomProperty, gofastcore.AttrName: f.qname}
-		if text != "" && f.titleAttr != "" {
-			attrs[gofastcore.AttrNoteType] = gofastcore.NoteAttribute
-			attrs[generic.AttrAttribute] = f.titleAttr
+		if f.title != "" {
+			attrs[AttrTitle] = f.title
 		}
+		text := e.clean(spanText(s, f.spanStart))
 		if text == "" {
-			text = e.clean(spanText(s, f.spanStart))
+			text = f.href
 		}
 		if text == "" {
 			return

@@ -146,8 +146,8 @@
     {"match": "Valeur", "as": "inline"},
     {"match": "Variable", "as": "inline"},
     {"match": "Date", "as": "inline"},
-    {"match": "LienExterne", "as": "inline", "link": {"attr": "URL"}, "title": {"attr": "commentaireLien"}, "attrs": {"sp.type": {"attr": "type"}, "sp.format": {"attr": "format"}, "sp.poids": {"attr": "poids"}, "sp.numerocerfa": {"attr": "numerocerfa"}, "sp.langue": {"attr": "langue"}}},
-    {"match": "LienInterne", "as": "inline", "link": {"attr": "LienPublication"}, "title": {"attr": "commentaireLien"}, "attrs": {"sp.type": {"attr": "type"}, "sp.audience": {"attr": "audience"}}},
+    {"match": "LienExterne", "as": "inline", "link": {"attr": "URL"}, "attrs": {"sp.comment": {"attr": "commentaireLien"}, "sp.type": {"attr": "type"}, "sp.format": {"attr": "format"}, "sp.poids": {"attr": "poids"}, "sp.numerocerfa": {"attr": "numerocerfa"}, "sp.langue": {"attr": "langue"}}},
+    {"match": "LienInterne", "as": "inline", "link": {"attr": "LienPublication"}, "attrs": {"sp.comment": {"attr": "commentaireLien"}, "sp.type": {"attr": "type"}, "sp.audience": {"attr": "audience"}}},
     {"match": "LienIntra", "as": "inline", "link": {"attr": "LienID"}, "attrs": {"sp.type": {"attr": "type"}}},
 
     {"match": "Question/Choix", "as": "item", "attrs": {"sp.sets": {"structure": "SiSelectionne"}}},

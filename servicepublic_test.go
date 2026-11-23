@@ -169,7 +169,8 @@ func TestServicePublicDecisions(t *testing.T) {
 			return fmt.Sprintf("reference %+v", bs[5])
 		}
 		st := doc.Parts[len(doc.Parts)-1]
-		if st.Kind != gofastcore.PartStored || st.Blocks[0].Text != "Autre fiche" || st.Blocks[0].Attrs["sp.audience"] != "Particuliers" {
+		if r := st.Blocks[0]; st.Kind != gofastcore.PartStored || r.Text != "ceci" || r.Attrs["sp.comment"] != "Autre fiche" ||
+			r.Attrs["sp.audience"] != "Particuliers" || r.Attrs[gofastcore.AttrNoteType] != "" || r.Attrs[AttrAttribute] != "" {
 			return "stored " + dump(doc)
 		}
 		if bad := citeCheck([]byte(spSample), doc); bad != "" {

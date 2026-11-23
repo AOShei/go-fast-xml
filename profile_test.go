@@ -392,7 +392,7 @@ func TestProfileLinksImagesValues(t *testing.T) {
 		t.Fatalf("stored part %s", dump(doc))
 	}
 	rec := st.Blocks[0]
-	if rec.Text != "Title of F1" || rec.Attrs["href"] != "F1" || rec.Attrs["sp.type"] != "Fiche" || rec.Attrs[gofastcore.AttrNoteType] != gofastcore.NoteAttribute ||
+	if rec.Text != "this" || rec.Attrs["title"] != "Title of F1" || rec.Attrs["href"] != "F1" || rec.Attrs["sp.type"] != "Fiche" || rec.Attrs[gofastcore.AttrNoteType] != "" ||
 		rec.Attrs[gofastcore.AttrStored] != gofastcore.StoredCustomProperty || st.Blocks[1].Text != "raw" || st.Blocks[1].Attrs["stored"] != "custom_xml" {
 		t.Errorf("stored %s", dump(doc))
 	}
