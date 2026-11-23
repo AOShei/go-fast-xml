@@ -46,6 +46,13 @@ profile is loaded, so that a typo cannot silently change the output.
 | `match` | When the profile applies (below) |
 | `heading_base` | The level of the outermost section's heading (`"nesting"`), 1 to 6; default 1 |
 | `rules` | The rules |
+| `notes` **(added)** | Anything, for people (a draft's account of its schema); not read |
+
+A rule may carry `"note"` (a string, for people; not read). A rule with
+`"review": true` is refused: it is a suggestion in a draft written by
+`gofastxml -draft-profile` (README, "Drafting a profile from an XSD"),
+and a draft is not a profile until each rule is reviewed and its mark
+removed. `"review": false` is accepted and means nothing.
 
 Load one with `gofastxml.LoadProfile`; a profile that does not load gives
 an error naming the rule (`profile: rule 12 ("Chapitre/Titre"): ...`).
