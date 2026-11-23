@@ -20,6 +20,7 @@ package generic
 
 import (
 	"bytes"
+	"slices"
 	"strings"
 
 	"github.com/AOShei/go-fast-core"
@@ -77,6 +78,9 @@ type Out struct {
 	NamesCut, PathsCut, ValuesCut int
 	// Splits counts texts split into Continued blocks.
 	Splits int
+	// Hint is the room for blocks the part is given when its first block
+	// is added (see BlocksHint); zero lets the part grow from nothing.
+	Hint int
 }
 
 // Add appends b, taking BlockCost, its text and its element path from the
@@ -89,9 +93,46 @@ func (o *Out) Add(b gofastcore.Block) bool {
 		o.Stopped = true
 		return false
 	}
-	o.Part.Blocks = append(o.Part.Blocks, b)
+	o.Append(b)
 	return true
 }
+
+// Append appends b to the part, its cost already taken. The first block
+// of the document gives the part Hint blocks of room.
+func (o *Out) Append(b gofastcore.Block) {
+	if o.Hint > 0 && o.Part.Blocks == nil && o.Part.Kind != gofastcore.PartStored {
+		o.Part.Blocks = make([]gofastcore.Block, 0, o.Hint)
+		o.Hint = 0
+	}
+	o.Part.Blocks = append(o.Part.Blocks, b)
+}
+
+// Reserve makes room for n more blocks in the part at once.
+func (o *Out) Reserve(n int) {
+	if len(o.Part.Blocks)+n <= cap(o.Part.Blocks) {
+		return
+	}
+	if o.Part.Blocks == nil && o.Part.Kind != gofastcore.PartStored {
+		n = max(n, o.Hint)
+		o.Hint = 0
+	}
+	o.Part.Blocks = slices.Grow(o.Part.Blocks, n)
+}
+
+// BlocksHint is the room for blocks given to a document of size bytes
+// before its first block: one block per BlockHintBytes of input, at most
+// MaxBlocksHint.
+func BlocksHint(size int64) int {
+	return int(min(size/BlockHintBytes, MaxBlocksHint))
+}
+
+// BlockHintBytes and MaxBlocksHint size BlocksHint. Service-Public files
+// make a block for every 126 to 419 bytes of input with the profile (1st
+// to 95th percentile), every 43 to 89 bytes generically.
+const (
+	BlockHintBytes = 128
+	MaxBlocksHint  = 4096
+)
 
 // Options are the generic reader's settings.
 type Options struct {
@@ -476,6 +517,7 @@ func (g *Generic) flush(force bool) {
 	if n == 0 {
 		return
 	}
+	g.out.Reserve(n)
 	for i := range n {
 		if g.queue[i].space {
 			continue
