@@ -69,7 +69,9 @@ const (
 // Warning codes of this library. Of the codes shared by all go-fast
 // libraries it raises text.unmapped_glyphs, text.control_characters_removed,
 // text.encoding_detected, input.repaired, input.unread_content,
-// input.external_reference, limit.exceeded and part.no_text.
+// input.external_reference, limit.exceeded, part.no_text and, with a
+// profile, structure.heading_level_clamped. Profile reading adds
+// WarnUnmappedElements, WarnUnmappedAttributes and WarnSkippedElements.
 const (
 	// WarnEntitiesAssumed (info): references to entities the file does
 	// not declare, in a file with an external DTD subset, were read as

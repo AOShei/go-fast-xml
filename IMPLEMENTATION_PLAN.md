@@ -6,9 +6,9 @@ This file tracks its phases (section 7) in this repository.
 | # | Phase | Status |
 |---|---|---|
 | 0 | Design check: `PROFILE_FORMAT.md`, the Service-Public mapping, corpus samples | with the orchestrator and Andrew |
-| 1 | Reader and generic reading (plan sections 1 to 3) | in progress on `phase-1-reader` |
+| 1 | Reader and generic reading (plan sections 1 to 3) | done, merged |
 | 1r | Fresh-eyes review of 1, then fixes | not started |
-| 2 | Profile engine and Service-Public | not started |
+| 2 | Profile engine and Service-Public | done on `phase-2-profiles`, awaiting review |
 | 3 | Profiles of rounds 2, 3 and 4 | not started |
 | 4 | `-draft-profile` | not started |
 | 5 | Review rounds 2 and 3, hardening, speed | not started |
@@ -45,3 +45,14 @@ Phase 1 is complete on `phase-1-reader`, awaiting review (phase 1r).
   `Out`; `Generic.Finish` writes out what is pending.
 - `Extract` builds reader, `Out` and consumer separately; the consumer is
   chosen in one place.
+
+## Phase 2
+
+| Step | Status |
+|---|---|
+| `PROFILE_FORMAT.md` (part A as user documentation) | done |
+| Loader and selectors (`internal/profile`), fuzzed | done |
+| Rule engine (`internal/engine`): every rule kind, both table models, spans, parts, citing | done |
+| Profile choice: built-in (`profiles/*.json`), `Extractor.Profiles`, `Extractor.Profile`, command flags | done |
+| Service-Public profile, corpus test, oracles of C6 and A6 | done |
+| Benchmark, README, CHANGELOG | done |
