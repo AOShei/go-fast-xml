@@ -93,6 +93,32 @@ func TestReview5DoctypeUnclosedRepaired(t *testing.T) {
 	}
 }
 
+// A paragraph cut while reading: each piece's text is in its own source
+// span (the word kept whole moves the next piece's start back), and a run
+// with no white space at all is cut where it stands, nothing lost.
+func TestReview5LongParagraphPieces(t *testing.T) {
+	for _, prof := range []string{"", r5Prof} {
+		pre := strings.Repeat("wxyz ", (MaxBlockBytes-6)/5) + "q "
+		src := "<r><p>" + pre + "abc<b>def</b> tail</p></r>"
+		doc := r5Extract(t, prof, src, nil)
+		for i, b := range doc.Parts[0].Blocks {
+			span := noSpace(stripMarkup(src[b.Loc.Offset : b.Loc.Offset+b.Loc.Length]))
+			if !strings.Contains(span, noSpace(b.Text)) {
+				t.Errorf("profile %v: piece %d (%d bytes) is not in its span", prof != "", i, len(b.Text))
+			}
+		}
+		run := strings.Repeat("a", MaxBlockBytes-2)
+		doc = r5Extract(t, prof, "<r><p>"+run+"<b>bbbb</b>cc</p></r>", nil)
+		all := ""
+		for _, b := range doc.Parts[0].Blocks {
+			all += b.Text
+		}
+		if all != run+"bbbbcc" || len(doc.Parts[0].Blocks) != 2 {
+			t.Errorf("profile %v: %d pieces, %d bytes, want 2 pieces, %d bytes", prof != "", len(doc.Parts[0].Blocks), len(all), len(run)+6)
+		}
+	}
+}
+
 // Values of one Extra key are joined in order, and the joined value stops
 // growing at MaxValueBytes.
 func TestReview5ExtraJoinOrder(t *testing.T) {

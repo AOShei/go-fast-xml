@@ -201,6 +201,30 @@ func (b *Builder) SplitAt(limit int) (string, int) {
 	return piece, took
 }
 
+// SplitWord takes the text up to its last white space as a piece and
+// keeps the word after it, which what comes next continues: a text cut
+// where a token starts is not cut inside a word. pos is where the caller
+// knows that word to start in the text (its source offset is known); a
+// text whose last white space is not just before pos, one that ends in
+// white space, or one that holds none is taken whole (kept is false).
+// took is as in SplitAt.
+func (b *Builder) SplitWord(pos int) (piece string, took int, kept bool) {
+	if len(b.pending) == 0 && pos > 0 && pos <= len(b.buf) {
+		if i := bytes.LastIndexAny(b.buf, " \n\t"); i > 0 && i == pos-1 {
+			if p := bytes.TrimRightFunc(b.buf[:i], unicode.IsSpace); len(p) > 0 {
+				piece = string(p)
+				rest := b.buf[i+1:]
+				took = len(b.buf) - len(rest)
+				b.buf = append(b.buf[:0], rest...)
+				return piece, took, true
+			}
+		}
+	}
+	piece = string(b.buf)
+	b.Reset()
+	return piece, len(piece), false
+}
+
 // Clean returns s with the text conventions applied, white space
 // collapsed and trimmed, and the counts of what was removed.
 func Clean(s string, preserve bool, b *Builder) string {

@@ -16,6 +16,10 @@
   internal subset ends at the subset's `]>` (else at the end of the
   declaration's window, the token limit), with `input.repaired`; the
   document after it is read instead of refused as `ErrMalformed`.
+- A paragraph over `MaxBlockBytes` is cut at the last white space already
+  read, not where an inline tag starts in the middle of a word (profile
+  and generic reading); only a run with no white space is cut where it
+  stands.
 
 ### Phase 4: drafting a profile from an XSD
 

@@ -85,11 +85,12 @@ type sink struct {
 	end      int64
 	pieces   int
 	pieceAt  int64
-	done     bool // an item has its text
-	fresh    bool // a line was just started (an item's marker written)
-	auto     bool // the marker is an ordered list's number, not from the file
-	verbatim bool // white space kept as written (code)
-	restart  bool // a part broke the block: the next text starts a block
+	word     generic.WordMark // where the last word starts
+	done     bool             // an item has its text
+	fresh    bool             // a line was just started (an item's marker written)
+	auto     bool             // the marker is an ordered list's number, not from the file
+	verbatim bool             // white space kept as written (code)
+	restart  bool             // a part broke the block: the next text starts a block
 	// structure captures
 	structure bool
 	sb        []byte
@@ -101,6 +102,7 @@ type sink struct {
 func (s *sink) reset(kind sinkKind, start int64) {
 	s.kind, s.start, s.end, s.pieces, s.pieceAt, s.done, s.restart = kind, start, start, 0, start, false, false
 	s.b.Reset()
+	s.word.OK = false
 	s.spans, s.after, s.marker = s.spans[:0], nil, ""
 	s.structure, s.sb, s.levels, s.cut, s.href = false, s.sb[:0], s.levels[:0], false, ""
 	s.fresh, s.auto, s.verbatim = false, false, false
@@ -247,6 +249,9 @@ type Engine struct {
 	// extra collects the values of each Metadata.Extra key, joined as
 	// they come and written to Meta.Extra once, at Finish.
 	extra map[string]*strings.Builder
+	// wordCut: a piece is being cut while reading (cutSink), at the last
+	// white space held rather than where the next token starts.
+	wordCut bool
 
 	parts  []*gofastcore.Part
 	stored *gofastcore.Part
@@ -1521,7 +1526,9 @@ func (e *Engine) Text(r *xmlread.Reader, t []byte, start, end int64) {
 	if s.restart && !spaceOnly(t) {
 		s.restart, s.pieceAt = false, start
 	}
+	pos0, trail := s.b.Pos(), s.b.Trail()
 	s.b.Append(t, preserve)
+	s.word.Note(&s.b, t, start, end, pos0, trail, e.out.UTF8)
 	s.end = max(s.end, end)
 	if !spaceOnly(t) {
 		s.fresh = false
@@ -1544,7 +1551,10 @@ func spaceOnly(t []byte) bool {
 // far is given as a piece and the rest continues it; a value or a cell is
 // cut there.
 func (e *Engine) cutSink(s *sink, at int64) {
-	if !e.givePiece(s, at) {
+	e.wordCut = true
+	ok := e.givePiece(s, at)
+	e.wordCut = false
+	if !ok {
 		if !s.cut {
 			s.cut = true
 			e.TextCut++
@@ -1615,19 +1625,31 @@ func (e *Engine) breakOpen(at int64) bool {
 func (e *Engine) piece(s *sink, f *frame, kind gofastcore.Kind, origin gofastcore.Origin, at int64) {
 	for s.b.Len() > generic.MaxBlockBytes || s.b.Size() > 0 {
 		var text string
-		took, all := 0, false
+		took, all, kept, end := 0, false, false, at
 		if s.b.Len() > generic.MaxBlockBytes {
 			text, took = s.b.SplitAt(generic.MaxBlockBytes)
+			s.word.OK = false
+		} else if e.wordCut && s.word.OK {
+			// Cut while reading: at the last white space held, the word
+			// after it kept for the text that continues it, which starts
+			// where the word does.
+			text, took, kept = s.b.SplitWord(s.word.Pos)
+			all = !kept
+			if kept {
+				end = s.word.At
+			}
+			s.word.OK = false
 		} else {
 			text, all = s.b.String(), true
 			took = len(text)
 			s.b.Reset()
+			s.word.OK = false
 		}
 		if text == "" {
 			break
 		}
 		b := gofastcore.Block{Kind: kind, Origin: origin, Text: text, Marker: s.marker, Continued: s.pieces > 0,
-			Loc: gofastcore.Location{Offset: s.pieceAt, Length: max(at-s.pieceAt, 0)}}
+			Loc: gofastcore.Location{Offset: s.pieceAt, Length: max(end-s.pieceAt, 0)}}
 		b.Spans = e.cutSpans(s, len(text), took, all)
 		if origin == gofastcore.OriginInferred {
 			b.Attrs = map[string]string{generic.AttrElement: e.pathTo(f)}
@@ -1645,7 +1667,10 @@ func (e *Engine) piece(s *sink, f *frame, kind gofastcore.Kind, origin gofastcor
 		}
 		s.marker = ""
 		s.pieces++
-		s.pieceAt = at
+		s.pieceAt = end
+		if kept {
+			break
+		}
 	}
 	if s.b.Size() == 0 {
 		s.spans = s.spans[:0]

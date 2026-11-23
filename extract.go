@@ -240,7 +240,7 @@ func (e *Extractor) Extract(ctx context.Context, r io.ReaderAt, size int64, opts
 	doc := gofastcore.New("xml")
 	doc.Source.Name, doc.Source.Size, doc.Source.MIME = o.Name, size, "application/xml"
 	part := &gofastcore.Part{Kind: gofastcore.PartBody, Number: 1}
-	out := &generic.Out{Part: part, Budget: text}
+	out := &generic.Out{Part: part, Budget: text, UTF8: enc.UTF8}
 	g := generic.New(out, generic.Options{NoAttributes: e.Attributes == AttributesNone})
 	d := &dispatch{x: e, out: out, g: g, h: g, forced: forced, none: none,
 		opts: engineOptions(&o)}
