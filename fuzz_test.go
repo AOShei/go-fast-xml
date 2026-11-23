@@ -80,7 +80,12 @@ const fuzzProfile = `{"profile": "fuzz", "format": 1, "match": [{"root": "r"}], 
   {"match": "part", "as": "part", "kind": "chapter", "name": {"child": "pn"}},
   {"match": "st", "as": "stored", "kind": "custom_xml"},
   {"match": "hide", "as": "transparent", "display": {"attr": "h", "in": ["1"], "reason": "hidden"}},
-  {"match": "sk", "as": "skip"}]}`
+  {"match": "sk", "as": "skip"},
+  {"match": "br", "as": "break"},
+  {"match": "sf", "as": "block", "kind": "footnote", "split": true},
+  {"match": "fg", "as": "transparent", "split": true, "attrs": {"x.c": {"attr": "c", "child": "cc"}}},
+  {"match": "oo", "as": "block", "kind": "footnote", "out_of_line": true},
+  {"match": "ti", "as": "item", "value": {"attr": "href"}}]}`
 
 // FuzzProfile runs the rule engine with a profile of every rule kind on
 // arbitrary input.
@@ -93,6 +98,8 @@ func FuzzProfile(f *testing.F) {
 			`<part><pn>P2</pn><p>in part</p></part><fn><lab>1</lab><p>fn</p></fn><code>x  y</code>` +
 			`<atb><ar from="a" to="b"/><ar from="c"/><tr><td>t</td></tr><ar to="d">text</ar></atb></r>`,
 		`<r><s><s><s><s><s><s><s><h>deep</h></s></s></s></s></s></s></s></r>`,
+		`<r><p>a<br/>b<sf>f<br/>n</sf>c<fg><cc c="1"/><lab>L</lab><p>in</p><tb><tr><td>x<sf>y</sf></td></tr></tb></fg>d<oo>o</oo>e</p>` +
+			`<p><lab>2</lab><tb><tr><td>t</td></tr></tb></p><l t="1"><lab>(a)</lab><ti href="h"><ti href="g"/></ti></l><t>T2<br/>x</t></r>`,
 	} {
 		f.Add([]byte(s), true)
 	}
