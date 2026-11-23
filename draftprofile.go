@@ -68,7 +68,7 @@ func DraftProfile(ctx context.Context, path string) (*Draft, error) {
 	}
 	if model.Cut {
 		d.Warnings = append(d.Warnings, gofastcore.Warning{Code: gofastcore.WarnLimitExceeded, Severity: gofastcore.SeverityError,
-			Message: fmt.Sprintf("schema: more than %d element declarations; the rest are not in the draft", model.MaxDecls)})
+			Message: fmt.Sprintf("schema: more than %d element declarations or %d children of content models; the rest are not in the draft", model.MaxDecls, xsd.MaxChildren)})
 	}
 	d.JSON = draft.Write(draft.Input{Entry: path, Set: set, Model: model, Problems: problems})
 	return d, nil

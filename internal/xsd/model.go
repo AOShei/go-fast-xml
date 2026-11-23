@@ -74,7 +74,7 @@ type Model struct {
 	// Roots are global elements no other element contains (all global
 	// elements, when each is contained somewhere).
 	Roots []*Decl
-	// Cut says that MaxDecls left declarations out.
+	// Cut says that MaxDecls or MaxChildren left declarations or children out.
 	Cut      bool
 	MaxDecls int
 	Missing  map[QName]string // references to components not read: what they are
@@ -83,6 +83,7 @@ type Model struct {
 type typeInfo struct {
 	content  Content
 	children []Child
+	index    map[*Decl]int // place of each child, once there are many
 	any      bool
 	attrs    []Attribute
 }
@@ -96,10 +97,15 @@ type analyzer struct {
 	subst   map[QName][]QName
 	queue   []*Decl
 	maxDecl int
+	links   int // children recorded, all types together
 }
 
 // MaxDecls bounds the declarations Analyze makes.
 const MaxDecls = 100000
+
+// MaxChildren bounds the children recorded for all content models
+// together: a wide group named by many elements makes their product.
+const MaxChildren = 2000000
 
 // Analyze works out each element declaration's content, children,
 // attributes and parents.
@@ -324,7 +330,7 @@ func (a *analyzer) particles(n *Node, rep bool, t *typeInfo, depth int) {
 				continue
 			}
 			if d := a.decl(c, false); d != nil {
-				addChild(t, d, r)
+				a.addChild(t, d, r)
 			}
 		case "sequence", "choice", "all":
 			a.particles(c, r, t, depth+1)
@@ -362,20 +368,45 @@ func (a *analyzer) addRef(q QName, rep bool, t *typeInfo, seen map[QName]bool) {
 		return
 	}
 	if d := a.decl(n, true); d != nil && !d.Abstract {
-		addChild(t, d, rep)
+		a.addChild(t, d, rep)
 	}
 	for _, m := range a.subst[q] {
 		a.addRef(m, rep, t, seen)
 	}
 }
 
-func addChild(t *typeInfo, d *Decl, rep bool) {
-	for i := range t.children {
-		if t.children[i].Decl == d {
-			// Met twice in one model: it may repeat.
-			t.children[i].Repeats = true
-			return
+func (a *analyzer) addChild(t *typeInfo, d *Decl, rep bool) {
+	if t.index == nil && len(t.children) >= 16 {
+		t.index = make(map[*Decl]int, 2*len(t.children))
+		for i := range t.children {
+			t.index[t.children[i].Decl] = i
 		}
+	}
+	at := -1
+	if t.index != nil {
+		if i, ok := t.index[d]; ok {
+			at = i
+		}
+	} else {
+		for i := range t.children {
+			if t.children[i].Decl == d {
+				at = i
+				break
+			}
+		}
+	}
+	if at >= 0 {
+		// Met twice in one model: it may repeat.
+		t.children[at].Repeats = true
+		return
+	}
+	if a.links >= MaxChildren {
+		a.m.Cut = true
+		return
+	}
+	a.links++
+	if t.index != nil {
+		t.index[d] = len(t.children)
 	}
 	t.children = append(t.children, Child{Decl: d, Repeats: rep})
 }

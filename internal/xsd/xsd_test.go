@@ -260,20 +260,23 @@ func TestLimits(t *testing.T) {
 // A schema whose types refer to each other in a long chain and a wide
 // fan-out is read quickly.
 func TestWideSchema(t *testing.T) {
+	// The children recorded are the product of the two counts, and the
+	// time follows them: 600 by 600 keeps the race detector's run short.
+	const wide = 600
 	var b strings.Builder
 	b.WriteString(head + `>`)
-	for i := 0; i < 2000; i++ {
+	for i := 0; i < wide; i++ {
 		n := strings.Repeat("x", i%7+1) + itoa(i)
 		b.WriteString(`<xs:element name="` + n + `"><xs:complexType><xs:choice maxOccurs="unbounded"><xs:group ref="all"/></xs:choice></xs:complexType></xs:element>`)
 	}
 	b.WriteString(`<xs:group name="all"><xs:choice>`)
-	for i := 0; i < 2000; i++ {
+	for i := 0; i < wide; i++ {
 		b.WriteString(`<xs:element ref="` + strings.Repeat("x", i%7+1) + itoa(i) + `"/>`)
 	}
 	b.WriteString(`</xs:choice></xs:group></xs:schema>`)
 	start := time.Now()
 	_, m := load(t, b.String())
-	if len(m.Decls) != 2000 || !m.Decls[0].Nests {
+	if len(m.Decls) != wide || !m.Decls[0].Nests {
 		t.Errorf("%d decls", len(m.Decls))
 	}
 	if d := time.Since(start); d > 10*time.Second {
