@@ -168,6 +168,9 @@ func (t *table) place(e *Engine, at, cs, rs int) {
 		t.col++
 	}
 	cs = min(max(cs, 1), MaxTableColumns)
+	if rs > MaxRowSpan {
+		e.RowSpanCut++
+	}
 	rs = min(max(rs, 1), MaxRowSpan)
 	// A span (namest/nameend, spanname, colspan) over a column a cell
 	// from a row above still holds is clipped at that column: no cell is

@@ -30,7 +30,7 @@ for each `TEI` in turn. `text` and `group` are transparent.
 | `stage` | paragraph, `tei.field=stage`, `tei.type` |
 | `castList`, `castGroup`, `castItem` | lists and items |
 | `note` | footnote, `Marker` from `@n`, `tei.type`, `tei.place`; inside a `p` or `l` it ends the block there (`split`) and text after it is a new block |
-| `pb`, `cb`, `milestone` | between blocks: a `note` of type `attribute` whose text is `@n` (`Attrs["attribute"]=n`, `tei.milestone=pb`); inside a `p`, `l`, `ab`, `head`, `stage`, `note`, `item` or `quote`: a record in the stored part (`custom_property`, name `pb`, `href` = `@n`, `tei.milestone`, `tei.facs`) at the pb's offset. Never block text |
+| `pb`, `cb`, `milestone` | between blocks: a `note` of type `attribute` whose text is `@n` (`Attrs["attribute"]=n`, `tei.milestone=pb`); inside a `p`, `l`, `ab`, `head`, `stage`, `note`, `item` or `quote`: `@n` written in place in the block's text, set off by spaces (`The 13 teh the end`), and a record in the stored part (`custom_property`, name `pb`, text `@n`, `tei.milestone`, `tei.facs`, `tei.ed`) at the pb's offset. A `milestone` inside a `p` or `stage` is read the same way (Folger's line numbers) |
 | `lb` | a line break (`break`: `\n` in the block; a space in a value); `lb[@break='no']`, a break inside a word, adds nothing; `lb@n` not read |
 | `choice` | every alternative stays in the text, in the file's order (`teh the`); each of `sic`, `corr`, `orig`, `reg`, `abbr`, `expan` also gives a record in the stored part saying which it is (`tei.choice`) |
 | `app`, `lem`, `rdg` | in the text; records with `tei.app` = `lem`/`rdg` and `tei.wit` |
@@ -73,16 +73,15 @@ order. Dates are as written.
 `Loc.Offset`/`Length`; `Loc.Anchor` = the element's `xml:id` (Folger
 gives every line and speech one); the `tei.divN_n` attributes and
 `tei.n` give the canonical reference (Hamlet 1.2 line 1, John 1.1). Page
-numbers are `pb` notes between blocks, or stored records with their
-offset inside a block.
+numbers are `pb` notes between blocks; inside a block they are in its
+text where the `pb` stands, and a stored record has the `pb`'s offset.
+This text is attribute-borne: it is in the block's span as `pb@n`, not
+as character data.
 
 ## Limits of the format met here
 
 - A `note` or `figure` inside a `p` or `l` ends the block there
   (`split`): the line or paragraph is in two blocks, the note between.
-- A `pb` inside a block can be recorded only through a link record (its
-  `href` is the page number); a key for "a record of an empty element's
-  attribute" would say it plainly.
 - `titleStmt/title`: only the first untyped title fills `Metadata.Title`;
   a second untyped title is not kept.
 

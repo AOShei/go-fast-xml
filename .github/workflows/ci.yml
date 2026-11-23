@@ -63,6 +63,13 @@ jobs:
           go test -run '^$' -fuzz '^FuzzExtract$' -fuzztime 20s -fuzzminimizetime 0s .
           go test -run '^$' -fuzz '^FuzzScanner$' -fuzztime 20s -fuzzminimizetime 0s ./internal/xmlscan
           go test -run '^$' -fuzz '^FuzzParse$' -fuzztime 20s -fuzzminimizetime 0s ./internal/dtd
+          go test -run '^$' -fuzz '^FuzzProfile$' -fuzztime 20s -fuzzminimizetime 0s .
+          go test -run '^$' -fuzz '^FuzzLoad$' -fuzztime 20s -fuzzminimizetime 0s ./internal/profile
+          go test -run '^$' -fuzz '^FuzzSelector$' -fuzztime 20s -fuzzminimizetime 0s ./internal/profile
+          go test -run '^$' -fuzz '^FuzzLoad$' -fuzztime 20s -fuzzminimizetime 0s ./internal/xsd
+          go test -run '^$' -fuzz '^FuzzDraft$' -fuzztime 20s -fuzzminimizetime 0s ./internal/draft
+          go test -run '^$' -fuzz '^FuzzCharset$' -fuzztime 20s -fuzzminimizetime 0s ./internal/charset
+          go test -run '^$' -fuzz '^FuzzDoubleByte$' -fuzztime 20s -fuzzminimizetime 0s ./internal/charset
 
   dependencies:
     # The series rule: the standard library and go-fast modules only.

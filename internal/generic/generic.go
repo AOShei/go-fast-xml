@@ -1,5 +1,5 @@
 // Package generic builds blocks from XML with no knowledge of its schema
-// (XML_PLAN.md section 3), and holds the part writer every consumer of
+// (README, "How XML maps without a profile"), and holds the part writer every consumer of
 // element events shares.
 //
 // An element that directly contains character data other than white
@@ -78,6 +78,12 @@ type Out struct {
 	NamesCut, PathsCut, ValuesCut int
 	// Splits counts texts split into Continued blocks.
 	Splits int
+	// PendingCut counts cuts by MaxPendingBlocks and MaxPendingBytes that
+	// show in the output: a block given as a piece because more than
+	// MaxPendingBlocks notes waited for it, and an element taken for a
+	// container because the queue passed its bound, which then had text
+	// of its own.
+	PendingCut int
 	// Hint is the room for blocks the part is given when its first block
 	// is added (see BlocksHint); zero lets the part grow from nothing.
 	Hint int
@@ -161,6 +167,8 @@ type frame struct {
 	pieces int   // blocks already given for its text
 	anchor string
 	id     string // the element's own identifier, read at its start
+	// forced: taken for a container because the queue passed its bound.
+	forced bool
 }
 
 type item struct {
@@ -229,6 +237,7 @@ func (g *Generic) StartElement(r *xmlread.Reader, e *xmlread.Element) {
 			o.anchor = f.id // the identifier of an element in the block
 		}
 		if len(g.after) > MaxPendingBlocks {
+			g.out.PendingCut++
 			g.cutOwner(e.Start) // the notes waiting for the block are bounded too
 		}
 		return
@@ -388,6 +397,12 @@ func (g *Generic) becomeText(d int, at int64) {
 	f.pieces = 0
 	f.anchor = f.id
 	if f.state != undecided {
+		if f.forced {
+			// Taken for a container at the queue's bound, it has text:
+			// it gives a block from here on, not one block.
+			f.forced = false
+			g.out.PendingCut++
+		}
 		f.state, f.start = textual, at
 		g.pieceAt = at
 		return
@@ -521,6 +536,7 @@ func (g *Generic) comment(text string, end int64) {
 		Loc:   gofastcore.Location{Offset: g.comStart, Length: max(end-g.comStart, 0)}}
 	g.comParts++
 	if g.comInner && g.owner > 0 && len(g.after) >= MaxPendingBlocks {
+		g.out.PendingCut++
 		g.cutOwner(g.comStart)
 	}
 	if g.comInner && g.owner > 0 {
@@ -564,6 +580,7 @@ func (g *Generic) flush(force bool) {
 			for i := u; i < len(g.stack); i++ {
 				if g.stack[i].state == undecided {
 					g.stack[i].state = container
+					g.stack[i].forced = !force
 				}
 			}
 		} else {

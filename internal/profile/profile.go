@@ -81,7 +81,7 @@ var (
 		AsTable:       append(slices.Clone(common), "model", "header"),
 		AsRow:         append(slices.Clone(common), "header", "cells"),
 		AsCell:        append(slices.Clone(common), "header", "colspan", "rowspan"),
-		AsInline:      {"match", "as", "style", "link", "title", "attrs", "extra", "space"},
+		AsInline:      {"match", "as", "style", "link", "title", "attrs", "extra", "space", "value"},
 		AsLabel:       {"match", "as"},
 		AsImage:       append(slices.Clone(common), "id", "alt"),
 		AsNote:        append(slices.Clone(common), "type", "value", "out_of_line", "split"),
@@ -114,6 +114,9 @@ type Value struct {
 	// AttrChild: {"attr": ..., "child": ...}, the attribute Attr of the
 	// first matching child, which is still read by its own rule.
 	AttrChild *Selector
+	// Codepoint: {"attr": ..., "codepoint": "hex"}, the character whose
+	// code point the attribute holds in hexadecimal (Formex QUOT.START).
+	Codepoint bool
 }
 
 // Claims reports whether the value is read from a child element.
@@ -795,6 +798,9 @@ func compileRule(raw json.RawMessage, i int, f *fileJSON, builtin bool) (*Rule, 
 			}
 		}
 	}
+	if r.As == AsInline && r.Value != nil && (r.Value.IsLiteral || r.Value.Attr.Local == "" || r.Value.Of != nil || r.Value.AttrChild != nil) {
+		return nil, fmt.Errorf("%s: an inline's \"value\" is an attribute of its own element", where)
+	}
 	if r.Title != nil && r.Link == nil {
 		return nil, fmt.Errorf("%s: \"title\" is the title of a link and needs \"link\"", where)
 	}
@@ -921,9 +927,22 @@ func (c *compiler) value(key string, v json.RawMessage) (*Value, error) {
 		Of        string `json:"of"`
 		Child     string `json:"child"`
 		Structure string `json:"structure"`
+		Codepoint string `json:"codepoint"`
 	}
 	if err := strict(v, &o); err != nil {
 		return nil, fmt.Errorf("%s: %q is not a value source: %v", c.where, key, err)
+	}
+	if o.Codepoint != "" {
+		// The character a code point names: of the element's own
+		// attribute only.
+		if o.Codepoint != "hex" || o.Attr == "" || o.Of != "" || o.Child != "" || o.Structure != "" {
+			return nil, fmt.Errorf("%s: %q: \"codepoint\" is \"hex\", with \"attr\" alone", c.where, key)
+		}
+		q, err := ResolveName(o.Attr, c.f.Namespaces, "")
+		if err != nil {
+			return nil, fmt.Errorf("%s: %q: %v", c.where, key, err)
+		}
+		return &Value{Attr: q, Codepoint: true}, nil
 	}
 	n := 0
 	for _, s := range []string{o.Attr, o.Child, o.Structure} {

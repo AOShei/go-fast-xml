@@ -322,6 +322,7 @@ func (e *Extractor) extract(ctx context.Context, r io.ReaderAt, size int64, opts
 	if d.eng != nil {
 		parts = d.eng.Parts()
 		out.ValuesCut += d.eng.ValuesCut
+		out.PendingCut += d.eng.PendingCut
 	}
 	metadata(doc, rep, enc, out)
 	if d.used != nil {
@@ -404,8 +405,8 @@ func engineWarnings(part *gofastcore.Part, e *engine.Engine) {
 	if e.TextCut > 0 {
 		limit(fmt.Sprintf("%s (table cells, values, labels) longer than %d bytes cut", plural(e.TextCut, "text", "texts"), MaxBlockBytes))
 	}
-	if e.PendingCut > 0 {
-		limit(fmt.Sprintf("%d times more than %d attribute notes waited for the block they stand in; the block's text so far was given as a piece and the notes after it", e.PendingCut, generic.MaxPendingBlocks))
+	if e.RowSpanCut > 0 {
+		limit(fmt.Sprintf("%s spanning more than %d rows cut to that span", plural(e.RowSpanCut, "cell", "cells"), engine.MaxRowSpan))
 	}
 	if e.SpansCut > 0 {
 		limit(fmt.Sprintf("%s past 100000 in one block left out", plural(e.SpansCut, "span", "spans")))
@@ -545,6 +546,10 @@ func partWarnings(part *gofastcore.Part, g interface{ Counts() (int, int) }, out
 	}
 	if stats.AttrsCut > 0 {
 		limit(fmt.Sprintf("%s past %d on one element not read", plural(stats.AttrsCut, "attribute", "attributes"), MaxAttributes))
+	}
+	if out.PendingCut > 0 {
+		limit(fmt.Sprintf("%s by the bound on what waits for a block (%d blocks, %d bytes): more notes waited for a block, or more blocks for an element not yet known to be a block, than it allows; that block's text was given in pieces, with the waiting blocks between them",
+			plural(out.PendingCut, "cut", "cuts"), generic.MaxPendingBlocks, generic.MaxPendingBytes))
 	}
 	if out.NamesCut > 0 {
 		limit(fmt.Sprintf("%s longer than %d bytes cut", plural(out.NamesCut, "name", "names"), MaxNameBytes))

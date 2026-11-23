@@ -22,7 +22,7 @@ paragraph:That is the question. #l2
 note:12 ^a1s2
 paragraph:One line ^a1s2
 paragraph:Two line ^a1s2
-paragraph:The teh the end #p1
+paragraph:The 13 teh the end #p1
 footnote(a):A note. ^p1
 paragraph:. #p1
 list_item1(1.):First ^a1s2
@@ -74,6 +74,11 @@ var teiCase = &jatsOracleCase{profile: "tei", format: "xml-tei", skip: map[strin
 	"revisionDesc": "metadata",
 	// Stored data: declarations of encoding.
 	"encodingDesc/refsDecl": "stored",
+}, attrText: map[string]string{
+	// Page and line numbers inside a block, written in place ("value").
+	// The rules for ab/pb, note/pb, item/pb and quote/pb are not met in
+	// the dev set.
+	"p/pb": "n", "l/pb": "n", "head/pb": "n", "stage/pb": "n", "p/milestone": "n", "stage/milestone": "n",
 }}
 
 func TestTeiCorpus(t *testing.T) { teiCase.run(t) }

@@ -28,6 +28,8 @@ var formexSpec = &aknOracleSpec{
 	splits:     map[string]bool{"TBL": true, "INCL.ELEMENT": true},
 	cells:      map[string]bool{"CELL": true},
 	attrMarker: map[gofastcore.Kind]bool{},
+	// Quotation marks written by code point ("value" with "codepoint").
+	attrChar: map[string]string{"QUOT.START": "CODE", "QUOT.END": "CODE"},
 }
 
 func TestFormexCorpus(t *testing.T) { aknCorpus(t, "xml-formex", "formex") }
