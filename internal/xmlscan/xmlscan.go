@@ -789,6 +789,14 @@ func cutText(b []byte) int {
 // safeCut returns how much of b can be delivered as a text chunk without
 // splitting a UTF-8 sequence, an entity reference or a CR LF pair.
 func safeCut(b []byte) int {
+	n := safeCutRef(b)
+	if n > 0 && b[n-1] == '\r' {
+		n-- // what was cut back may have left a CR at the end
+	}
+	return n
+}
+
+func safeCutRef(b []byte) int {
 	n := len(b)
 	if n > 0 && b[n-1] == '\r' {
 		n--
@@ -850,10 +858,10 @@ func chunkEnd(b []byte, n int) int {
 		return 0
 	}
 	n = afterSpace(b, n)
-	if n > 0 && b[n-1] == '\r' {
+	for n > 0 && !utf8.RuneStart(b[n]) {
 		n--
 	}
-	for n > 0 && !utf8.RuneStart(b[n]) {
+	if n > 0 && b[n-1] == '\r' {
 		n--
 	}
 	return n
@@ -1031,6 +1039,9 @@ func doctypeEnd(b []byte) (n int, repaired bool) {
 			}
 			i += j + 1
 		case '<':
+			if rest := b[i:]; len(rest) < len(commentOpen) && bytes.HasPrefix(commentOpen, rest) {
+				return -1, false // what follows decides: see more first
+			}
 			if bytes.HasPrefix(b[i:], commentOpen) {
 				j := bytes.Index(b[i+4:], []byte("-->"))
 				if j < 0 {
