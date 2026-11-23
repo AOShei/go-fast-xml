@@ -164,6 +164,8 @@ type frame struct {
 	// whose waiting label it does not take; resume is that block's sink.
 	outOfLine bool
 	resume    *sink
+	// labelFresh: a label read inline at the start of a line.
+	labelFresh bool
 
 	sections int
 	quotes   int
@@ -805,7 +807,10 @@ func (e *Engine) nested(f *frame, el *xmlread.Element) bool {
 	default: // skBlock, skCell
 		if r.As == profile.AsLabel && (s.kind == skCell || e.labelInline(s)) {
 			f.role = roleInline
-			s.b.Space()
+			if !s.fresh {
+				s.b.Space()
+			}
+			f.labelFresh = s.fresh
 			return true
 		}
 		switch r.As {
@@ -1609,6 +1614,12 @@ func (e *Engine) EndElement(r *xmlread.Reader, el *xmlread.Element, start, end i
 		}
 	case f.role == roleInline:
 		e.endInline(f, end)
+		if f.rule != nil && f.rule.As == profile.AsLabel && e.cur != nil {
+			// A label read inline is followed by a space; one that starts
+			// a line (an item's) keeps the line open for what follows.
+			e.cur.b.Space()
+			e.cur.fresh = f.labelFresh
+		}
 	case f.cals != "":
 		e.calsEnd(f)
 	default:
