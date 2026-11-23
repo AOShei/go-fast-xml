@@ -29,7 +29,7 @@ The document is read as a stream, never as a tree: besides the document it retur
 ```
 gofastxml [flags] file-or-directory...
   -format json|markdown|text  -attributes=false  -o file  -quiet  -version
-  -profile NAME|FILE|none  -profiles  -spans
+  -profile NAME|FILE|none  -profiles  -spans  -charset NAME
   -furniture  -stored[=kinds]  -part-markers  -children  -exclude-display[=reasons]
   -max-input-bytes N  -max-decoded-bytes N  -max-text-bytes N
 ```
@@ -170,6 +170,8 @@ A comment is a `note` block marked `Attrs["stored"] = "markup_comment"`, as go-f
 ## Encodings
 
 The encoding is decided as XML 1.0 (section 4.3.3 and appendix F) says: a byte order mark (UTF-8, UTF-16LE, UTF-16BE), else UTF-16 recognised from the first bytes of the XML declaration, else the `encoding` the declaration names, else UTF-8. A declaration that names UTF-16 in a file that reads as ASCII is read as UTF-8; a byte order mark wins over a declaration that disagrees.
+
+`Extractor.Charset` (the command's `-charset NAME`) gives the encoding from outside the file, as a MIME charset label does (`windows-1251`, `shift_jis`): it is used whatever the declaration names or the bytes suggest; a byte order mark still overrides it, as with go-fast-html's option of the same name. A label that names no encoding decoded here is `ErrUnsupported` before anything is read (go-fast-html ignores it with a warning).
 
 UTF-8, UTF-16 and windows-1252 are decoded natively, and US-ASCII and ISO-8859-1 as windows-1252, as the WHATWG Encoding standard and browsers do (the bytes 0x80 to 0x9F are then the characters windows-1252 has there, not C1 controls). Every other label is looked up in a copy of go-fast-html's `internal/charset` (the other single-byte encodings, Shift_JIS, EUC-JP, GBK, GB18030, EUC-KR, Big5). A declared encoding not among them (ISO-2022-JP, UTF-7, EBCDIC), and UTF-32, is `ErrUnsupported`.
 

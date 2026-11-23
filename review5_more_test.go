@@ -5,6 +5,7 @@ package gofastxml
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand/v2"
 	"os"
@@ -316,6 +317,51 @@ func TestReview5TokenTestOnce(t *testing.T) {
 	}
 	if got != "heading heading paragraph " {
 		t.Errorf("kinds %q", got)
+	}
+}
+
+// Extractor.Charset is used whatever the declaration names or the bytes
+// suggest; a byte order mark still wins; an unknown label is an error
+// before reading.
+func TestCharsetOverride(t *testing.T) {
+	read := func(cs, src string) (*gofastcore.Document, error) {
+		return (&Extractor{Charset: cs}).Extract(context.Background(), strings.NewReader(src), int64(len(src)), nil)
+	}
+	text := func(doc *gofastcore.Document) string {
+		s := ""
+		for _, b := range doc.Parts[0].Blocks {
+			s += b.Text
+		}
+		return s
+	}
+	// Declared UTF-8, and valid UTF-8 ("\xd0\x94" is "Д"), read as
+	// windows-1251 as told.
+	doc, err := read("windows-1251", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><r>\xc4\xe0</r>")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := text(doc); got != "Да" || doc.Metadata.Extra[ExtraEncoding] != "windows-1251" {
+		t.Errorf("text %q, encoding %q", got, doc.Metadata.Extra[ExtraEncoding])
+	}
+	doc, err = read("windows-1251", "<r>\xd0\x94</r>")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := text(doc); got != "Р”" {
+		t.Errorf("valid UTF-8 read as windows-1251: %q", got)
+	}
+	doc, err = read("Windows-1251", "\xef\xbb\xbf<r>\xd0\x94</r>")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := text(doc); got != "Д" {
+		t.Errorf("with a UTF-8 byte order mark: %q", got)
+	}
+	if _, err := read("no-such-encoding", "<r/>"); !errors.Is(err, gofastcore.ErrUnsupported) {
+		t.Errorf("unknown label: %v", err)
+	}
+	if _, err := (&Extractor{Charset: "x-unknown"}).Extract(context.Background(), nil, 0, nil); !errors.Is(err, gofastcore.ErrUnsupported) {
+		t.Errorf("unknown label is not refused before reading: %v", err)
 	}
 }
 

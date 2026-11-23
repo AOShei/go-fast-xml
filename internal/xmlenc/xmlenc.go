@@ -112,6 +112,24 @@ func Sniff(sample []byte) (Result, error) {
 	return r, nil
 }
 
+// SniffAs is Sniff with the encoding given from outside the input: enc
+// is used whatever the XML declaration names or the bytes suggest. A
+// byte order mark still wins (as go-fast-html's Charset), and a UTF-32
+// one is refused.
+func SniffAs(sample []byte, enc charset.Encoding) (Result, error) {
+	if bytes.HasPrefix(sample, []byte{0xEF, 0xBB, 0xBF}) || bytes.HasPrefix(sample, []byte{0xFE, 0xFF}) || bytes.HasPrefix(sample, []byte{0xFF, 0xFE}) {
+		return Sniff(sample)
+	}
+	r := Result{Enc: enc, UTF8: enc == charset.UTF8}
+	switch enc {
+	case charset.UTF16BE, charset.UTF16LE:
+		r.Declared = declared16(sample, enc == charset.UTF16BE)
+	default:
+		r.Declared = declared(sample)
+	}
+	return r, nil
+}
+
 // trimPartial drops a UTF-8 sequence cut off at the end of a sample.
 func trimPartial(b []byte) []byte {
 	for back := 1; back <= 3 && back <= len(b); back++ {

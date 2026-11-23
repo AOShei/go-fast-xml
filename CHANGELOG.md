@@ -37,6 +37,10 @@
   far is given as a piece and the notes follow (`limit.exceeded`).
   Token tests (`[@a~='t']`) split an element's value once, not once per
   rule.
+- `Extractor.Charset` and the command's `-charset NAME`: the encoding
+  given from outside the file is used whatever it declares or its bytes
+  suggest; a byte order mark still wins (as in go-fast-html); an unknown
+  label is `ErrUnsupported` before reading.
 
 ### Phase 4: drafting a profile from an XSD
 
