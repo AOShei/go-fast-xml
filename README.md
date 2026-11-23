@@ -256,7 +256,15 @@ Generic reading reports no `Display` reason: XML in general has no declaration o
 
 Profiles: `TestProfile*` read small synthetic documents with one synthetic profile per shape of the format (headings by nesting, dispatch on attributes, CALS and rows tables with spans, labels, out-of-line footnotes, marks from conditions, parts, metadata, links, images, values from attributes); each checks `Validate` and that every block's text is at its offsets. `TestServicePublicCorpus` reads every Service-Public file of the dev and held-out sets (aggregate counts only for held-out) and fails on a panic, an error, a `Validate` failure or a file not read with the profile; it logs the unmapped elements and attributes. `TestServicePublicOracles` checks every dev file against two oracles: the body's block and cell text, in order, is the file's character data in order (white space aside) apart from a listed set of elements (metadata, the `Titre` that `TitreRiche` repeats, values read into `Attrs`, image alt text), each of which must occur; and every block's text is in the source at its `Loc.Offset`/`Length`.
 
-`BenchmarkExtract` reads a synthetic 10 MiB document; `BenchmarkEncodingXML` tokenizes the same bytes with `encoding/xml` (tokens only, no document). `BenchmarkServicePublic` reads a fixed list of 200 Service-Public dev files with the profile and generically (about 96 and 103 MB/s, 1,050 and 1,390 allocations per file, on a Ryzen 9 9900X).
+`TestOutputDigests` (run with `-args -digests=FILE`, kept outside the repository) records a digest of the JSON of every dev file of every `xml-*` corpus, read with the profile chosen and generically, on its first run, and fails on any difference on later runs; it also checks that `ExtractBytes` gives what `ExtractFile` gives.
+
+## Speed
+
+Measured on a Ryzen 9 9900X (a shared machine), Go 1.27.3, one thread (`-cpu 1`), three runs each; user CPU (`user-s/op`) is reported by the batch benchmark because wall time is noisy there.
+
+- `BenchmarkBatch` reads the whole Service-Public dev batch (4,194 files, 106 MB, one of 25 MB), one document at a time, the result dropped: `file` through `ExtractFile` with the profile chosen by the root element, about 91 MB/s (1.07 s user CPU, 900 MB allocated and 5.5 million allocations per batch); `bytes` through `ExtractBytes`, each file read into a reused buffer first, about 101 MB/s; `generic` through `ExtractFile` with generic reading, about 69 MB/s; `encodingxml` tokenizes the same files with `encoding/xml`'s `RawToken` (tokens only, no document), about 101 MB/s.
+- `BenchmarkServicePublic` reads a fixed list of 200 of those files from memory: about 110 MB/s and 915 allocations per file with the profile, 101 MB/s and 1,272 generically.
+- `BenchmarkExtract` reads a synthetic 10 MiB document generically, about 85 MB/s; `BenchmarkEncodingXML` tokenizes the same bytes with `encoding/xml`, about 115 MB/s.
 
 ## Provenance
 
