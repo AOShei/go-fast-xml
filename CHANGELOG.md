@@ -12,6 +12,10 @@
 - Text after a block, list or item read as lines of the paragraph (or
   item, or cell) it stands in starts a new line: `<p>lead<list>...</list>
   tail</p>` no longer runs the last item into "tail".
+- An unclosed comment, processing instruction or literal in a DOCTYPE's
+  internal subset ends at the subset's `]>` (else at the end of the
+  declaration's window, the token limit), with `input.repaired`; the
+  document after it is read instead of refused as `ErrMalformed`.
 
 ### Phase 4: drafting a profile from an XSD
 

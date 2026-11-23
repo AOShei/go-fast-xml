@@ -72,6 +72,27 @@ func TestReview5NestedBlockTailMore(t *testing.T) {
 	}
 }
 
+// An unclosed comment in the internal subset ends at the subset's "]>":
+// input.repaired says so, and the document after it is read.
+func TestReview5DoctypeUnclosedRepaired(t *testing.T) {
+	src := `<!DOCTYPE r [ <!ENTITY e "Ee"> <!-- open ]><r><p>Hello &e;</p></r>`
+	doc := r5Extract(t, "", src, nil)
+	repaired := false
+	for _, w := range doc.AllWarnings() {
+		repaired = repaired || w.Code == gofastcore.WarnInputRepaired
+	}
+	if !repaired {
+		t.Errorf("no input.repaired: %+v", doc.AllWarnings())
+	}
+	text := ""
+	for _, b := range doc.Parts[0].Blocks {
+		text += b.Text
+	}
+	if !strings.Contains(text, "Hello") {
+		t.Errorf("text %q", text)
+	}
+}
+
 // Values of one Extra key are joined in order, and the joined value stops
 // growing at MaxValueBytes.
 func TestReview5ExtraJoinOrder(t *testing.T) {
