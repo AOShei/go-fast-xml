@@ -161,6 +161,15 @@ func (t *table) place(e *Engine, at, cs, rs int) {
 	}
 	cs = min(max(cs, 1), MaxTableColumns)
 	rs = min(max(rs, 1), MaxRowSpan)
+	// A span (namest/nameend, spanname, colspan) over a column a cell
+	// from a row above still holds is clipped at that column: no cell is
+	// in two merges.
+	for c := t.col + 1; c < t.col+cs && c < len(t.occ); c++ {
+		if t.occupied(c) {
+			cs = c - t.col
+			break
+		}
+	}
 	t.cs, t.rs = cs, rs
 	if t.col+cs > MaxTableColumns {
 		if !t.cut {
@@ -249,6 +258,7 @@ func (t *table) block(e *Engine, start, end int64) (gofastcore.Block, bool) {
 			merges = append(merges, m)
 		}
 	}
+	merges = disjoint(merges, n, t.ncols)
 	tb := &gofastcore.Table{Rows: t.rows, HeaderRows: min(t.header, n), Merges: merges}
 	if e.opts.Spans {
 		tb.Cells = t.cells
@@ -268,6 +278,39 @@ func (t *table) block(e *Engine, start, end int64) (gofastcore.Block, bool) {
 		b.Attrs[generic.AttrAttribute] = strings.Join(t.attrNames, " ")
 	}
 	return b, true
+}
+
+// disjoint returns the merges with none sharing a cell with one before it:
+// placing clips spans at occupied columns, and this check makes sure. A
+// merge that would share a cell is left out (its cells stay plain).
+func disjoint(merges []gofastcore.Merge, rows, cols int) []gofastcore.Merge {
+	if len(merges) < 2 {
+		return merges
+	}
+	taken := make([]uint64, (rows*cols+63)/64)
+	out := merges[:0]
+	for _, m := range merges {
+		free := true
+		for r := m.Row; r < m.Row+m.RowSpan && free; r++ {
+			for c := m.Col; c < m.Col+m.ColSpan; c++ {
+				if i := r*cols + c; taken[i/64]&(1<<(i%64)) != 0 {
+					free = false
+					break
+				}
+			}
+		}
+		if !free {
+			continue
+		}
+		for r := m.Row; r < m.Row+m.RowSpan; r++ {
+			for c := m.Col; c < m.Col+m.ColSpan; c++ {
+				i := r*cols + c
+				taken[i/64] |= 1 << (i % 64)
+			}
+		}
+		out = append(out, m)
+	}
+	return out
 }
 
 // calsTable returns the innermost open CALS table when the element just

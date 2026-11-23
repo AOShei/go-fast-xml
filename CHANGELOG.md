@@ -28,6 +28,10 @@
   each file.
 - In an ordered list, a label first in an item is its marker in place of
   the list's generated number, as `PROFILE_FORMAT.md` says.
+- A column span (`namest`/`nameend`, `spanname`, `colspan`) over a column
+  a cell from a row above still holds is clipped there; no two merges of
+  a table share a cell (checked when the table is made, and in the fuzz
+  targets).
 
 ### Phase 4: drafting a profile from an XSD
 

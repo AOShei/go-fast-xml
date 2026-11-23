@@ -5,6 +5,8 @@ package gofastxml
 
 import (
 	"context"
+	"fmt"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"slices"
@@ -196,6 +198,65 @@ func TestReview5OrderedItemLabelMore(t *testing.T) {
 	}
 	if want := "(a)|ay;2.|bee (x) more;3.|sea;"; got != want {
 		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+// sharedMergeCell describes a cell of a table that two merges share, or
+// returns "".
+func sharedMergeCell(doc *gofastcore.Document) string {
+	for _, p := range doc.Parts {
+		for _, b := range p.Blocks {
+			if b.Table == nil {
+				continue
+			}
+			seen := map[[2]int]bool{}
+			for _, m := range b.Table.Merges {
+				for r := m.Row; r < m.Row+m.RowSpan; r++ {
+					for c := m.Col; c < m.Col+m.ColSpan; c++ {
+						if seen[[2]int{r, c}] {
+							return fmt.Sprintf("cell (%d,%d) is in two merges: %+v", r, c, b.Table.Merges)
+						}
+						seen[[2]int{r, c}] = true
+					}
+				}
+			}
+		}
+	}
+	return ""
+}
+
+// Random tables in both models, with spans that run over cells spanning
+// rows from above: no two merges share a cell.
+func TestReview5MergesDisjointRandom(t *testing.T) {
+	r := rand.New(rand.NewPCG(5, 9))
+	for i := range 400 {
+		var sb strings.Builder
+		if i%2 == 0 {
+			sb.WriteString(`<r><rt>`)
+			for range 1 + r.IntN(5) {
+				sb.WriteString("<tr>")
+				for range 1 + r.IntN(4) {
+					fmt.Fprintf(&sb, `<td cs="%d" rs="%d">x</td>`, 1+r.IntN(3), 1+r.IntN(3))
+				}
+				sb.WriteString("</tr>")
+			}
+			sb.WriteString(`</rt></r>`)
+		} else {
+			sb.WriteString(`<r><t><tgroup cols="4"><colspec colname="c1"/><colspec colname="c2"/><colspec colname="c3"/><colspec colname="c4"/><tbody>`)
+			for range 1 + r.IntN(5) {
+				sb.WriteString("<row>")
+				for range 1 + r.IntN(4) {
+					a := 1 + r.IntN(4)
+					fmt.Fprintf(&sb, `<entry namest="c%d" nameend="c%d" morerows="%d">x</entry>`, a, a+r.IntN(3), r.IntN(3))
+				}
+				sb.WriteString("</row>")
+			}
+			sb.WriteString(`</tbody></tgroup></t></r>`)
+		}
+		doc := r5Extract(t, r5Prof, sb.String(), nil)
+		if bad := sharedMergeCell(doc); bad != "" {
+			t.Fatalf("%s: %s", sb.String(), bad)
+		}
 	}
 }
 
