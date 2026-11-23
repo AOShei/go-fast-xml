@@ -21,12 +21,18 @@ type table struct {
 	cells  []gofastcore.CellDetail
 	header int  // leading header rows
 	body   bool // a row that is not a header row came
-	occ    []int
-	row    []string
-	inRow  bool
-	col    int
-	cs, rs int
-	ncols  int
+	// The row being read: declared a header row (counted at its start),
+	// its cells, and whether all of them are header cells (a row of th
+	// among the leading rows is a header row, counted at its end).
+	rowHead         bool
+	rowCells        int
+	rowAllHeadCells bool
+	occ             []int
+	row             []string
+	inRow           bool
+	col             int
+	cs, rs          int
+	ncols           int
 	// CALS
 	colnames map[string]int
 	spans    map[string][2]int
@@ -100,10 +106,9 @@ func (t *table) startRow(header bool) {
 		t.endRow()
 	}
 	t.inRow, t.col, t.row = true, 0, t.row[:0]
-	if header && !t.body {
+	t.rowHead, t.rowCells, t.rowAllHeadCells = header && !t.body, 0, true
+	if t.rowHead {
 		t.header++
-	} else {
-		t.body = true
 	}
 }
 
@@ -115,6 +120,8 @@ func (t *table) occupied(c int) bool {
 // free column, or at col when col >= 0.
 func (t *table) startCell(e *Engine, cs, rs int, header bool) {
 	t.place(e, -1, cs, rs)
+	t.rowCells++
+	t.rowAllHeadCells = t.rowAllHeadCells && header
 }
 
 func (t *table) place(e *Engine, at, cs, rs int) {
@@ -171,6 +178,13 @@ func (t *table) endRow() {
 		return
 	}
 	t.inRow = false
+	if !t.rowHead {
+		if t.rowCells > 0 && t.rowAllHeadCells && !t.body {
+			t.header++
+		} else {
+			t.body = true
+		}
+	}
 	for c := len(t.row); c < len(t.occ); c++ {
 		if t.occupied(c) {
 			t.row = append(t.row, "")

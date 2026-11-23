@@ -39,7 +39,7 @@ are read generically (and counted) unless their names are below.
 | `fn` | footnote, `Marker` from `callout` |
 | `draft-comment`, `required-cleanup` | `note` of type `comment` |
 | inline programming and UI elements (`codeph`, `filepath`, `cmdname`, `uicontrol`...) | code or bold spans; `b`, `i`, `sup`, `sub`, `tt`, `term`, `cite` spans |
-| map: `topicref`, `mapref`, `keydef`, `chapter`, `ditavalref`, `topichead`, `topicgroup` and the like | **list items nested as in the map**; `href` (`navtitle` for `topichead`) is the item's `Marker`, and its text when it has none of its own; `dita.href`, `dita.keys`, `dita.keyref`, `dita.navtitle`, `dita.scope`, `dita.format`, `dita.chunk`, `dita.processing_role` in `Attrs`. Nothing is fetched |
+| map: `topicref`, `mapref`, `keydef`, `chapter`, `ditavalref`, `topichead`, `topicgroup` and the like | **list items nested as in the map**; `href` (`navtitle` for `topichead`) is the item's text when it has none of its own (`value`, with `Attrs["attribute"]`); `dita.href`, `dita.keys`, `dita.keyref`, `dita.navtitle`, `dita.scope`, `dita.format`, `dita.chunk`, `dita.processing_role` in `Attrs`. Nothing is fetched |
 | `reltable` | table (`relheader` header row, `relcell` cells) |
 | `related-links/link` | list items with `dita.href` |
 

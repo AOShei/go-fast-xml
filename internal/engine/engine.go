@@ -1005,6 +1005,14 @@ func (e *Engine) startRule(f *frame, el *xmlread.Element) {
 			lvl = f.ld + 1
 		}
 		f.ld, f.inItem = lvl, true
+		if r.Value != nil {
+			// The item's text when its element gives none (DITA's
+			// topicref@href).
+			f.val, f.hasVal = e.resolve(f, r.Value, "", useValue)
+			if r.Value.Claims() == nil && !r.Value.IsLiteral && r.Value.Of == nil {
+				f.valAttr = r.Value.Attr.Local
+			}
+		}
 		e.openSink(f, skItem, el.Start)
 		if r.Marker != nil {
 			f.sink.marker, _ = e.resolve(f, r.Marker, "", useMarker)
@@ -1335,6 +1343,11 @@ func (e *Engine) finishSink(s *sink, f *frame, kind gofastcore.Kind, origin gofa
 		// The file's label numbers the item, not the list's count.
 		s.marker, s.auto = "", false
 	}
+	fromValue := false
+	if kind == gofastcore.KindListItem && s.b.Size() == 0 && f != nil && f.hasVal && f.val != "" && s.pieces == 0 && !s.done {
+		s.b.Append([]byte(f.val), false)
+		fromValue = true
+	}
 	if text := s.b.String(); text != "" || s.marker != "" && !s.auto {
 		if text == "" {
 			// A block whose only text is its label: the label is its text.
@@ -1351,6 +1364,9 @@ func (e *Engine) finishSink(s *sink, f *frame, kind gofastcore.Kind, origin gofa
 		if kind == gofastcore.KindListItem {
 			b.Level = uint8(min(max(f.ld, 1), 255))
 			b.Ordered = e.orderedItem(f)
+			if fromValue && f.valAttr != "" {
+				b.Attrs = map[string]string{generic.AttrAttribute: f.valAttr}
+			}
 		}
 		if kind == gofastcore.KindHeading {
 			b.Level = uint8(min(e.level(f), 255))

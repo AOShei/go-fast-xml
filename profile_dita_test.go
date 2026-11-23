@@ -49,7 +49,7 @@ note:Java
 	m, mdata := jatsExtractFixture(t, "dita/guide.ditamap", "dita")
 	wantMap := `# body
 heading1:Guide ^guide
-list_item1(install.dita):Installing ^guide
+list_item1:Installing ^guide
 list_item2:sub/more.dita ^guide
 list_item1:https://example.org ^guide
 `

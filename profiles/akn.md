@@ -26,7 +26,7 @@ older namespaces are read with the 3.0 rules (`namespace_aliases`).
 | `content`, `intro`, `wrapUp`, `quotedStructure`, `embeddedStructure`, `subFlow`, `foreign` | transparent |
 | `blockList`/`item`, `ul`, `ol`/`li`, `toc`/`tocItem` | list and items, anchor `@eId` |
 | `authorialNote` | `footnote` block, `out_of_line`, `Marker` from `@marker`, anchor `@eId` |
-| `table`/`tr`/`th`/`td`, the same in XHTML in `foreign` | table, `rows` model, `colspan`/`rowspan` |
+| `table`/`tr`/`th`/`td`, the same in XHTML in `foreign` | table, `rows` model, `colspan`/`rowspan`; leading rows of `th` cells are header rows (`HeaderRows`) |
 | `img` | image (`@src`, `@alt`) |
 | MathML `math` | `formula`, `notation` `plain` (its text), `Attrs["akn.formula_markup"]="MathML"` |
 | `b`, `i`, `sup`, `sub` | inline styles |

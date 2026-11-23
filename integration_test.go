@@ -181,6 +181,41 @@ func TestXIncludeReported(t *testing.T) {
 	}
 }
 
+// TestProfileItemValue: "value" on an item is its text when its element
+// gives none, carrying Attrs["attribute"]; the item has no Marker.
+func TestProfileItemValue(t *testing.T) {
+	prof := head("itemval", `{"root": "map"}`) + `"rules": [
+		{"match": "map", "as": "list"},
+		{"match": "topicref", "as": "item", "value": {"attr": "href"}},
+		{"match": "navtitle", "as": "block", "kind": "paragraph"}]}`
+	src := `<map><topicref href="a.dita"><topicref href="b.dita"/></topicref><topicref href="c.dita"><navtitle>C</navtitle></topicref></map>`
+	doc := extractWith(t, prof, src, nil)
+	wantBrief(t, doc, "list_item1:a.dita\nlist_item2:b.dita\nlist_item1:C\n")
+	if bs := blocks(doc); bs[0].Attrs[AttrAttribute] != "href" || bs[2].Attrs[AttrAttribute] != "" {
+		t.Errorf("attrs %v %v", bs[0].Attrs, bs[2].Attrs)
+	}
+}
+
+// TestProfileHeaderCells: a leading row whose cells all match a header
+// cell rule is a header row; one after a body row is not.
+func TestProfileHeaderCells(t *testing.T) {
+	prof := head("thead", `{"root": "doc"}`) + `"rules": [
+		{"match": "doc", "as": "transparent"},
+		{"match": "table", "as": "table"},
+		{"match": "tr", "as": "row"},
+		{"match": "td", "as": "cell"},
+		{"match": "th", "as": "cell", "header": true}]}`
+	for src, want := range map[string]int{
+		`<doc><table><tr><th>a</th><th>b</th></tr><tr><th>c</th><th>d</th></tr><tr><td>1</td><td>2</td></tr><tr><th>x</th><th>y</th></tr></table></doc>`: 2,
+		`<doc><table><tr><th>a</th><td>b</td></tr><tr><td>1</td><td>2</td></tr></table></doc>`:                                                           0,
+	} {
+		doc := extractWith(t, prof, src, nil)
+		if got := blocks(doc)[0].Table.HeaderRows; got != want {
+			t.Errorf("%s: header rows %d, want %d", src, got, want)
+		}
+	}
+}
+
 // TestProfileNoteInTableInBlock: an out_of_line note inside a table that
 // split a paragraph is in file order: the table's caption, the note, the
 // table, then the paragraph's text after the table.
