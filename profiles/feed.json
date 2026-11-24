@@ -101,9 +101,9 @@
     {"match": "a:feed/a:contributor", "as": "metadata", "field": "extra", "key": "feed.contributor", "value": {"child": "a:name"}},
     {"match": "a:feed/a:category", "as": "metadata", "field": "keyword", "value": {"attr": "term"}},
 
-    {"match": "item[@rdf:about]", "as": "section", "anchor": {"attr": "rdf:about"}, "attrs": {"feed.link": {"child": "link"}, "feed.published": {"child": "pubDate"}, "feed.date": {"child": "dc:date"}, "feed.comments": {"child": "comments"}}},
+    {"match": "item[@rdf:about]", "as": "section", "anchor": {"attr": "rdf:about"}, "attrs": {"feed.link": {"child": "link"}, "feed.published": {"child": "pubDate"}, "feed.date": {"child": "dc:date"}}},
     {"match": "item", "as": "section", "anchor": {"child": "guid"},
-      "attrs": {"feed.guid_is_permalink": {"attr": "isPermaLink", "child": "guid"}, "feed.link": {"child": "link"}, "feed.published": {"child": "pubDate"}, "feed.date": {"child": "dc:date"}, "feed.comments": {"child": "comments"},
+      "attrs": {"feed.guid_is_permalink": {"attr": "isPermaLink", "child": "guid"}, "feed.link": {"child": "link"}, "feed.published": {"child": "pubDate"}, "feed.date": {"child": "dc:date"},
         "feed.itunes_duration": {"child": "itunes:duration"}, "feed.itunes_episode": {"child": "itunes:episode"}, "feed.itunes_season": {"child": "itunes:season"}, "feed.itunes_episode_type": {"child": "itunes:episodeType"}, "feed.itunes_explicit": {"child": "itunes:explicit"}, "feed.itunes_block": {"child": "itunes:block"},
         "feed.georss_point": {"child": "georss:point"}, "feed.geo_lat": {"child": "geo:Point/geo:lat"}, "feed.geo_long": {"child": "geo:Point/geo:long"}}},
     {"match": "item/title", "as": "heading", "level": "nesting"},
