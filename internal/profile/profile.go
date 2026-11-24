@@ -51,13 +51,20 @@ const (
 	AsTransparent
 	AsSkip
 	AsBreak
+	AsDocument
+)
+
+// Media types a "document" rule may hand over.
+const (
+	MediaHTML  = "text/html"
+	MediaXHTML = "application/xhtml+xml"
 )
 
 var asNames = map[string]As{
 	"section": AsSection, "heading": AsHeading, "block": AsBlock, "list": AsList, "item": AsItem,
 	"table": AsTable, "row": AsRow, "cell": AsCell, "inline": AsInline, "label": AsLabel,
 	"image": AsImage, "note": AsNote, "metadata": AsMetadata, "part": AsPart, "stored": AsStored,
-	"transparent": AsTransparent, "skip": AsSkip, "break": AsBreak,
+	"transparent": AsTransparent, "skip": AsSkip, "break": AsBreak, "document": AsDocument,
 }
 
 func (a As) String() string {
@@ -91,6 +98,7 @@ var (
 		AsTransparent: append(slices.Clone(common), "split"),
 		AsSkip:        {"match", "as"},
 		AsBreak:       {"match", "as"},
+		AsDocument:    append(slices.Clone(common), "media_type", "when"),
 	}
 	allKeys = map[string]bool{}
 )
@@ -199,6 +207,16 @@ type Rule struct {
 	Cells      []*Value
 	HeaderText []string
 
+	// A "document" rule: the media type handed over, a constant
+	// (MediaType) or chosen by an attribute (MediaAttr, MediaMap: a value
+	// not in the map, or no attribute, and the rule does not apply).
+	// WhenMarkup: the rule applies only when the element's text holds
+	// markup; otherwise its fallback paragraph is made.
+	MediaType  string
+	MediaAttr  *QName
+	MediaMap   map[string]string
+	WhenMarkup bool
+
 	// Reads lists the attributes of the element the rule reads.
 	Reads []QName
 	// Claims lists the value sources read from children.
@@ -210,6 +228,15 @@ type Match struct {
 	Root          QName
 	DoctypePublic string
 	Attr          []AttrTest
+	// Declares: the root element declares this namespace URI, with any
+	// prefix or as the default ("declares").
+	Declares string
+}
+
+// Declarer is a root path that can tell which namespaces its element
+// declares.
+type Declarer interface {
+	Declares(uri string) bool
 }
 
 // Profile is a loaded profile.
@@ -274,11 +301,41 @@ func (p *Profile) Lookup(path Path) *Rule {
 			r = p.wild[j]
 			j++
 		}
-		if r.Selector.Match(path) {
+		if r.Selector.Match(path) && r.applies(path) {
 			return r
 		}
 	}
 	return nil
+}
+
+// applies reports whether a rule that matched applies: a "document" rule
+// whose media type an attribute chooses applies only when the attribute
+// has a value in its map.
+func (r *Rule) applies(path Path) bool {
+	_, ok := r.Media(path)
+	return ok
+}
+
+// Media returns the media type a "document" rule hands over for the
+// element at index 0 of path, and whether the rule applies; other rules
+// give ("", true).
+func (r *Rule) Media(path Path) (string, bool) {
+	if r.MediaAttr == nil {
+		return r.MediaType, true
+	}
+	v, ok := path.Attr(0, *r.MediaAttr)
+	if !ok {
+		return "", false
+	}
+	t, ok := r.MediaMap[v]
+	return t, ok
+}
+
+func (r *Rule) mediaTests() int {
+	if r.MediaAttr != nil {
+		return 1
+	}
+	return 0
 }
 
 // before orders rules by precedence: more steps, more tests, later rule.
@@ -286,7 +343,8 @@ func before(a, b *Rule) bool {
 	if x, y := len(a.Selector.Steps), len(b.Selector.Steps); x != y {
 		return x > y
 	}
-	if x, y := a.Selector.Tests(), b.Selector.Tests(); x != y {
+	// A media type chosen by an attribute counts as a test of it.
+	if x, y := a.Selector.Tests()+a.mediaTests(), b.Selector.Tests()+b.mediaTests(); x != y {
 		return x > y
 	}
 	return a.Index > b.Index
@@ -302,6 +360,11 @@ func (p *Profile) MatchesRoot(path Path, doctypePublic string) bool {
 		}
 		if m.DoctypePublic != "" && !strings.HasPrefix(doctypePublic, m.DoctypePublic) {
 			continue
+		}
+		if m.Declares != "" {
+			if d, ok := path.(Declarer); !ok || !d.Declares(m.Declares) {
+				continue
+			}
 		}
 		st := Step{Name: m.Root, Tests: m.Attr}
 		if st.matches(path, 0) {
@@ -344,6 +407,7 @@ type matchJSON struct {
 	Root          string `json:"root"`
 	Namespace     string `json:"namespace"`
 	DoctypePublic string `json:"doctype_public"`
+	Declares      string `json:"declares"`
 	Attr          string `json:"attr"`
 }
 
@@ -413,7 +477,7 @@ func Load(r io.Reader, builtin bool) (*Profile, error) {
 		if m.Root == "" || strings.ContainsAny(m.Root, ":/[]@ ") {
 			return nil, &Error{Msg: fmt.Sprintf("match %d: \"root\" %q is not a local name", i+1, m.Root)}
 		}
-		mm := Match{Root: QName{URI: m.Namespace, Local: m.Root}, DoctypePublic: m.DoctypePublic}
+		mm := Match{Root: QName{URI: m.Namespace, Local: m.Root}, DoctypePublic: m.DoctypePublic, Declares: m.Declares}
 		if m.Attr != "" {
 			st, rest, err := parseStep("*"+m.Attr, f.Namespaces, "")
 			if err != nil || rest != "" {
@@ -448,6 +512,10 @@ func Load(r io.Reader, builtin bool) (*Profile, error) {
 					kept[t.Name] = true
 				}
 			}
+		}
+		if r.MediaAttr != nil {
+			// The lookup's cache tells elements apart by this value.
+			p.tested = appendNew(p.tested, *r.MediaAttr)
 		}
 		for _, v := range r.values() {
 			if v.Of != nil {
@@ -817,8 +885,59 @@ func compileRule(raw json.RawMessage, i int, f *fileJSON, builtin bool) (*Rule, 
 			}
 		}
 	}
+	if r.As == AsDocument {
+		if err := c.document(r); err != nil {
+			return nil, err
+		}
+	}
 	r.reads()
 	return r, nil
+}
+
+// document reads the keys of a "document" rule: "media_type", a media
+// type or {"attr": name, "map": {value: media type}}, and "when".
+func (c *compiler) document(r *Rule) error {
+	media := func(s string) error {
+		if s != MediaHTML && s != MediaXHTML {
+			return fmt.Errorf("%s: \"media_type\" %q is not %s or %s", c.where, s, MediaHTML, MediaXHTML)
+		}
+		return nil
+	}
+	v, ok := c.m["media_type"]
+	if !ok {
+		return fmt.Errorf("%s: a \"document\" rule needs \"media_type\"", c.where)
+	}
+	if json.Unmarshal(v, &r.MediaType) == nil {
+		if err := media(r.MediaType); err != nil {
+			return err
+		}
+	} else {
+		var a struct {
+			Attr string            `json:"attr"`
+			Map  map[string]string `json:"map"`
+		}
+		if err := strict(v, &a); err != nil {
+			return fmt.Errorf("%s: \"media_type\" must be a media type or {\"attr\", \"map\"}: %v", c.where, err)
+		}
+		q, err := ResolveName(a.Attr, c.f.Namespaces, "")
+		if err != nil || len(a.Map) == 0 || len(a.Map) > 64 {
+			return fmt.Errorf("%s: \"media_type\" needs \"attr\" and a \"map\" of 1 to 64 entries", c.where)
+		}
+		for _, t := range a.Map {
+			if err := media(t); err != nil {
+				return err
+			}
+		}
+		r.MediaAttr, r.MediaMap = &q, a.Map
+	}
+	if w, ok := c.m["when"]; ok {
+		var s string
+		if json.Unmarshal(w, &s) != nil || s != "markup" {
+			return fmt.Errorf("%s: \"when\" must be \"markup\"", c.where)
+		}
+		r.WhenMarkup = true
+	}
+	return nil
 }
 
 func validKey(k string) bool {
@@ -851,6 +970,9 @@ func (r *Rule) reads() {
 	}
 	if r.Display != nil {
 		add(r.Display.Attr)
+	}
+	if r.MediaAttr != nil {
+		add(*r.MediaAttr)
 	}
 	if r.Level.Attr != nil {
 		add(*r.Level.Attr)

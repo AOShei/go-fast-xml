@@ -52,6 +52,20 @@ const (
 type Options struct {
 	Spans    bool
 	NoImages bool
+	// Child hands over the content of a "document" rule's element; it
+	// returns the document to list in Children and whether it was
+	// extracted. Without it the content is kept as a paragraph.
+	Child func(name, mediaType string, data []byte) (*gofastcore.Document, bool)
+	// Raw returns the bytes of the file from start to end, for XHTML
+	// content; nil when the file is not UTF-8 (the content is then
+	// written from the decoded text).
+	Raw func(start, end int64) []byte
+	// MaxChildren bounds the documents handed over.
+	MaxChildren int
+	// PartWanted reports whether the part of that number is in the
+	// output; the content of document rules in other parts is not handed
+	// over.
+	PartWanted func(number int) bool
 }
 
 type role uint8
@@ -61,6 +75,7 @@ const (
 	roleSink
 	roleInline
 	roleSkip
+	roleDoc // inside a "document" rule's element
 )
 
 type sinkKind uint8
@@ -228,6 +243,28 @@ type frame struct {
 	hasVal bool
 	part   *gofastcore.Part
 	imgAlt bool
+
+	// isDoc: the element of a "document" rule. kids: the children that
+	// came from this section; secFirst and secHead: its first block and
+	// first heading.
+	isDoc             bool
+	kids              []int
+	secFirst, secHead blockRef
+	// waiting: the values a section read for its first block or its
+	// anchor, kept to be written as blocks of their own if it ends with
+	// none (profiles with a "document" rule). capRule: the rule of an
+	// element read for a value, for the block it would have been.
+	waiting []waitVal
+	capRule *profile.Rule
+}
+
+// waitVal is a value a section waits to place: read from the attribute
+// attr of the element at start..end, or (attr empty) from the element
+// whose rule is rule.
+type waitVal struct {
+	text, attr, path string
+	rule             *profile.Rule
+	start, end       int64
 }
 
 type mark struct {
@@ -294,6 +331,17 @@ type Engine struct {
 	PendingCut        int
 	Controls, Invalid int
 
+	// Embedded documents ("document" rules): the documents and where each
+	// came from, in file order. DocsCut counts contents cut to
+	// MaxBlockBytes, ChildrenCut those not handed over past MaxChildren,
+	// Plain those kept as a paragraph because they held no markup.
+	Children                    []*gofastcore.Document
+	ChildLocs                   []ChildLoc
+	DocsCut, ChildrenCut, Plain int
+	docs                        bool
+	doc                         *docCap
+	scratchTag                  []byte
+
 	com      generic.Builder
 	inCom    bool
 	comStart int64
@@ -305,7 +353,7 @@ type Engine struct {
 // part.
 func New(p *profile.Profile, out *generic.Out, opts Options) *Engine {
 	e := &Engine{p: p, out: out, opts: opts, parts: []*gofastcore.Part{out.Part},
-		cache: map[string]*profile.Rule{}, hasChildAttrs: p.ReadsChildAttrs()}
+		cache: map[string]*profile.Rule{}, hasChildAttrs: p.ReadsChildAttrs(), docs: hasDocuments(p)}
 	e.resetCounts()
 	return e
 }
@@ -465,6 +513,12 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 	if p != nil {
 		f.sections, f.ld, f.inItem, f.display, f.quotes = p.sections, p.ld, p.inItem, p.display, p.quotes
 		f.capture, f.captureOf = p.capture, p.captureOf
+		if e.doc != nil {
+			// Content of a document rule's element: handed over as it is.
+			f.role = roleDoc
+			e.docStart(el)
+			return
+		}
 		if p.role == roleSkip {
 			f.role = roleSkip
 			return
@@ -474,7 +528,7 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 	f.partAt, f.idxAt = e.out.Part, len(e.out.Part.Blocks)
 	e.readAttrs = e.readAttrs[:0]
 	if e.hasChildAttrs {
-		e.readAttrs = e.childAttrs()
+		e.readAttrs = e.childAttrs(el)
 	}
 	if f.capture != nil {
 		// Inside an element read for a value: its text, or its outline.
@@ -532,6 +586,16 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 		if rule.Value != nil {
 			e.inlineValue(r, rule, el)
 		}
+		return
+	}
+	if rule.As == profile.AsDocument {
+		if e.cur != nil {
+			// Inside an open block its text stays in that block.
+			f.role = roleContainer
+			return
+		}
+		e.flushStray()
+		e.startDocument(f, el)
 		return
 	}
 	if rule.As == profile.AsBreak {
@@ -641,7 +705,7 @@ func (e *Engine) claim() (*slot, int) {
 // childAttrs fills the slots of open elements that read an attribute of
 // the element on top of the stack ({"attr": ..., "child": ...}), which is
 // then read by its own rule as usual. It returns the attributes read.
-func (e *Engine) childAttrs() []profile.QName {
+func (e *Engine) childAttrs(el *xmlread.Element) []profile.QName {
 	var read []profile.QName
 	n := len(e.frames)
 	for k := 1; k < n && k < e.p.MaxSteps(); k++ {
@@ -654,7 +718,11 @@ func (e *Engine) childAttrs() []profile.QName {
 			s.filled = true
 			read = append(read, s.v.Attr)
 			if v, ok := e.Attr(0, s.v.Attr); ok {
-				e.fill(o, s, e.clean(v))
+				v = e.clean(v)
+				e.fill(o, s, v)
+				if s.use == useFirst && !o.first.ok() {
+					e.wait(o, s.v, v, el)
+				}
 			}
 		}
 	}
@@ -665,6 +733,9 @@ func (e *Engine) startCapture(f *frame, s *slot, owner int, el *xmlread.Element)
 	e.flushStray()
 	s.filled = true
 	f.role, f.capture, f.captureOf, f.structRoot = roleSink, s, owner, true
+	if e.docs && (s.use == useFirst || s.use == useAnchor) {
+		f.capRule = e.lookup()
+	}
 	// What the value gives its owner outlives this element.
 	f.marks, f.anchors = math.MaxInt, math.MaxInt
 	f.sink = e.getSink(skCapture, el.Start)
@@ -1199,6 +1270,7 @@ func (e *Engine) common(f *frame, el *xmlread.Element) {
 		if v, ok := e.resolve(f, r.Anchor, "", useAnchor); ok && v != "" {
 			f.anchor = v
 			e.anchors = append(e.anchors, anchorAt{v, len(e.frames)})
+			e.wait(f, r.Anchor, v, el)
 		}
 	} else if v, ok := el.Attr(xmlscan.XMLNamespace, "id"); ok {
 		f.anchor = e.clean(v)
@@ -1218,6 +1290,7 @@ func (e *Engine) common(f *frame, el *xmlread.Element) {
 		if v, ok := e.resolve(f, x.Value, x.Key, use); ok && v != "" {
 			if container {
 				f.firstSet = append(f.firstSet, kv{x.Key, v})
+				e.wait(f, x.Value, v, el)
 			} else {
 				f.own = append(f.own, kv{x.Key, v})
 			}
@@ -1424,7 +1497,11 @@ func (e *Engine) add(b gofastcore.Block, f *frame, own bool) blockRef {
 		return blockRef{}
 	}
 	e.out.Append(b)
-	return blockRef{e.out.Part, len(e.out.Part.Blocks) - 1}
+	ref := blockRef{e.out.Part, len(e.out.Part.Blocks) - 1}
+	if e.docs && b.Attrs[gofastcore.AttrStored] == "" {
+		e.noteBlock(ref, b.Kind == gofastcore.KindHeading)
+	}
+	return ref
 }
 
 func hasUse(ss []slot, u useKind) bool {
@@ -1609,6 +1686,18 @@ func (e *Engine) Text(r *xmlread.Reader, t []byte, start, end int64) {
 	preserve := s.verbatim
 	if el := r.Top(); el != nil {
 		preserve = preserve || el.Preserve
+	}
+	if e.doc != nil && s == e.doc.sink {
+		// A document rule's text: handed over, and gathered as its
+		// fallback paragraph, both cut at MaxBlockBytes.
+		e.docText(t)
+		if s.cut {
+			return
+		}
+		if s.b.Size()+len(t) > generic.MaxBlockBytes {
+			t = t[:cutAt(t, generic.MaxBlockBytes-s.b.Size())]
+			s.cut, e.doc.cut = true, true
+		}
 	}
 	if s.b.Size() > 0 && s.b.Size()+len(t) > generic.MaxBlockBytes {
 		e.cutSink(s, start)
@@ -1816,6 +1905,12 @@ func (e *Engine) Comment(r *xmlread.Reader, t []byte, final bool, start, end int
 	if !e.inCom {
 		e.inCom, e.comStart, e.comParts = true, start, 0
 		e.com.Reset()
+		if e.doc != nil {
+			e.doc.comment(nil, true, false)
+		}
+	}
+	if e.doc != nil {
+		e.doc.comment(t, false, final)
 	}
 	if e.com.Size() > 0 && e.com.Size()+len(t) > generic.MaxBlockBytes {
 		e.comment(e.com.String(), start)
@@ -1842,6 +1937,12 @@ func (e *Engine) comment(text string, end int64) {
 		Attrs: map[string]string{gofastcore.AttrStored: gofastcore.StoredMarkupComment},
 		Loc:   gofastcore.Location{Offset: e.comStart, Length: max(end-e.comStart, 0)}}
 	e.comParts++
+	if d := e.doc; d != nil && len(d.notes) < generic.MaxPendingBlocks {
+		// Inside a document rule's element: the child's, unless its text
+		// stays in the body (endDocument).
+		d.notes = append(d.notes, b)
+		return
+	}
 	if s := e.active(); s != nil && len(s.after) < generic.MaxPendingBlocks {
 		s.after = append(s.after, b)
 		return
@@ -1863,8 +1964,12 @@ func (e *Engine) EndElement(r *xmlread.Reader, el *xmlread.Element, start, end i
 	var ref blockRef
 	switch {
 	case f.role == roleSkip:
+	case f.role == roleDoc:
+		e.docEnd(el)
+	case f.isDoc:
+		ref = e.endDocument(f, start, end)
 	case f.capture != nil && f.structRoot:
-		ref = e.endCapture(f)
+		ref = e.endCapture(f, end)
 	case f.capture != nil:
 		if s := e.cur; s != nil && s.structure {
 			e.structEnd(s)
@@ -1900,6 +2005,12 @@ func (e *Engine) EndElement(r *xmlread.Reader, el *xmlread.Element, start, end i
 	}
 	if f.suspended || f.outOfLine {
 		e.cur = f.resume
+	}
+	if len(f.waiting) > 0 && !f.secFirst.ok() && f.rule != nil && f.rule.As == profile.AsSection {
+		e.flushWaiting(f)
+	}
+	if len(f.kids) > 0 {
+		e.endSection(f)
 	}
 	e.marks = e.marks[:min(f.marks, len(e.marks))]
 	e.anchors = e.anchors[:min(f.anchors, len(e.anchors))]
@@ -2007,7 +2118,7 @@ func (e *Engine) addStored(b gofastcore.Block) {
 
 // endCapture ends an element read for a value, and gives the value where
 // it goes.
-func (e *Engine) endCapture(f *frame) blockRef {
+func (e *Engine) endCapture(f *frame, end int64) blockRef {
 	s := f.sink
 	e.cur = f.prevCur
 	var v string
@@ -2026,7 +2137,11 @@ func (e *Engine) endCapture(f *frame) blockRef {
 	e.putSink(s)
 	f.sink = nil
 	if f.captureOf < len(e.frames) {
-		e.fill(&e.frames[f.captureOf], f.capture, v)
+		o := &e.frames[f.captureOf]
+		if f.capRule != nil && v != "" && !o.secFirst.ok() {
+			o.waiting = append(o.waiting, waitVal{text: v, rule: f.capRule, start: f.start, end: end})
+		}
+		e.fill(o, f.capture, v)
 	}
 	return blockRef{}
 }
@@ -2094,6 +2209,15 @@ func (e *Engine) fill(o *frame, s *slot, v string) {
 	case useAnchor:
 		o.anchor = v
 		e.anchors = append(e.anchors, anchorAt{v, e.depthOf(o)})
+		if o.partAt == e.out.Part {
+			// Blocks made inside the owner before its identifier came
+			// (an RSS item's title before its guid) are given it too.
+			for i := o.idxAt; i < len(o.partAt.Blocks); i++ {
+				if b := &o.partAt.Blocks[i]; b.Loc.Anchor == "" && b.Attrs[AttrAnchorParent] == "" && b.Attrs[gofastcore.AttrStored] == "" {
+					e.patch(blockRef{o.partAt, i}, AttrAnchorParent, v)
+				}
+			}
+		}
 	}
 }
 
@@ -2403,6 +2527,18 @@ func (e *Engine) metadata(f *frame, v string, end int64) {
 
 func parseDate(s string) (time.Time, bool) {
 	for _, layout := range []string{time.RFC3339Nano, "2006-01-02T15:04:05", "2006-01-02"} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t, true
+		}
+	}
+	// RFC 822 (RSS), with a numeric offset or GMT, UT or Z: a zone
+	// abbreviation other than these does not say its offset.
+	for _, z := range []string{" GMT", " UT", " Z"} {
+		if strings.HasSuffix(s, z) {
+			s = s[:len(s)-len(z)] + " +0000"
+		}
+	}
+	for _, layout := range []string{"Mon, 2 Jan 2006 15:04:05 -0700", "2 Jan 2006 15:04:05 -0700", "Mon, 2 Jan 2006 15:04 -0700"} {
 		if t, err := time.Parse(layout, s); err == nil {
 			return t, true
 		}

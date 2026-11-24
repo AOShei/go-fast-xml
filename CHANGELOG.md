@@ -12,6 +12,37 @@
 - **`gofastxml` on a directory** also reads files named `.dita`,
   `.ditamap`, `.docbook` and `.tei` (in any case), as the `gofast` command
   does. It read `.xml` only.
+- **Web feeds: a thirteenth built-in profile, `feed`**, for RSS 0.91 to
+  2.0, RSS 1.0 and Atom 1.0 with their common extensions (Dublin Core,
+  `content:`, iTunes, Podcasting 2.0, Media RSS, GeoRSS, Slash,
+  syndication). Feeds were read generically. See `profiles/feed.md`.
+- **An anchor that comes late reaches the blocks before it.** When a
+  profile reads an element's anchor from a child (an RSS item's `guid`)
+  and blocks of the element were made before it, those blocks get
+  `Attrs["anchor_parent"]` too. In every profile, a user's own included.
+  The output of the built-in profiles other than `feed` is unchanged on
+  the corpus: none reads an anchor from a child.
+- **Embedded documents: comments and empty sections.** A comment inside a
+  `document` element is the child's, a note of the parent only when the
+  text stays in the body. A section that makes no block writes what it
+  read for its first block and anchor as blocks of its own (profiles with
+  a `document` rule). The fallback text of HTML with element children
+  closes its start tags. RSS `textInput` is mapped.
+- **Embedded documents.** A new rule kind, `"as": "document"`, with
+  `media_type` and `when`, hands an element's content to
+  `Options.ExtractChild` and appends the result to `Document.Children`
+  (escaped HTML in a feed was literal markup in a paragraph). The section's
+  heading carries `Attrs["children"]`; each child carries
+  `xml.parent_offset`, `xml.parent_length`, `xml.parent_anchor` and
+  `xml.parent_element`. Without a child extractor the text stays in the
+  body with `Attrs["media_type"]`. At most `MaxChildren` (10,000) per
+  document. A `match` entry may test `declares`.
+- **Dates in RFC 822 form** with a numeric offset or `GMT`, `UT`, `Z` fill
+  `Metadata.Created` and `Modified` from a profile's `created` and
+  `modified` fields; they stayed as written in `Extra`.
+- **`gofastxml` reads HTML and XHTML children with go-fast-html.** The
+  module now requires go-fast-core v0.1.6 and go-fast-html v0.4.4 (the
+  command's dependency; the library package imports only go-fast-core).
 
 ## v0.1.0 (2026-11-24)
 

@@ -111,6 +111,9 @@ type jatsOracleCase struct {
 	// gap is an Attrs key and value marking blocks whose text is in their
 	// span in order but with gaps (see jatsCiteCheck).
 	gap []string
+	// name, when set, is the name of an element in the paths of skip and
+	// attrText (a prefix for its namespace); otherwise its local name.
+	name func(xml.Name) string
 	// prep, if set, adjusts a document before the oracles see it (blocks
 	// whose text or Marker the profile takes from an attribute).
 	prep func(doc *gofastcore.Document)
@@ -192,7 +195,11 @@ func (c *jatsOracleCase) sourceText(data []byte, used map[string]bool) (string, 
 		}
 		switch tk := tok.(type) {
 		case xml.StartElement:
-			stack = append(stack, tk.Name.Local)
+			if c.name != nil {
+				stack = append(stack, c.name(tk.Name))
+			} else {
+				stack = append(stack, tk.Name.Local)
+			}
 			if skip > 0 {
 				skip++
 			} else if k, ok := c.skipped(stack); ok {

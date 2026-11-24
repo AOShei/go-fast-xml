@@ -62,8 +62,10 @@ an error naming the rule (`profile: rule 12 ("Chapitre/Titre"): ...`).
 `match` is a list; a file matches when any entry does. An entry tests the
 root element: `root` (local name), `namespace` (URI; absent means "no
 namespace"), and optionally `doctype_public` (a prefix of the DOCTYPE
-public identifier) and `attr` (attribute tests on the root, written as in
-selectors: `"[@class~='topic/topic']"`).
+public identifier), `attr` (attribute tests on the root, written as in
+selectors: `"[@class~='topic/topic']"`) and `declares` **(added)** (a
+namespace URI the root element declares, with any prefix or as the
+default: RSS 1.0's `rdf:RDF` declares `http://purl.org/rss/1.0/`).
 
 The profiles in `Extractor.Profiles` are tried first, in order, then the
 built-in ones in a fixed order, then generic reading. `Extractor.Profile`
@@ -110,6 +112,52 @@ in no namespace. The prefix `xml` is predefined.
 | `stored` | The element's text goes to the stored part | `kind`: one of core's stored kinds |
 | `transparent` | The element means nothing itself; its children are read by their own rules | |
 | `skip` | Left out, counted in the info warning `xml.skipped_elements`. Refused in built-in profiles | |
+| `document` **(added)** | The element's content is an embedded document, handed to `Options.ExtractChild` and appended to `Document.Children` (below) | `media_type`; `when` |
+
+A `document` rule's `media_type` is `"text/html"` or
+`"application/xhtml+xml"`, or chosen by an attribute:
+`{"attr": "type", "map": {"html": "text/html", "xhtml": "application/xhtml+xml"}}`
+(1 to 64 entries, values exact). When the attribute is absent or its
+value is not in the map, the rule does not apply and the element's other
+rule (or generic reading) does; a rule with a map counts as having one
+more attribute test when rules are ranked. `"when": "markup"` makes the
+rule apply only when the element's character data, unescaped, holds a tag
+(`<` followed by a letter, `/` or `!`, and later a `>`) or a reference
+(`&name;`, `&#digits;`, `&#xhex;`), or the element has child elements.
+
+What is handed over: for `text/html`, the character data unescaped
+(entities and CDATA resolved), with the tags of any child elements
+written back, as UTF-8, media type `text/html; charset=utf-8`; for
+`application/xhtml+xml`, the bytes of the file between the start and end
+tag when the file is UTF-8, else the content written back from the
+decoded text, media type `application/xhtml+xml; charset=utf-8`.
+Namespace declarations in scope but outside the element are not added.
+The child's name is the element and its parent and the anchor of the
+enclosing identified element (`item/description#guid`, the anchor cut to
+256 bytes). At most 1 MiB (`MaxBlockBytes`) is handed over; a longer
+content is cut there, with `limit.exceeded`.
+
+The rule's **fallback** is a `block` of kind `paragraph` with the rule's
+`anchor`, `attrs` and `mark`: its text is the character data with the
+markup as text (HTML), or the text content (XHTML; a space between
+block-level elements). The fallback is made when `when` finds no markup
+(no `media_type` attribute), when the child was not extracted (no
+`Options.Child`, the depth limit, the child extractor refused or failed:
+then with `Attrs["media_type"]`), and past `MaxChildren` (10,000)
+documents (with `media_type` and `limit.exceeded`). When the child was
+extracted the body has no block for the element. Met inside an open
+block, a `document` rule's text stays in that block.
+
+The two links: the heading of the innermost `section` the element stands
+in (else the section's first block) carries `Attrs["children"]`, the
+indexes in `Document.Children` of the documents from that section, comma
+separated; a section with no block has none. Each child carries in
+`Metadata.Extra` `xml.parent_offset` and `xml.parent_length` (its element
+in the file, start tag to end tag), `xml.parent_anchor` (the enclosing
+identified element's anchor, when there is one, also when it comes after
+the element) and `xml.parent_element` (the element's path). A child that
+was not extracted (the stub `ExtractChild` returns) is listed with the
+same keys.
 
 Keys any block-making or container rule may carry:
 
@@ -265,4 +313,8 @@ for; none changes what an existing key means.
 | `value` | `item` | Phase 3 integration (DITA `topicref@href`): the item's text when its element gives none of its own (an empty `topicref`, or one whose children are only other items); it then carries `Attrs["attribute"]`. It is not the `Marker` (a marker is the item's number or bullet) |
 | (header cells) | `cell` with `header` | Phase 3 integration (AKN and HTML-like `th`): a row with no `header` of its own whose cells all match a cell rule whose `header` test is true counts in `HeaderRows` when it is among the leading rows (no body row before it) |
 | (label inside a block) | `label` | Phase 3 (AKN `num` in a `quotedStructure` inside a paragraph, `num` in a table cell): a label met inside a paragraph or item that already has text, a marker or a waiting label, or inside a cell, is read as text of that block, after a space. It was the block's marker only if it had none, and was dropped otherwise. A label as the first thing in a block is its marker as before. An `out_of_line` note inside a label is a block of its own as inside a paragraph |
+| `"as": "document"`, `media_type`, `when` | rule kind | Feeds: escaped HTML in an RSS `description` and Atom `content type="html"` was literal markup in a paragraph. The element's content is handed to the child extractor (section 3). `media_type`: `"text/html"`, `"application/xhtml+xml"`, or `{"attr": name, "map": {value: media type}}`; `when`: `"markup"` |
+| `declares` | `match` entry | Feeds: an `rdf:RDF` root is RSS 1.0 only when it declares `http://purl.org/rss/1.0/`; other RDF stays generic |
+| (late anchor) | engine | An anchor read from a child (`{"child": "guid"}`) that comes after blocks of its element were made gives those blocks `anchor_parent` too, and the element's embedded documents their `xml.parent_anchor` and name. In every profile; none of the twelve profiles before `feed` reads an anchor that way, so their output is unchanged |
+| (RFC 822 dates) | `metadata` `created`, `modified` | Feeds: a date in RFC 822 form with a numeric offset or `GMT`, `UT`, `Z` (`Mon, 02 Jan 2006 15:04:05 GMT`) fills the field; one with another zone name stays as written in `Extra` |
 | `value` | `inline` | Phase 6 (TEI `p/pb@n`, Formex `QUOT.START`/`QUOT.END`): an attribute of the inline's own element (`{"attr": "n"}` or `{"attr": "CODE", "codepoint": "hex"}`; no literal, `of`, `child` or `structure`) written where the element stands in the open block's text (or the value being read), as if it were the element's text: with `space`, set off by white space. The block's `Loc` still covers its element; this text is in the span as an attribute, not as character data. An absent attribute writes nothing. With `attrs` the record in the stored part has this text |

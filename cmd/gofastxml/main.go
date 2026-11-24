@@ -32,6 +32,7 @@ import (
 	"strings"
 
 	"github.com/AOShei/go-fast-core"
+	"github.com/AOShei/go-fast-html"
 	"github.com/AOShei/go-fast-xml"
 )
 
@@ -125,6 +126,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	var opts gofastcore.Options
 	opts.Limits.MaxInputBytes, opts.Limits.MaxDecodedBytes, opts.Limits.MaxTextBytes = *maxInput, *maxBytes, *maxText
 	opts.Spans = *spans
+	opts.Child = dispatcher
 	if !*attributes {
 		extractor.Attributes = gofastxml.AttributesNone
 	}
@@ -308,4 +310,22 @@ func xmlName(path string) bool {
 		return true
 	}
 	return false
+}
+
+// dispatcher is the command's Options.Child: the embedded documents a
+// profile hands over (escaped HTML in a feed, Atom XHTML content) are read
+// by go-fast-html; any other type is refused with ErrUnsupported, and the
+// child is then listed only. Core's depth limit applies through
+// ExtractChild.
+func dispatcher(ctx context.Context, name, mimeType string, r io.ReaderAt, size int64, o *gofastcore.Options) (*gofastcore.Document, error) {
+	t, params, _ := strings.Cut(mimeType, ";")
+	switch strings.TrimSpace(strings.ToLower(t)) {
+	case "text/html", "application/xhtml+xml":
+		charset := ""
+		if _, v, ok := strings.Cut(strings.ToLower(params), "charset="); ok {
+			charset = strings.Trim(strings.TrimSpace(v), `"`)
+		}
+		return (&gofasthtml.Extractor{Format: "html", Charset: charset}).Extract(ctx, r, size, o)
+	}
+	return nil, fmt.Errorf("gofastxml: no extractor for %q: %w", mimeType, gofastcore.ErrUnsupported)
 }

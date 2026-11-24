@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand/v2"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -16,11 +17,19 @@ import (
 // testEntities are the internal entities the generated documents declare.
 var testEntities = map[string]string{"lt": "<", "gt": ">", "amp": "&", "quot": `"`, "apos": "'", "ent": "entity text"}
 
+// testRefRE is a whole character or entity reference.
+var testRefRE = regexp.MustCompile(`^&(?:#[0-9]+|#x[0-9A-Fa-f]+|[A-Za-z_][\w.-]*);$`)
+
 // stripMarkup returns the character data of a piece of source: tags,
 // comments and processing instructions removed, CDATA unwrapped,
 // references decoded, line ends normalized. A piece may start or end
 // inside a CDATA section.
-func stripMarkup(s string) string {
+func stripMarkup(s string) string { return markupText(s, false) }
+
+// unescapeMarkup is stripMarkup with tags kept as they are written.
+func unescapeMarkup(s string) string { return markupText(s, true) }
+
+func markupText(s string, keepTags bool) string {
 	var b strings.Builder
 	for i := 0; i < len(s); {
 		switch {
@@ -31,7 +40,14 @@ func stripMarkup(s string) string {
 			}
 			i += j + 3
 		case strings.HasPrefix(s[i:], "<![CDATA["):
+			// Its content is text as it stands, markup-like or not.
 			i += 9
+			j := strings.Index(s[i:], "]]>")
+			if j < 0 {
+				j = len(s) - i
+			}
+			b.WriteString(strings.ReplaceAll(strings.ReplaceAll(s[i:i+j], "\r\n", "\n"), "\r", "\n"))
+			i += j
 		case strings.HasPrefix(s[i:], "]]>"):
 			i += 3
 		case s[i] == '<':
@@ -39,9 +55,18 @@ func stripMarkup(s string) string {
 			if j < 0 {
 				return b.String()
 			}
+			if keepTags && !strings.HasPrefix(s[i:], "<?") {
+				b.WriteString(s[i : i+j+1])
+			}
 			i += j + 1
 		case s[i] == '&':
 			j := strings.IndexByte(s[i:], ';')
+			if j < 0 || !testRefRE.MatchString(s[i:i+j+1]) {
+				// Not a reference: an ampersand in a CDATA section.
+				b.WriteByte('&')
+				i++
+				continue
+			}
 			name := s[i+1 : i+j]
 			switch {
 			case strings.HasPrefix(name, "#x"):

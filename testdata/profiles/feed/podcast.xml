@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:podcast="https://podcastindex.org/namespace/1.0">
+<channel>
+<title>Pod</title>
+<link>https://pod.example/</link>
+<description>Talk about things.</description>
+<itunes:author>Host Name</itunes:author>
+<itunes:summary>A summary &lt;b&gt;in bold&lt;/b&gt;.</itunes:summary>
+<itunes:explicit>false</itunes:explicit>
+<itunes:type>episodic</itunes:type>
+<itunes:owner><itunes:name>Owner</itunes:name><itunes:email>owner@pod.example</itunes:email></itunes:owner>
+<itunes:category text="Technology"><itunes:category text="Podcasting"/></itunes:category>
+<itunes:image href="https://pod.example/art.jpg"/>
+<podcast:funding url="https://pod.example/give">Support us</podcast:funding>
+<item>
+<title>Episode 1</title>
+<guid isPermaLink="false">pod-ep-1</guid>
+<pubDate>Tue, 03 Mar 2026 08:00:00 +0000</pubDate>
+<itunes:duration>00:42:10</itunes:duration>
+<itunes:episode>1</itunes:episode>
+<itunes:episodeType>full</itunes:episodeType>
+<itunes:subtitle>The first one</itunes:subtitle>
+<description>Show notes.</description>
+<enclosure url="https://pod.example/1.mp3" length="1000" type="audio/mpeg"/>
+<podcast:transcript url="https://pod.example/1.vtt" type="text/vtt" language="en"/>
+<podcast:chapters url="https://pod.example/1.json" type="application/json+chapters"/>
+<podcast:person role="host" href="https://pod.example/host">Host Name</podcast:person>
+</item>
+</channel>
+</rss>

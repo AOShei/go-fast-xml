@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<channel>
+<title>Example feed</title>
+<link>https://example.org/</link>
+<description>Plain channel text.</description>
+<language>en</language>
+<lastBuildDate>Mon, 02 Mar 2026 10:00:00 GMT</lastBuildDate>
+<item>
+<title>One</title>
+<link>https://example.org/1</link>
+<description>&lt;p&gt;First &lt;b&gt;item&lt;/b&gt;&lt;/p&gt;</description>
+<dc:creator>Ann</dc:creator>
+<category>news</category>
+<enclosure url="https://example.org/1.mp3" type="audio/mpeg" length="12"/>
+<guid isPermaLink="false">id-1</guid>
+</item>
+<item>
+<title>Two</title>
+<description>Only text, a &lt; b.</description>
+<content:encoded><![CDATA[<p>Full text</p>]]></content:encoded>
+<guid>id-2</guid>
+</item>
+</channel>
+</rss>

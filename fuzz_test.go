@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 
@@ -102,7 +103,40 @@ const fuzzProfile = `{"profile": "fuzz", "format": 1, "match": [{"root": "r"}], 
   {"match": "oo", "as": "block", "kind": "footnote", "out_of_line": true},
   {"match": "ti", "as": "item", "value": {"attr": "href"}},
   {"match": "qs", "as": "inline", "value": {"attr": "c", "codepoint": "hex"}},
-  {"match": "pg", "as": "inline", "value": {"attr": "n"}, "space": true, "attrs": {"x.m": "pb"}}]}`
+  {"match": "pg", "as": "inline", "value": {"attr": "n"}, "space": true, "attrs": {"x.m": "pb"}},
+  {"match": "dd", "as": "document", "media_type": "text/html", "anchor": {"attr": "id"}},
+  {"match": "dm", "as": "document", "media_type": "text/html", "when": "markup"},
+  {"match": "dx", "as": "document", "media_type": {"attr": "type", "map": {"html": "text/html", "xhtml": "application/xhtml+xml"}}},
+  {"match": "dx", "as": "block", "kind": "paragraph"}]}`
+
+// fuzzChild is a child extractor for the fuzz tests: a document of one
+// paragraph holding what it is given, or ErrUnsupported for an odd size.
+func fuzzChild(ctx context.Context, name, mime string, r io.ReaderAt, size int64, opts *gofastcore.Options) (*gofastcore.Document, error) {
+	if size%2 == 1 {
+		return nil, gofastcore.ErrUnsupported
+	}
+	b := make([]byte, size)
+	r.ReadAt(b, 0)
+	return oneParagraph(b), nil
+}
+
+// oneParagraph is the document of a fake child extractor: one paragraph
+// holding b, cleaned as an extractor cleans text (valid UTF-8, no control
+// characters, no white space at its ends); no block when that is empty.
+func oneParagraph(b []byte) *gofastcore.Document {
+	text := strings.TrimSpace(strings.Map(func(r rune) rune {
+		if r < 0x20 && r != '\t' && r != '\n' || r >= 0x7f && r <= 0x9f {
+			return -1
+		}
+		return r
+	}, strings.ToValidUTF8(string(b), "�")))
+	d := gofastcore.New("fake")
+	d.Parts = []gofastcore.Part{{Kind: gofastcore.PartBody, Number: 1, Blocks: []gofastcore.Block{}}}
+	if text != "" {
+		d.Parts[0].Blocks = []gofastcore.Block{{Kind: gofastcore.KindParagraph, Origin: gofastcore.OriginNative, Text: text}}
+	}
+	return d
+}
 
 // FuzzProfile runs the rule engine with a profile of every rule kind on
 // arbitrary input.
@@ -118,6 +152,9 @@ func FuzzProfile(f *testing.F) {
 		`<r><p>a<br/>b<sf>f<br/>n</sf>c<fg><cc c="1"/><lab>L</lab><p>in</p><tb><tr><td>x<sf>y</sf></td></tr></tb></fg>d<oo>o</oo>e</p>` +
 			`<p><lab>2</lab><tb><tr><td>t</td></tr></tb></p><l t="1"><lab>(a)</lab><ti href="h"><ti href="g"/></ti></l><t>T2<br/>x</t></r>`,
 		`<r><p><qs c="2018"/>q<qs c="D800"/>x<pg n="12"/>y</p><t><qs c="22"/>T<pg n="3"/></t><qs c="110000"/><pg n="4"/><td><qs c="A"/></td></r>`,
+		`<r><s id="s"><h>H</h><dd id="d">&lt;p&gt;one&lt;/p&gt;</dd><dm>plain</dm><dm><![CDATA[<b>b</b>]]></dm><dm>a &amp;amp; b</dm>` +
+			`<dx type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p>x<br/>y</p></div></dx><dx type="html">&lt;i&gt;</dx><dx type="text">&lt;t&gt;</dx>` +
+			`<p>in <dd>&lt;q&gt;</dd> p</p><dd><x a="1">t<!-- c --></x></dd></s></r>`,
 	} {
 		f.Add([]byte(s), true)
 	}
@@ -128,6 +165,9 @@ func FuzzProfile(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte, spans bool) {
 		x := &Extractor{Profiles: []*Profile{p}, Profile: "fuzz"}
 		opts := &gofastcore.Options{Spans: spans, Limits: gofastcore.Limits{MaxTextBytes: 1 << 20, MaxDecodedBytes: 1 << 16}}
+		if spans {
+			opts.Child = fuzzChild
+		}
 		doc, err := x.Extract(context.Background(), bytes.NewReader(data), int64(len(data)), opts)
 		if err != nil {
 			if !errors.Is(err, gofastcore.ErrMalformed) && !errors.Is(err, gofastcore.ErrUnsupported) {
