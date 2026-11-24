@@ -86,3 +86,26 @@ func TestCommand(t *testing.T) {
 		}
 	}
 }
+
+// A directory stands for the files with the names XML documents have, in
+// any case, and no others.
+func TestDirectoryNames(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"a.xml", "b.DITA", "c.ditamap", "d.docbook", "e.Tei", "f.txt", "g.html", "h.xml.bak", "xml"} {
+		os.WriteFile(filepath.Join(dir, name), []byte("<doc><p>"+name+"</p></doc>"), 0o644)
+	}
+	var out, errs bytes.Buffer
+	if code := run(context.Background(), []string{"-format", "text", dir}, &out, &errs); code != 0 {
+		t.Fatalf("exit %d: %s", code, errs.String())
+	}
+	var texts []string
+	for _, line := range strings.Split(out.String(), "\n") {
+		if line != "" && !strings.HasPrefix(line, "==>") {
+			texts = append(texts, line)
+		}
+	}
+	got := strings.Join(texts, " ")
+	if got != "a.xml b.DITA c.ditamap d.docbook e.Tei" {
+		t.Errorf("read %q", got)
+	}
+}

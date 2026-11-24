@@ -37,7 +37,7 @@ gofastxml [flags] file-or-directory...
   -max-input-bytes N  -max-decoded-bytes N  -max-text-bytes N
 ```
 
-A directory stands for the files in it and below it whose names end in `.xml` (in any case). A file named on the command line is read whatever its name. With one input the JSON is indented; with several, each document is one line. Documents go to standard output; warnings of severity error go to standard error; the exit status is 1 if any input could not be read, 2 for a usage error.
+A directory stands for the files in it and below it whose names end in `.xml`, `.dita`, `.ditamap`, `.docbook` or `.tei` (in any case), the names the `gofast` command takes for XML too. A file named on the command line is read whatever its name. With one input the JSON is indented; with several, each document is one line. Documents go to standard output; warnings of severity error go to standard error; the exit status is 1 if any input could not be read, 2 for a usage error.
 
 The render flags are the series' shared ones (`COMMAND_FLAGS.md`), defined by core's `AddRenderFlags`, and affect Markdown and text only; JSON always has everything. This library writes one stored kind, `markup_comment` (the file's comments), so `-stored=markup_comment` puts comments in the text.
 
