@@ -364,7 +364,10 @@ func TestProfileMetadataAndUnmapped(t *testing.T) {
 	}
 	got := strings.Join(codes, "\n")
 	if !strings.Contains(got, "xml.unmapped_elements: elements with no rule in the profile, read generically: 1 in all: Inconnu (1)") ||
-		!strings.Contains(got, "Publication@lost (1)") || !strings.Contains(got, "Inconnu@code (1)") {
+		!strings.Contains(got, "Publication@lost (1)") ||
+		// Inconnu has no rule: its attribute is in the output as a note,
+		// so it is not among the attributes left out.
+		strings.Contains(got, "Inconnu@code") {
 		t.Errorf("warnings:\n%s", got)
 	}
 }

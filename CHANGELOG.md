@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- **`xml.unmapped_attributes` no longer counts attributes that are in the
+  output.** An element a profile has no rule for is read generically, so
+  its attributes are notes; they were also counted in this warning, whose
+  meaning is "values not in the output". Now it counts only attributes of
+  mapped elements that no rule reads. The element is still named in
+  `xml.unmapped_elements`. No block or text changes; only this warning's
+  message and whether it is raised.
+- **`gofastxml` on a directory** also reads files named `.dita`,
+  `.ditamap`, `.docbook` and `.tei` (in any case), as the `gofast` command
+  does. It read `.xml` only.
+
 ## v0.1.0 (2026-11-24)
 
 First release. Requires go-fast-core v0.1.4. Standard library only.

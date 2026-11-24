@@ -787,7 +787,6 @@ func (e *Engine) attrNotes(el *xmlread.Element, dst []gofastcore.Block) []gofast
 		if text == "" {
 			continue
 		}
-		e.count(e.unmappedAttrs, el.Name+"@"+a.Name)
 		dst = append(dst, gofastcore.Block{Kind: gofastcore.KindNote, Origin: gofastcore.OriginInferred, Text: text,
 			Attrs: map[string]string{gofastcore.AttrNoteType: gofastcore.NoteAttribute,
 				generic.AttrAttribute: generic.CleanName(generic.CutString(a.Name, generic.MaxNameBytes), &e.scratch),
