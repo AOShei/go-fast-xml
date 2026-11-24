@@ -2166,6 +2166,15 @@ func (e *Engine) fill(o *frame, s *slot, v string) {
 	case useAnchor:
 		o.anchor = v
 		e.anchors = append(e.anchors, anchorAt{v, e.depthOf(o)})
+		if e.docs && o.partAt == e.out.Part {
+			// Blocks made inside the owner before its identifier came
+			// (an RSS item's title before its guid) are given it too.
+			for i := o.idxAt; i < len(o.partAt.Blocks); i++ {
+				if b := &o.partAt.Blocks[i]; b.Loc.Anchor == "" && b.Attrs[AttrAnchorParent] == "" && b.Attrs[gofastcore.AttrStored] == "" {
+					e.patch(blockRef{o.partAt, i}, AttrAnchorParent, v)
+				}
+			}
+		}
 	}
 }
 
@@ -2475,6 +2484,18 @@ func (e *Engine) metadata(f *frame, v string, end int64) {
 
 func parseDate(s string) (time.Time, bool) {
 	for _, layout := range []string{time.RFC3339Nano, "2006-01-02T15:04:05", "2006-01-02"} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t, true
+		}
+	}
+	// RFC 822 (RSS), with a numeric offset or GMT, UT or Z: a zone
+	// abbreviation other than these does not say its offset.
+	for _, z := range []string{" GMT", " UT", " Z"} {
+		if strings.HasSuffix(s, z) {
+			s = s[:len(s)-len(z)] + " +0000"
+		}
+	}
+	for _, layout := range []string{"Mon, 2 Jan 2006 15:04:05 -0700", "2 Jan 2006 15:04:05 -0700", "Mon, 2 Jan 2006 15:04 -0700"} {
 		if t, err := time.Parse(layout, s); err == nil {
 			return t, true
 		}

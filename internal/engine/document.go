@@ -33,6 +33,7 @@ type ChildLoc struct {
 	Offset, Length int64
 	Anchor         string
 	Element        string
+	name           string // the name the child was given
 }
 
 // docCap is the element of a "document" rule being read: its content is
@@ -313,7 +314,8 @@ func (e *Engine) endDocument(f *frame, cstart, end int64) blockRef {
 			break
 		}
 	}
-	child, ok := e.opts.Child(e.childName(f, loc.Anchor), d.media+"; charset=utf-8", data)
+	loc.name = e.childName(f, loc.Anchor)
+	child, ok := e.opts.Child(loc.name, d.media+"; charset=utf-8", data)
 	idx := len(e.Children)
 	e.Children = append(e.Children, child)
 	e.ChildLocs = append(e.ChildLocs, loc)
@@ -379,6 +381,23 @@ func (e *Engine) noteBlock(ref blockRef, heading bool) {
 func (e *Engine) endSection(f *frame) {
 	if len(f.kids) == 0 {
 		return
+	}
+	if a := f.anchor; a != "" {
+		// An identifier that came after the child (an RSS guid after the
+		// description) is its parent anchor too, and is in its name.
+		for _, k := range f.kids {
+			l := &e.ChildLocs[k]
+			if l.Anchor != "" {
+				continue
+			}
+			l.Anchor = a
+			if c := e.Children[k]; c.Source.Name == l.name {
+				if len(a) > MaxChildNameBytes {
+					a = a[:cutAt([]byte(a), MaxChildNameBytes)]
+				}
+				c.Source.Name = e.clean(l.name + "#" + a)
+			}
+		}
 	}
 	ref := f.secHead
 	if !ref.ok() {

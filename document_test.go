@@ -31,10 +31,7 @@ func fakeChild(got *[]handed, err error) gofastcore.ChildFunc {
 		if err != nil {
 			return nil, err
 		}
-		d := gofastcore.New("fake")
-		d.Parts = []gofastcore.Part{{Kind: gofastcore.PartBody, Number: 1,
-			Blocks: []gofastcore.Block{{Kind: gofastcore.KindParagraph, Origin: gofastcore.OriginNative, Text: string(b)}}}}
-		return d, nil
+		return oneParagraph(b), nil
 	}
 }
 

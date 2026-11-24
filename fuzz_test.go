@@ -117,18 +117,25 @@ func fuzzChild(ctx context.Context, name, mime string, r io.ReaderAt, size int64
 	}
 	b := make([]byte, size)
 	r.ReadAt(b, 0)
+	return oneParagraph(b), nil
+}
+
+// oneParagraph is the document of a fake child extractor: one paragraph
+// holding b, cleaned as an extractor cleans text (valid UTF-8, no control
+// characters, no white space at its ends); no block when that is empty.
+func oneParagraph(b []byte) *gofastcore.Document {
+	text := strings.TrimSpace(strings.Map(func(r rune) rune {
+		if r < 0x20 && r != '\t' && r != '\n' || r >= 0x7f && r <= 0x9f {
+			return -1
+		}
+		return r
+	}, strings.ToValidUTF8(string(b), "�")))
 	d := gofastcore.New("fake")
-	d.Parts = []gofastcore.Part{{Kind: gofastcore.PartBody, Number: 1,
-		Blocks: []gofastcore.Block{{Kind: gofastcore.KindParagraph, Origin: gofastcore.OriginNative, Text: strings.Map(func(r rune) rune {
-			if r < 0x20 && r != '\t' && r != '\n' || r >= 0x7f && r <= 0x9f {
-				return -1 // a child extractor removes controls
-			}
-			return r
-		}, strings.ToValidUTF8(string(b), "�"))}}}}
-	if strings.TrimSpace(d.Parts[0].Blocks[0].Text) == "" {
-		d.Parts[0].Blocks = nil
+	d.Parts = []gofastcore.Part{{Kind: gofastcore.PartBody, Number: 1}}
+	if text != "" {
+		d.Parts[0].Blocks = []gofastcore.Block{{Kind: gofastcore.KindParagraph, Origin: gofastcore.OriginNative, Text: text}}
 	}
-	return d, nil
+	return d
 }
 
 // FuzzProfile runs the rule engine with a profile of every rule kind on
