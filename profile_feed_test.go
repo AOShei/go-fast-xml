@@ -46,16 +46,45 @@ func feedRead(path string, child bool) (*gofastcore.Document, []byte, error) {
 var feedSkip = map[string]string{
 	"channel/link": "", "channel/language": "", "channel/lastBuildDate": "", "channel/pubDate": "", "channel/generator": "",
 	"channel/copyright": "", "channel/managingEditor": "", "channel/webMaster": "", "channel/docs": "", "channel/ttl": "",
-	"channel/category": "", "channel/creator": "", "channel/date": "", "channel/rights": "", "channel/publisher": "",
-	"channel/subject": "", "channel/source": "", "channel/updatePeriod": "", "channel/updateFrequency": "", "channel/updateBase": "",
-	"channel/author": "", "channel/keywords": "", "channel/explicit": "", "channel/type": "", "channel/new-feed-url": "",
-	"owner/name": "", "owner/email": "", "channel/email": "",
+	"channel/category": "", "channel/dc:creator": "", "channel/dc:date": "", "channel/dc:rights": "", "channel/dc:publisher": "",
+	"channel/dc:subject": "", "channel/dc:source": "", "channel/dc:language": "",
+	"channel/sy:updatePeriod": "", "channel/sy:updateFrequency": "", "channel/sy:updateBase": "",
+	"channel/itunes:author": "", "channel/googleplay:author": "", "channel/itunes:keywords": "", "channel/itunes:explicit": "",
+	"channel/itunes:type": "", "channel/itunes:new-feed-url": "",
+	"itunes:owner/itunes:name": "", "itunes:owner/itunes:email": "", "channel/googleplay:email": "",
 	"image/url": "", "image/link": "", "image/width": "", "image/height": "", "image/description": "", "image/title": "",
-	"item/guid": "", "item/link": "", "item/pubDate": "", "item/date": "", "item/duration": "",
-	"item/episode": "", "item/episodeType": "", "item/explicit": "", "item/point": "", "Point/lat": "", "Point/long": "",
+	"item/guid": "", "item/link": "", "item/pubDate": "", "item/dc:date": "", "item/itunes:duration": "",
+	"item/itunes:episode": "", "item/itunes:episodeType": "", "item/itunes:explicit": "", "item/georss:point": "",
+	"geo:Point/geo:lat": "", "geo:Point/geo:long": "",
 	"feed/id": "", "feed/updated": "", "feed/rights": "", "feed/generator": "", "feed/icon": "", "feed/logo": "",
 	"feed/author": "", "entry/id": "", "entry/published": "", "entry/updated": "",
 	"author/uri": "", "author/email": "",
+}
+
+// feedPrefixes are the prefixes of the oracle's paths: RSS 1.0 and Atom
+// elements, like RSS 2.0's, have none.
+var feedPrefixes = map[string]string{
+	"": "", "http://purl.org/rss/1.0/": "", "http://www.w3.org/2005/Atom": "",
+	"http://www.w3.org/1999/02/22-rdf-syntax-ns#": "rdf:",
+	"http://purl.org/dc/elements/1.1/":            "dc:", "http://purl.org/rss/1.0/modules/syndication/": "sy:",
+	"http://www.itunes.com/dtds/podcast-1.0.dtd":      "itunes:",
+	"http://www.google.com/schemas/play-podcasts/1.0": "googleplay:",
+	"http://www.georss.org/georss":                    "georss:",
+	"http://www.w3.org/2003/01/geo/wgs84_pos#":        "geo:",
+}
+
+// feedName is an element's name in feedSkip's paths: its local name with
+// the prefix of its namespace, "?:" for a namespace not listed.
+func feedName(n xml.Name) string {
+	uri := n.Space
+	if strings.HasPrefix(uri, "https://") {
+		uri = "http://" + uri[len("https://"):]
+	}
+	p, ok := feedPrefixes[uri]
+	if !ok {
+		p = "?:"
+	}
+	return p + n.Local
 }
 
 // feedText is the body's text in order, white space removed, with the
@@ -109,17 +138,28 @@ func safeCite(data []byte, doc *gofastcore.Document) (bad string) {
 	}()
 	// A document rule's text kept in the body (media_type) is the
 	// element's character data with its markup as text, which the
-	// oracle's stripper would remove: it is checked to start where its
-	// element does instead.
+	// oracle's stripper would remove: it is checked in full against the
+	// source at its offsets unescaped, tags kept (for XHTML, whose markup
+	// is not kept, stripped), and then left out of jatsCiteCheck.
 	c := *doc
 	c.Parts = make([]gofastcore.Part, len(doc.Parts))
 	for i, p := range doc.Parts {
 		p.Blocks = append([]gofastcore.Block(nil), p.Blocks...)
 		for j := range p.Blocks {
 			b := &p.Blocks[j]
-			if b.Attrs[AttrMediaType] != "" {
-				if b.Loc.Offset < 0 || b.Loc.Offset >= int64(len(data)) || data[b.Loc.Offset] != '<' {
-					return fmt.Sprintf("block %d (media_type) does not start at its element", j)
+			if mt := b.Attrs[AttrMediaType]; mt != "" && b.Kind == gofastcore.KindParagraph {
+				l := b.Loc
+				if l.Offset < 0 || l.Length <= 0 || l.Offset+l.Length > int64(len(data)) || data[l.Offset] != '<' {
+					return fmt.Sprintf("block %d (media_type) is not at its element", j)
+				}
+				span := string(data[l.Offset : l.Offset+l.Length])
+				if mt == "application/xhtml+xml" {
+					span = stripMarkup(span)
+				} else {
+					span = unescapeMarkup(span)
+				}
+				if !strings.Contains(noSpace(span), noSpace(b.Text)) {
+					return fmt.Sprintf("block %d (media_type) text %q not in its span %q", j, around(b.Text, 0), around(span, 0))
 				}
 				b.Attrs = map[string]string{AttrAttribute: "checked"}
 			}
@@ -146,6 +186,14 @@ func charData(s []byte) string {
 	}
 }
 
+// feedNotWellFormed are the dev files encoding/xml, the oracle's reader,
+// stops in, with what its error says: oracle (a) compares the text up to
+// there.
+var feedNotWellFormed = map[string]string{
+	// The file is cut off in the middle of an item's description.
+	"feeds-danluu.xml": "unexpected EOF",
+}
+
 // TestFeedOracles checks over every dev feed, without a child extractor
 // and with the fake one: (a) the body's text in order, with the text
 // handed to children at their place, is the file's character data in
@@ -157,20 +205,13 @@ func TestFeedOracles(t *testing.T) {
 	if dir == "" {
 		t.Skip("no dev corpus")
 	}
-	c := &jatsOracleCase{profile: "feed", format: "xml-feeds", skip: feedSkip}
+	c := &jatsOracleCase{profile: "feed", format: "xml-feeds", skip: feedSkip, name: feedName}
 	used := map[string]bool{}
-	// The known differences of (a) and (b) are counted and the first ones
-	// shown (see the report); a child whose element is not at its parent
-	// offsets fails the test.
-	fails, notWellFormed, aDiff, bDiff, files := 0, 0, 0, 0, 0
-	show := func(format string, args ...any) {
-		if fails < 6 {
-			t.Logf(format, args...)
-		}
-		fails++
-	}
+	met := map[string]bool{}
+	files := 0
 	for _, path := range jatsCorpusFiles(dir) {
 		files++
+		name := filepath.Base(path)
 		for _, child := range []bool{false, true} {
 			doc, data, err := feedRead(path, child)
 			if err != nil {
@@ -179,24 +220,31 @@ func TestFeedOracles(t *testing.T) {
 			got := feedText(doc)
 			src, err := c.sourceText(data, used)
 			if err != nil {
-				// Not well-formed for encoding/xml: the text it read is a
-				// prefix of the document's, white space aside.
-				notWellFormed++
-				if !strings.HasPrefix(got, src[:len(src)*9/10]) {
-					aDiff++
-					show("%s (child %v): (a) the text read before the error is not the document's", filepath.Base(path), child)
+				// Not well-formed for encoding/xml (the listed exceptions):
+				// the text it read up to its error is the start of the
+				// document's, white space aside.
+				if why, ok := feedNotWellFormed[name]; !ok {
+					t.Errorf("%s: encoding/xml stops: %v", name, err)
+				} else if !strings.Contains(err.Error(), why) {
+					t.Errorf("%s: encoding/xml stops with %q, not %q", name, err, why)
+				}
+				met[name] = true
+				if !strings.HasPrefix(got, src) {
+					i := 0
+					for i < len(got) && i < len(src) && got[i] == src[i] {
+						i++
+					}
+					t.Errorf("%s (child %v): (a) the text read before the error is not the document's start, at byte %d:\n doc:  %q\n file: %q", name, child, i, around(got, i), around(src, i))
 				}
 			} else if got != src && !(jatsEntityRE.MatchString(src) && jatsInOrder(got, jatsEntityRE.Split(src, -1))) {
-				aDiff++
 				i := 0
 				for i < len(got) && i < len(src) && got[i] == src[i] {
 					i++
 				}
-				show("%s (child %v): (a) text differs at byte %d:\n doc:  %q\n file: %q", filepath.Base(path), child, i, around(got, i), around(src, i))
+				t.Errorf("%s (child %v): (a) text differs at byte %d:\n doc:  %q\n file: %q", name, child, i, around(got, i), around(src, i))
 			}
 			if bad := safeCite(data, doc); bad != "" {
-				bDiff++
-				show("%s (child %v): (b) %s", filepath.Base(path), child, around(bad, 0))
+				t.Errorf("%s (child %v): (b) %s", name, child, around(bad, 0))
 			}
 			for i, k := range doc.Children {
 				off, _ := strconv.ParseInt(k.Metadata.Extra[ExtraParentOffset], 10, 64)
@@ -210,13 +258,17 @@ func TestFeedOracles(t *testing.T) {
 			}
 		}
 	}
-	t.Logf("%d files, two modes each: (a) differs in %d readings, (b) in %d", files, aDiff, bDiff)
+	t.Logf("%d files, two modes each", files)
 	for k := range feedSkip {
 		if !used[k] {
 			t.Errorf("exception %q is met nowhere in the dev set", k)
 		}
 	}
-	t.Logf("files read leniently past an error of encoding/xml: %d (both modes)", notWellFormed)
+	for k := range feedNotWellFormed {
+		if !met[k] {
+			t.Errorf("exception %s: encoding/xml reads it whole", k)
+		}
+	}
 }
 
 // TestFeedCorpus reads every feed of dev and held-out with the fake child

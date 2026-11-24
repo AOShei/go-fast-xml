@@ -29,6 +29,24 @@ func feedString(t *testing.T, src string, got *[]handed) *gofastcore.Document {
 	return doc
 }
 
+// TestStripMarkupCDATA: the oracle's stripper keeps a CDATA section's
+// content as text and an ampersand that starts no reference as itself.
+func TestStripMarkupCDATA(t *testing.T) {
+	for in, want := range map[string]string{
+		`<t><![CDATA[<b>I</b>t & co]]> &amp; x</t>`: `<b>I</b>t & co & x`,
+		`a & b; <x>c</x> &#65;&lt;`:                 `a & b; c A<`,
+		`<![CDATA[cut <i>`:                          `cut <i>`,
+		`end & `:                                    `end & `,
+	} {
+		if got := stripMarkup(in); got != want {
+			t.Errorf("stripMarkup(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if got := unescapeMarkup(`<d>&lt;p&gt;x<!--c--><![CDATA[<b>y</b>]]></d>`); got != `<d><p>x<b>y</b></d>` {
+		t.Errorf("unescapeMarkup: %q", got)
+	}
+}
+
 // TestFeedItemWithNoBlock: what an item reads for its first block or its
 // anchor comes out when the item makes no block.
 func TestFeedItemWithNoBlock(t *testing.T) {
