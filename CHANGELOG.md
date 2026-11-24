@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.2.0 (2026-11-24)
 
 - **`xml.unmapped_attributes` no longer counts attributes that are in the
   output.** An element a profile has no rule for is read generically, so
