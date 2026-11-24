@@ -16,6 +16,7 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/AOShei/go-fast-core"
@@ -101,6 +102,34 @@ const (
 	ExtraDoctypeSystem             = "doctype_system"
 	ExtraEncoding                  = "encoding"
 )
+
+// Embedded documents: the content of an element a profile's "document"
+// rule names (an RSS description holding HTML) is handed to
+// gofastcore.Options.ExtractChild and the result appended to
+// Document.Children, in file order.
+const (
+	// AttrChildren, on the heading of the section the element stands in
+	// (else its first block), is the indexes in Document.Children of the
+	// documents that came from that section, comma separated.
+	AttrChildren = engine.AttrChildren
+	// AttrMediaType is the media type of a document rule's content kept
+	// in the body as a paragraph, when the child was not extracted.
+	AttrMediaType = engine.AttrMediaType
+	// Keys of each child's Metadata.Extra: the bytes of the element in
+	// the file (start tag to end tag, as a block's Loc), the anchor of
+	// the nearest enclosing identified element, and the element's path.
+	ExtraParentOffset  = "xml.parent_offset"
+	ExtraParentLength  = "xml.parent_length"
+	ExtraParentAnchor  = "xml.parent_anchor"
+	ExtraParentElement = "xml.parent_element"
+	// MaxChildren bounds the documents handed over from one document;
+	// past it the content stays in the body as a paragraph, with
+	// limit.exceeded.
+	MaxChildren = 10000
+)
+
+// maxChildren is MaxChildren; tests lower it.
+var maxChildren = MaxChildren
 
 // Attributes says what becomes of attributes.
 type Attributes uint8
@@ -299,6 +328,36 @@ func (e *Extractor) extract(ctx context.Context, r io.ReaderAt, size int64, opts
 	g := generic.New(out, generic.Options{NoAttributes: e.Attributes == AttributesNone})
 	d := &dispatch{x: e, out: out, g: g, h: g, forced: forced, none: none,
 		opts: engineOptions(&o)}
+	maxParts := gofastcore.ResolveLimit(int64(o.Limits.MaxParts), engine.MaxParts)
+	var expTaken int64 // entity expansion taken from the decode budget
+	childCut := 0      // children not read: the decode budget was spent
+	d.opts.MaxChildren = maxChildren
+	d.opts.PartWanted = func(n int) bool { return o.Parts.Contains(n) && int64(n) <= maxParts }
+	d.opts.Child = func(name, mt string, data []byte) (*gofastcore.Document, bool) {
+		// The decode budget says what is left before the child reads.
+		exp := rd.Scanner().Stats.Expanded
+		decode.Take(exp - expTaken)
+		expTaken = exp
+		var c *gofastcore.Document
+		if decode.Take(int64(len(data))) {
+			c = o.ExtractChild(ctx, name, mt, bytes.NewReader(data), int64(len(data)))
+		} else {
+			childCut++
+			c = o.ExtractChild(ctx, name, mt, nil, int64(len(data)))
+		}
+		return c, childExtracted(c)
+	}
+	if enc.UTF8 {
+		d.opts.Raw = func(start, end int64) []byte {
+			b := make([]byte, end-start)
+			if mem != nil && end <= int64(len(mem)) {
+				copy(b, mem[start:end])
+				return b
+			}
+			n, _ := r.ReadAt(b, start)
+			return b[:n]
+		}
+	}
 
 	runErr := rd.Run(d)
 	if err := ctx.Err(); err != nil {
@@ -306,7 +365,7 @@ func (e *Extractor) extract(ctx context.Context, r io.ReaderAt, size int64, opts
 	}
 	d.Finish(rd.Offset())
 	stats := rd.Scanner().Stats
-	decode.Take(stats.Expanded)
+	decode.Take(stats.Expanded - expTaken)
 	rep := &rd.Report
 	if rep.Elements == 0 {
 		if errors.Is(runErr, xmlscan.ErrTokenTooLarge) {
@@ -335,9 +394,13 @@ func (e *Extractor) extract(ctx context.Context, r io.ReaderAt, size int64, opts
 	if last.Kind == gofastcore.PartStored {
 		last = parts[len(parts)-2]
 	}
+	var locs []engine.ChildLoc
+	if d.eng != nil {
+		locs = d.eng.ChildLocs
+	}
 	if !enc.UTF8 {
 		var err error
-		if at, err = sourceOffsets(parts, dec, r, enc.Skip, at); err != nil {
+		if at, err = sourceOffsets(parts, locs, dec, r, enc.Skip, at); err != nil {
 			last.Warn(gofastcore.SeverityError, gofastcore.WarnPartFailed,
 				fmt.Sprintf("reading the input again to map locations to it failed (%v); locations are offsets in the text decoded to UTF-8", err))
 		}
@@ -345,9 +408,13 @@ func (e *Extractor) extract(ctx context.Context, r io.ReaderAt, size int64, opts
 	if d.eng != nil {
 		d.eng.PartWarnings(last)
 		engineWarnings(last, d.eng)
+		children(doc, d.eng)
+		if childCut > 0 {
+			last.Warn(gofastcore.SeverityError, gofastcore.WarnLimitExceeded,
+				fmt.Sprintf("the decode budget (Limits.MaxDecodedBytes) was spent; %s not handed to the child extractor and kept in the body", plural(childCut, "embedded document was", "embedded documents were")))
+		}
 	}
 	partWarnings(last, d, out, rep, dec, stats, runErr, at, size)
-	maxParts := gofastcore.ResolveLimit(int64(o.Limits.MaxParts), engine.MaxParts)
 	for _, p := range parts {
 		if p.Kind == gofastcore.PartStored && o.Parts != (gofastcore.PartRange{}) {
 			continue
@@ -411,6 +478,12 @@ func engineWarnings(part *gofastcore.Part, e *engine.Engine) {
 	if e.SpansCut > 0 {
 		limit(fmt.Sprintf("%s past 100000 in one block left out", plural(e.SpansCut, "span", "spans")))
 	}
+	if e.DocsCut > 0 {
+		limit(fmt.Sprintf("%s of embedded documents longer than %d bytes cut", plural(e.DocsCut, "content", "contents"), MaxBlockBytes))
+	}
+	if e.ChildrenCut > 0 {
+		limit(fmt.Sprintf("%s past %d not handed to the child extractor; their text is in the body", plural(e.ChildrenCut, "embedded document", "embedded documents"), maxChildren))
+	}
 	if e.PartsCut > 0 {
 		limit(fmt.Sprintf("%s past %d not started; their content is in the last part", plural(e.PartsCut, "part", "parts"), engine.MaxParts))
 	}
@@ -420,12 +493,15 @@ func engineWarnings(part *gofastcore.Part, e *engine.Engine) {
 // in the decoded text into offsets in the file, for input not read as
 // UTF-8. The offsets are mapped in increasing order, in one pass over the
 // part of the input they reach.
-func sourceOffsets(parts []*gofastcore.Part, dec *xmlenc.Reader, r io.ReaderAt, skip int, at int64) (int64, error) {
+func sourceOffsets(parts []*gofastcore.Part, locs []engine.ChildLoc, dec *xmlenc.Reader, r io.ReaderAt, skip int, at int64) (int64, error) {
 	var offs []int64
 	for _, part := range parts {
 		for _, b := range part.Blocks {
 			offs = append(offs, b.Loc.Offset, b.Loc.Offset+b.Loc.Length)
 		}
+	}
+	for _, l := range locs {
+		offs = append(offs, l.Offset, l.Offset+l.Length)
 	}
 	offs = append(offs, at)
 	slices.Sort(offs)
@@ -445,7 +521,44 @@ func sourceOffsets(parts []*gofastcore.Part, dec *xmlenc.Reader, r io.ReaderAt, 
 			l.Offset, l.Length = start, end-start
 		}
 	}
+	for i := range locs {
+		l := &locs[i]
+		start, end := get(l.Offset), get(l.Offset+l.Length)
+		l.Offset, l.Length = start, end-start
+	}
 	return get(at), nil
+}
+
+// childExtracted reports whether ExtractChild extracted the document, or
+// returned the stub of one it did not.
+func childExtracted(c *gofastcore.Document) bool {
+	for _, w := range c.Warnings {
+		switch w.Code {
+		case gofastcore.WarnChildNotExtracted, gofastcore.WarnChildUnsupported,
+			gofastcore.WarnChildEncrypted, gofastcore.WarnChildFailed:
+			return false
+		}
+	}
+	return true
+}
+
+// children appends the documents the engine handed over, each with where
+// it came from in its Metadata.Extra.
+func children(doc *gofastcore.Document, eng *engine.Engine) {
+	for i, c := range eng.Children {
+		l := eng.ChildLocs[i]
+		if c.Metadata.Extra == nil {
+			c.Metadata.Extra = map[string]string{}
+		}
+		c.Metadata.Extra[ExtraParentOffset] = strconv.FormatInt(l.Offset, 10)
+		c.Metadata.Extra[ExtraParentLength] = strconv.FormatInt(l.Length, 10)
+		c.Metadata.Extra[ExtraParentElement] = l.Element
+		if l.Anchor != "" {
+			c.Metadata.Extra[ExtraParentAnchor] = l.Anchor
+		}
+		doc.Children = append(doc.Children, c)
+	}
+	eng.Children, eng.ChildLocs = nil, nil
 }
 
 // tagBytes is MaxTagBytes; tests lower it.

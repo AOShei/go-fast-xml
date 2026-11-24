@@ -11,6 +11,7 @@ import (
 
 	"github.com/AOShei/go-fast-xml/internal/engine"
 	"github.com/AOShei/go-fast-xml/internal/generic"
+	"github.com/AOShei/go-fast-xml/internal/xmlscan"
 	"github.com/AOShei/go-fast-xml/internal/profile"
 	"github.com/AOShei/go-fast-xml/internal/xmlread"
 )
@@ -133,6 +134,16 @@ func (p rootPath) Name(int) profile.QName {
 	return profile.QName{URI: p.el.URI, Local: p.el.Local}
 }
 func (p rootPath) Attr(_ int, q profile.QName) (string, bool) { return p.el.Attr(q.URI, q.Local) }
+
+// Declares reports whether the root declares the namespace uri.
+func (p rootPath) Declares(uri string) bool {
+	for _, a := range p.el.Attrs {
+		if a.URI == xmlscan.XMLNSNamespace && a.Value == uri {
+			return true
+		}
+	}
+	return false
+}
 
 // dispatch hands the events to the generic reader until the root element
 // comes, then to the profile that matches it, if any.
