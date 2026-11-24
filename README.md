@@ -10,7 +10,7 @@ if err != nil { ... }
 fmt.Println(doc.Text())
 ```
 
-A document whose schema has a **profile** is read with it: the profile maps the schema's elements onto headings, paragraphs, lists, tables, links, notes and metadata (see [Profiles](#profiles)). Twelve profiles are built in: Akoma Ntoso, HL7 CDA, CLML (legislation.gov.uk), DITA, DocBook, Formex (EUR-Lex), JATS, Légifrance, patents (USPTO and EPO), S1000D, Service-Public.fr and TEI. A profile is a JSON file, so other schemas can be given one without code, and `-draft-profile` drafts one from an XSD. Any other XML document is read generically: its text in document order, as inferred paragraphs, with its attributes and comments as notes.
+A document whose schema has a **profile** is read with it: the profile maps the schema's elements onto headings, paragraphs, lists, tables, links, notes and metadata (see [Profiles](#profiles)). Thirteen profiles are built in: Akoma Ntoso, HL7 CDA, CLML (legislation.gov.uk), DITA, DocBook, web feeds (RSS and Atom), Formex (EUR-Lex), JATS, Légifrance, patents (USPTO and EPO), S1000D, Service-Public.fr and TEI. A profile can hand an element's content to a child extractor as an embedded document (escaped HTML in a feed; see [Embedded documents](#embedded-documents)). A profile is a JSON file, so other schemas can be given one without code, and `-draft-profile` drafts one from an XSD. Any other XML document is read generically: its text in document order, as inferred paragraphs, with its attributes and comments as notes.
 
 The document is read as a stream, never as a tree: besides the document it returns, memory is bounded by the fixed bounds below (one tag, one block, the blocks waiting for an undecided element, the namespace declarations in scope), not by the file. For input not read as UTF-8, the map back to the file's bytes adds 16 bytes per 32 KiB of input. A generated 200 MiB document of small elements is read with a peak heap of about 1 MiB (`TestLargeStream`).
 
@@ -23,6 +23,18 @@ The document is read as a stream, never as a tree: besides the document it retur
 - `LoadProfile(io.Reader) (*Profile, error)` reads and validates a profile; `BuiltinProfiles()` lists the built-in ones in the order they are tried, `BuiltinProfile(name)` returns one. A `Profile` (`Name()`, `Title()`) is immutable and safe for concurrent `Extract` calls.
 - `Extractor.Charset`: the encoding of the input given from outside the file (see [Encodings](#encodings)).
 - `DraftProfile(ctx, path) (*Draft, error)` drafts a profile from an XSD (see [Drafting a profile](#drafting-a-profile-from-an-xsd)).
+- Embedded documents: `AttrChildren` (`children`), `AttrMediaType` (`media_type`), and the keys of each child's `Metadata.Extra` `ExtraParentOffset` (`xml.parent_offset`), `ExtraParentLength` (`xml.parent_length`), `ExtraParentAnchor` (`xml.parent_anchor`), `ExtraParentElement` (`xml.parent_element`); `MaxChildren` (10,000). See [Embedded documents](#embedded-documents).
+
+## Embedded documents
+
+A profile's `document` rule (PROFILE_FORMAT.md section 3) says that an element's content is a document of its own: an RSS `description` holding escaped HTML, an Atom `content type="xhtml"`. The content is handed to `Options.ExtractChild` with the context of the reading, so the child shares the text and decode budgets and the cancellation, and the result is appended to `Document.Children`, in file order. Each text is handed over and dropped at once.
+
+- **What is handed over.** `text/html; charset=utf-8`: the element's character data, unescaped (entities and CDATA resolved), as UTF-8. `application/xhtml+xml; charset=utf-8`: the markup between the start and end tag, the file's bytes when the file is UTF-8, else written back from the decoded text; namespace declarations made outside the element are not added. The bytes count against `Limits.MaxDecodedBytes` before the child reads; at most `MaxBlockBytes` (1 MiB) of one element is handed over, a longer content cut there with `limit.exceeded`.
+- **The two links.** The heading of the section the element stands in (an item's title; else the section's first block) carries `Attrs["children"]`: the indexes in `Document.Children` of every document from that section, comma separated. Each child carries `xml.parent_offset` and `xml.parent_length` (the element's bytes in the file, start tag to end tag, as a block's `Loc`), `xml.parent_anchor` (the item's anchor, when it has one) and `xml.parent_element` (the element's path) in `Metadata.Extra`, and its `Source.Name` is short: `item/description#<guid>`. A section that ends with no block at all (an item whose only content was handed over) has no `children` attribute: then the child's own keys are the link.
+- **Citing text of a child.** A block of a child is cited by the child's own `Loc` (offsets in the text handed over) within the element at `xml.parent_offset` of the feed file, and by `xml.parent_anchor`.
+- **Without a child extractor** (no `Options.Child`, the depth limit, or the child extractor refused or failed), the child is still listed (the stub `ExtractChild` returns, with its `child.*` warning and the keys above), and the text is also kept in the body as a paragraph with `Attrs["media_type"]`: the markup as text for HTML, the text content for XHTML. No text is lost when go-fast-xml is used alone. When the child was extracted, the body has no block for the element: no text is in the output twice.
+- Past `MaxChildren` (10,000) documents, the text stays in the body as that paragraph, with `limit.exceeded` once saying how many were not handed over. `Options.Parts` leaving a part out leaves its children out.
+- **The command** reads `text/html` and `application/xhtml+xml` children with go-fast-html (its `Options.Child`); every other type is refused with `ErrUnsupported`. This is why the module's `go.mod` requires go-fast-html; the library package imports only go-fast-core and the standard library. `-children=false` leaves children out of Markdown and text; JSON always has them.
 
 ## Command
 
@@ -86,6 +98,10 @@ Selected by the DITA topic and map roots with a DITA DOCTYPE public identifier o
 #### DocBook (`docbook`)
 
 Selected by DocBook 5 roots in `http://docbook.org/ns/docbook`, and DocBook 4 roots with no namespace and a DocBook DOCTYPE public identifier (or, with none, a few roots no other schema uses). Maps books, chapters and sections, `para`, lists, CALS and HTML tables, admonitions, figures and examples, `programlisting` as code, footnotes (split from their paragraph), glossaries, `refentry`, and `info` metadata. An `imageobject`'s `condition` is recorded in `Attrs["db.condition"]`, never evaluated. Keys: `db.*`. Cite: `Loc.Anchor` from `xml:id` (or `id` in DocBook 4). Tested: DocBook 5.0 to 5.2 and 4.1.2 to 4.5; not tested: SGML DocBook, `assembly`. `profiles/docbook.json` is generated by a test (`go test -run TestDocbookGenerated -docbook.update`). [profiles/docbook.md](profiles/docbook.md)
+
+#### Web feeds (`feed`)
+
+Selected by the root `rss` (no namespace; RSS 0.91 to 2.0), `feed` in `http://www.w3.org/2005/Atom`, and `RDF` in the RDF namespace when it declares `http://purl.org/rss/1.0/` (RSS 1.0; any other RDF file is read generically). The channel or feed title is `Metadata.Title` and a level-1 heading; each `item` or `entry` is a section with its title as a level-2 heading. Escaped HTML is handed to the child extractor: RSS `description`, `content:encoded`, `itunes:summary` and `media:description` when they hold markup (else they are paragraphs), Atom `content`, `summary`, `subtitle` and `rights` by their `type` (`html`, `xhtml`; `text` or none is a paragraph as written). Links, dates, the guid and podcast data are attributes of the item's heading (`feed.link`, `feed.published`, `feed.itunes_duration`, ...) or paragraphs and notes marked `feed.field`; enclosures, Atom links and Media RSS content are attribute notes keeping every attribute. Keys: `feed.*`. Cite: the item's anchor is its `guid`, Atom `id` or `rdf:about`, on every block as `anchor_parent`. Tested: the 76 dev feeds (RSS 2.0, RSS 1.0, Atom, podcasts). [profiles/feed.md](profiles/feed.md)
 
 #### Formex (`formex`)
 
@@ -289,6 +305,9 @@ Fixed bounds of this library; those named are exported constants. Each cut is `l
 | table columns (profiles) | 1,024 | cells past it are left out |
 | rows one cell spans (profiles) | 65,535 | the span is cut |
 | spans in one block (profiles) | 100,000 | later spans are left out (the text stays) |
+| `MaxChildren` (profiles) | 10,000 documents | the content of later `document` elements is not handed over and stays in the body as a paragraph with `Attrs["media_type"]` |
+| one embedded document (profiles) | `MaxBlockBytes`, 1 MiB | the content handed over, and its fallback paragraph, are cut there |
+| (decode budget, profiles) | `Limits.MaxDecodedBytes` | the bytes handed to children are taken from it before each child reads; once it is spent, a child is listed but not read, and its text stays in the body |
 | a cell, label or value read from a child (profiles) | 1 MiB (`MaxBlockBytes`) | the text is cut there |
 | parts started by `part` rules | 100,000, and `Limits.MaxParts` | the content stays in the last part; parts past `Limits.MaxParts` are left out |
 

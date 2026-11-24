@@ -12,6 +12,25 @@
 - **`gofastxml` on a directory** also reads files named `.dita`,
   `.ditamap`, `.docbook` and `.tei` (in any case), as the `gofast` command
   does. It read `.xml` only.
+- **Web feeds: a thirteenth built-in profile, `feed`**, for RSS 0.91 to
+  2.0, RSS 1.0 and Atom 1.0 with their common extensions (Dublin Core,
+  `content:`, iTunes, Podcasting 2.0, Media RSS, GeoRSS, Slash,
+  syndication). Feeds were read generically. See `profiles/feed.md`.
+- **Embedded documents.** A new rule kind, `"as": "document"`, with
+  `media_type` and `when`, hands an element's content to
+  `Options.ExtractChild` and appends the result to `Document.Children`
+  (escaped HTML in a feed was literal markup in a paragraph). The section's
+  heading carries `Attrs["children"]`; each child carries
+  `xml.parent_offset`, `xml.parent_length`, `xml.parent_anchor` and
+  `xml.parent_element`. Without a child extractor the text stays in the
+  body with `Attrs["media_type"]`. At most `MaxChildren` (10,000) per
+  document. A `match` entry may test `declares`.
+- **Dates in RFC 822 form** with a numeric offset or `GMT`, `UT`, `Z` fill
+  `Metadata.Created` and `Modified` from a profile's `created` and
+  `modified` fields; they stayed as written in `Extra`.
+- **`gofastxml` reads HTML and XHTML children with go-fast-html.** The
+  module now requires go-fast-core v0.1.6 and go-fast-html v0.4.4 (the
+  command's dependency; the library package imports only go-fast-core).
 
 ## v0.1.0 (2026-11-24)
 
