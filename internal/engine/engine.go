@@ -264,7 +264,7 @@ type frame struct {
 type waitVal struct {
 	text, attr, path string
 	rule             *profile.Rule
-	start, end int64
+	start, end       int64
 }
 
 type mark struct {
