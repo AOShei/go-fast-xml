@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<rss version="0.91">
+<channel>
+<title>Old feed</title>
+<link>http://example.org/</link>
+<description>A feed of 0.91.</description>
+<language>en-gb</language>
+<copyright>Copyright 2001</copyright>
+<image>
+<title>Old feed logo</title>
+<url>http://example.org/logo.gif</url>
+<link>http://example.org/</link>
+<width>88</width>
+<height>31</height>
+</image>
+<item>
+<title>Caf&#233; opens</title>
+<link>http://example.org/cafe</link>
+<description>Coffee &amp; cake.</description>
+</item>
+<textinput>
+<title>Search</title>
+<description>Search the site</description>
+<name>q</name>
+<link>http://example.org/search</link>
+</textinput>
+</channel>
+</rss>
