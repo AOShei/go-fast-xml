@@ -2,6 +2,7 @@ package gofastxml
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/AOShei/go-fast-core"
@@ -45,6 +46,46 @@ func TestStripMarkupCDATA(t *testing.T) {
 	if got := unescapeMarkup(`<d>&lt;p&gt;x<!--c--><![CDATA[<b>y</b>]]></d>`); got != `<d><p>x<b>y</b></d>` {
 		t.Errorf("unescapeMarkup: %q", got)
 	}
+}
+
+// TestDocumentComments: a comment inside a document rule's element is the
+// child's (in the bytes handed over) when the child is extracted, and a
+// note of the parent, as anywhere else, when its text stays in the body.
+func TestDocumentComments(t *testing.T) {
+	const src = `<doc><sec id="s"><t>T</t>` +
+		`<d><p>One<!-- c1 --></p></d>` +
+		`<content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml">Two<!-- c2 --></div></content>` +
+		`<m>plain <!-- c3 --> text</m><m><!-- c4 --></m><p>P<!-- c5 --></p></sec></doc>`
+	read := func(got *[]handed) *gofastcore.Document {
+		p, err := LoadProfile(strings.NewReader(docProf))
+		if err != nil {
+			t.Fatal(err)
+		}
+		opts := &gofastcore.Options{}
+		if got != nil {
+			opts.Child = fakeChild(got, nil)
+		}
+		doc, err := (&Extractor{Profiles: []*Profile{p}}).Extract(context.Background(), strings.NewReader(src), int64(len(src)), opts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := doc.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		if bad := safeCite([]byte(src), doc); bad != "" {
+			t.Errorf("cite: %s", bad)
+		}
+		checkChildren(t, []byte(src), doc)
+		return doc
+	}
+	var got []handed
+	doc := read(&got)
+	wantBrief(t, doc, "heading1:T\nparagraph:plain text\nnote:c3\nnote:c4\nparagraph:P\nnote:c5\n")
+	if len(got) != 2 || got[0].data != `<p>One<!-- c1 --></p>` || got[1].data != `<div xmlns="http://www.w3.org/1999/xhtml">Two<!-- c2 --></div>` {
+		t.Errorf("handed %q", got)
+	}
+	doc = read(nil)
+	wantBrief(t, doc, "heading1:T\nparagraph:<p>One</p>\nnote:c1\nparagraph:Two\nnote:c2\nparagraph:plain text\nnote:c3\nnote:c4\nparagraph:P\nnote:c5\n")
 }
 
 // TestFeedItemWithNoBlock: what an item reads for its first block or its

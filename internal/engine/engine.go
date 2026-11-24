@@ -1905,6 +1905,12 @@ func (e *Engine) Comment(r *xmlread.Reader, t []byte, final bool, start, end int
 	if !e.inCom {
 		e.inCom, e.comStart, e.comParts = true, start, 0
 		e.com.Reset()
+		if e.doc != nil {
+			e.doc.comment(nil, true, false)
+		}
+	}
+	if e.doc != nil {
+		e.doc.comment(t, false, final)
 	}
 	if e.com.Size() > 0 && e.com.Size()+len(t) > generic.MaxBlockBytes {
 		e.comment(e.com.String(), start)
@@ -1931,6 +1937,12 @@ func (e *Engine) comment(text string, end int64) {
 		Attrs: map[string]string{gofastcore.AttrStored: gofastcore.StoredMarkupComment},
 		Loc:   gofastcore.Location{Offset: e.comStart, Length: max(end-e.comStart, 0)}}
 	e.comParts++
+	if d := e.doc; d != nil && len(d.notes) < generic.MaxPendingBlocks {
+		// Inside a document rule's element: the child's, unless its text
+		// stays in the body (endDocument).
+		d.notes = append(d.notes, b)
+		return
+	}
 	if s := e.active(); s != nil && len(s.after) < generic.MaxPendingBlocks {
 		s.after = append(s.after, b)
 		return

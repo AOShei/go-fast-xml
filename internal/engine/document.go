@@ -47,6 +47,55 @@ type docCap struct {
 	open  bool // a descendant's start tag awaits its '>'
 	elems bool // it has descendant elements
 	cut   bool
+	// notes: the comments inside it, notes of the parent only if its
+	// text stays in the body. coms: where they are in buf.
+	notes []gofastcore.Block
+	coms  [][2]int
+}
+
+// comment writes a comment inside the element to what is handed over
+// (for XHTML read from the file, it is there already): begin starts it,
+// final ends it.
+func (d *docCap) comment(t []byte, begin, final bool) {
+	if d.raw {
+		return
+	}
+	if begin {
+		d.closeTag()
+		if len(d.coms) < generic.MaxPendingBlocks {
+			d.coms = append(d.coms, [2]int{len(d.buf), -1})
+		}
+		d.put([]byte("<!--"))
+		return
+	}
+	d.put(t)
+	if final {
+		d.put([]byte("-->"))
+		if n := len(d.coms); n > 0 && d.coms[n-1][1] < 0 {
+			d.coms[n-1][1] = len(d.buf)
+		}
+	}
+}
+
+// withoutComments is data without the comments written into it.
+func (d *docCap) withoutComments(data []byte) []byte {
+	if len(d.coms) == 0 {
+		return data
+	}
+	var out []byte
+	at := 0
+	for _, c := range d.coms {
+		end := c[1]
+		if end < 0 || end > len(data) {
+			end = len(data)
+		}
+		if c[0] < at || c[0] > len(data) {
+			continue
+		}
+		out = append(out, data[at:c[0]]...)
+		at = end
+	}
+	return append(out, data[at:]...)
 }
 
 // hasDocuments reports whether the profile has a "document" rule.
@@ -92,10 +141,15 @@ func cutAt(b []byte, n int) int {
 	return n
 }
 
+// closeTag ends a start tag left open, in what is handed over and, for
+// HTML, in the fallback text.
 func (d *docCap) closeTag() {
 	if d.open {
 		d.open = false
 		d.put([]byte{'>'})
+		if d.media == profile.MediaHTML {
+			d.sinkText([]byte{'>'})
+		}
 	}
 }
 
@@ -167,7 +221,9 @@ func (e *Engine) docText(t []byte) {
 }
 
 // docSinkText writes markup into the fallback text, as text.
-func (e *Engine) docSinkText(d *docCap, t []byte) {
+func (e *Engine) docSinkText(d *docCap, t []byte) { d.sinkText(t) }
+
+func (d *docCap) sinkText(t []byte) {
 	s := d.sink
 	if s.cut {
 		return
@@ -287,14 +343,17 @@ func (e *Engine) endDocument(f *frame, cstart, end int64) blockRef {
 		e.DocsCut++
 	}
 	paragraph := func(media string) blockRef {
+		// The text stays in the body: so do its comments, as notes.
+		s.after = append(s.after, d.notes...)
 		ref := e.finishSink(s, f, gofastcore.KindParagraph, gofastcore.OriginNative, end)
 		if media != "" {
 			e.patch(ref, AttrMediaType, media)
 		}
 		return ref
 	}
-	if len(bytes.TrimSpace(data)) == 0 || f.rule.WhenMarkup && !d.elems && !HasMarkup(data) {
-		if f.rule.WhenMarkup && len(bytes.TrimSpace(data)) > 0 {
+	text := d.withoutComments(data)
+	if len(bytes.TrimSpace(text)) == 0 || f.rule.WhenMarkup && !d.elems && !HasMarkup(text) {
+		if f.rule.WhenMarkup && len(bytes.TrimSpace(text)) > 0 {
 			e.Plain++
 		}
 		return paragraph("")
