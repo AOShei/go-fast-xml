@@ -2209,7 +2209,7 @@ func (e *Engine) fill(o *frame, s *slot, v string) {
 	case useAnchor:
 		o.anchor = v
 		e.anchors = append(e.anchors, anchorAt{v, e.depthOf(o)})
-		if e.docs && o.partAt == e.out.Part {
+		if o.partAt == e.out.Part {
 			// Blocks made inside the owner before its identifier came
 			// (an RSS item's title before its guid) are given it too.
 			for i := o.idxAt; i < len(o.partAt.Blocks); i++ {

@@ -419,3 +419,33 @@ func TestProfileForced(t *testing.T) {
 		t.Errorf("none: %v %v", err, doc.Metadata.Extra)
 	}
 }
+
+// An identifier read from a child that comes after blocks of its element
+// is given to those blocks too, in every profile.
+func TestProfileLateAnchor(t *testing.T) {
+	prof := head("late", `{"root": "doc"}`) + `"rules": [
+		{"match": "sec", "as": "section", "anchor": {"child": "id"}},
+		{"match": "sec/title", "as": "heading", "level": "nesting"},
+		{"match": "id", "as": "transparent"},
+		{"match": "p", "as": "block", "kind": "paragraph"}]}`
+	src := `<doc><sec><title>One</title><p>Before.</p><id>s1</id><p>After.</p></sec><sec><title>Two</title><p>None.</p></sec></doc>`
+	doc := extractWith(t, prof, src, nil)
+	if len(doc.Children) != 0 {
+		t.Fatalf("children: %d", len(doc.Children))
+	}
+	want := map[string]string{"One": "s1", "Before.": "s1", "After.": "s1", "Two": "", "None.": ""}
+	seen := 0
+	for _, b := range blocks(doc) {
+		anchor, ok := want[b.Text]
+		if !ok {
+			continue
+		}
+		seen++
+		if got := b.Attrs[AttrAnchorParent]; got != anchor && b.Loc.Anchor != anchor {
+			t.Errorf("%q: anchor_parent %q, anchor %q, want %q", b.Text, got, b.Loc.Anchor, anchor)
+		}
+	}
+	if seen != len(want) {
+		t.Errorf("saw %d of %d blocks: %+v", seen, len(want), blocks(doc))
+	}
+}

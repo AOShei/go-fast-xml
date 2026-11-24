@@ -16,6 +16,12 @@
   2.0, RSS 1.0 and Atom 1.0 with their common extensions (Dublin Core,
   `content:`, iTunes, Podcasting 2.0, Media RSS, GeoRSS, Slash,
   syndication). Feeds were read generically. See `profiles/feed.md`.
+- **An anchor that comes late reaches the blocks before it.** When a
+  profile reads an element's anchor from a child (an RSS item's `guid`)
+  and blocks of the element were made before it, those blocks get
+  `Attrs["anchor_parent"]` too. In every profile, a user's own included.
+  The output of the built-in profiles other than `feed` is unchanged on
+  the corpus: none reads an anchor from a child.
 - **Embedded documents: comments and empty sections.** A comment inside a
   `document` element is the child's, a note of the parent only when the
   text stays in the body. A section that makes no block writes what it
