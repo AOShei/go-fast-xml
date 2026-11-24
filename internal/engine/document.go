@@ -376,6 +376,61 @@ func (e *Engine) noteBlock(ref blockRef, heading bool) {
 	}
 }
 
+// wait records a value of attribute src read by a section for its first
+// block or its anchor, in profiles with a "document" rule.
+func (e *Engine) wait(f *frame, src *profile.Value, v string, el *xmlread.Element) {
+	if !e.docs || v == "" || src == nil || src.IsLiteral || src.Attr.Local == "" || src.Child != nil || src.Structure != nil {
+		return
+	}
+	if f.rule == nil || f.rule.As != profile.AsSection || f.secFirst.ok() {
+		return
+	}
+	name := src.Attr.Local
+	for i := range el.Attrs {
+		if a := &el.Attrs[i]; a.Local == src.Attr.Local && a.URI == src.Attr.URI {
+			name = a.Name
+		}
+	}
+	f.waiting = append(f.waiting, waitVal{text: v, attr: name, path: e.path(), start: el.Start, end: el.End})
+}
+
+// flushWaiting writes the values a section read for its first block or
+// its anchor when it ends with no block, so that none is lost: a value
+// read from an element as the block its element's rule makes (a
+// paragraph when that rule makes none), one read from an attribute as an
+// attribute note. The first of them carries the section's attrs and all
+// its anchor, as a first block does.
+func (e *Engine) flushWaiting(f *frame) {
+	for _, w := range f.waiting {
+		b := gofastcore.Block{Kind: gofastcore.KindParagraph, Origin: gofastcore.OriginNative, Text: w.text,
+			Loc: gofastcore.Location{Offset: w.start, Length: max(w.end-w.start, 0)}}
+		attrs := map[string]string{}
+		switch r := w.rule; {
+		case w.attr != "":
+			b.Kind = gofastcore.KindNote
+			attrs[gofastcore.AttrNoteType] = gofastcore.NoteAttribute
+			attrs[generic.AttrAttribute] = generic.CleanName(generic.CutString(w.attr, generic.MaxNameBytes), &e.scratch)
+			attrs[generic.AttrElement] = w.path
+		case r != nil && r.As == profile.AsBlock && r.Kind == gofastcore.KindParagraph:
+		case r != nil && r.As == profile.AsNote:
+			b.Kind = gofastcore.KindNote
+			attrs[gofastcore.AttrNoteType] = r.NoteType
+		}
+		if r := w.rule; r != nil && w.attr == "" {
+			for _, x := range r.Attrs {
+				if x.Value != nil && x.Value.IsLiteral && x.Value.Literal != "" {
+					attrs[x.Key] = x.Value.Literal
+				}
+			}
+		}
+		if len(attrs) > 0 {
+			b.Attrs = attrs
+		}
+		e.add(b, f, false)
+	}
+	f.waiting = nil
+}
+
 // endSection writes a section's "children" on its heading, else its
 // first block.
 func (e *Engine) endSection(f *frame) {

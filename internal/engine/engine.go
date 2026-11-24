@@ -250,6 +250,21 @@ type frame struct {
 	isDoc             bool
 	kids              []int
 	secFirst, secHead blockRef
+	// waiting: the values a section read for its first block or its
+	// anchor, kept to be written as blocks of their own if it ends with
+	// none (profiles with a "document" rule). capRule: the rule of an
+	// element read for a value, for the block it would have been.
+	waiting []waitVal
+	capRule *profile.Rule
+}
+
+// waitVal is a value a section waits to place: read from the attribute
+// attr of the element at start..end, or (attr empty) from the element
+// whose rule is rule.
+type waitVal struct {
+	text, attr, path string
+	rule             *profile.Rule
+	start, end int64
 }
 
 type mark struct {
@@ -513,7 +528,7 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 	f.partAt, f.idxAt = e.out.Part, len(e.out.Part.Blocks)
 	e.readAttrs = e.readAttrs[:0]
 	if e.hasChildAttrs {
-		e.readAttrs = e.childAttrs()
+		e.readAttrs = e.childAttrs(el)
 	}
 	if f.capture != nil {
 		// Inside an element read for a value: its text, or its outline.
@@ -690,7 +705,7 @@ func (e *Engine) claim() (*slot, int) {
 // childAttrs fills the slots of open elements that read an attribute of
 // the element on top of the stack ({"attr": ..., "child": ...}), which is
 // then read by its own rule as usual. It returns the attributes read.
-func (e *Engine) childAttrs() []profile.QName {
+func (e *Engine) childAttrs(el *xmlread.Element) []profile.QName {
 	var read []profile.QName
 	n := len(e.frames)
 	for k := 1; k < n && k < e.p.MaxSteps(); k++ {
@@ -703,7 +718,11 @@ func (e *Engine) childAttrs() []profile.QName {
 			s.filled = true
 			read = append(read, s.v.Attr)
 			if v, ok := e.Attr(0, s.v.Attr); ok {
-				e.fill(o, s, e.clean(v))
+				v = e.clean(v)
+				e.fill(o, s, v)
+				if s.use == useFirst && !o.first.ok() {
+					e.wait(o, s.v, v, el)
+				}
 			}
 		}
 	}
@@ -714,6 +733,9 @@ func (e *Engine) startCapture(f *frame, s *slot, owner int, el *xmlread.Element)
 	e.flushStray()
 	s.filled = true
 	f.role, f.capture, f.captureOf, f.structRoot = roleSink, s, owner, true
+	if e.docs && (s.use == useFirst || s.use == useAnchor) {
+		f.capRule = e.lookup()
+	}
 	// What the value gives its owner outlives this element.
 	f.marks, f.anchors = math.MaxInt, math.MaxInt
 	f.sink = e.getSink(skCapture, el.Start)
@@ -1248,6 +1270,7 @@ func (e *Engine) common(f *frame, el *xmlread.Element) {
 		if v, ok := e.resolve(f, r.Anchor, "", useAnchor); ok && v != "" {
 			f.anchor = v
 			e.anchors = append(e.anchors, anchorAt{v, len(e.frames)})
+			e.wait(f, r.Anchor, v, el)
 		}
 	} else if v, ok := el.Attr(xmlscan.XMLNamespace, "id"); ok {
 		f.anchor = e.clean(v)
@@ -1267,6 +1290,7 @@ func (e *Engine) common(f *frame, el *xmlread.Element) {
 		if v, ok := e.resolve(f, x.Value, x.Key, use); ok && v != "" {
 			if container {
 				f.firstSet = append(f.firstSet, kv{x.Key, v})
+				e.wait(f, x.Value, v, el)
 			} else {
 				f.own = append(f.own, kv{x.Key, v})
 			}
@@ -1933,7 +1957,7 @@ func (e *Engine) EndElement(r *xmlread.Reader, el *xmlread.Element, start, end i
 	case f.isDoc:
 		ref = e.endDocument(f, start, end)
 	case f.capture != nil && f.structRoot:
-		ref = e.endCapture(f)
+		ref = e.endCapture(f, end)
 	case f.capture != nil:
 		if s := e.cur; s != nil && s.structure {
 			e.structEnd(s)
@@ -1969,6 +1993,9 @@ func (e *Engine) EndElement(r *xmlread.Reader, el *xmlread.Element, start, end i
 	}
 	if f.suspended || f.outOfLine {
 		e.cur = f.resume
+	}
+	if len(f.waiting) > 0 && !f.secFirst.ok() && f.rule != nil && f.rule.As == profile.AsSection {
+		e.flushWaiting(f)
 	}
 	if len(f.kids) > 0 {
 		e.endSection(f)
@@ -2079,7 +2106,7 @@ func (e *Engine) addStored(b gofastcore.Block) {
 
 // endCapture ends an element read for a value, and gives the value where
 // it goes.
-func (e *Engine) endCapture(f *frame) blockRef {
+func (e *Engine) endCapture(f *frame, end int64) blockRef {
 	s := f.sink
 	e.cur = f.prevCur
 	var v string
@@ -2098,7 +2125,11 @@ func (e *Engine) endCapture(f *frame) blockRef {
 	e.putSink(s)
 	f.sink = nil
 	if f.captureOf < len(e.frames) {
-		e.fill(&e.frames[f.captureOf], f.capture, v)
+		o := &e.frames[f.captureOf]
+		if f.capRule != nil && v != "" && !o.secFirst.ok() {
+			o.waiting = append(o.waiting, waitVal{text: v, rule: f.capRule, start: f.start, end: end})
+		}
+		e.fill(o, f.capture, v)
 	}
 	return blockRef{}
 }
