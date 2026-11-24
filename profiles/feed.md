@@ -36,7 +36,7 @@ built-in profile's selector names these roots.
 
 | Element | Model |
 |---|---|
-| `item`, `entry` | a section; anchor `guid` (RSS 2.0), `rdf:about` (RSS 1.0), Atom `id`: every block of the item carries it as `Attrs["anchor_parent"]` (also those made before a late `guid`) |
+| `item`, `entry` | a section; anchor `guid` (RSS 2.0), `rdf:about` (RSS 1.0), Atom `id`: every block of the item carries it as `Attrs["anchor_parent"]` (also those made before a late `guid`). An item that makes no block (only a `link`, a `guid`, an `rdf:about`) writes what it read for its heading and anchor as the blocks their elements' rules make (`link`, `guid` paragraphs), an attribute's value as an attribute note |
 | `item/title`, `entry/title` | a level-2 heading; RSS titles as written. An Atom title of type `html` or `xhtml` is a heading holding the text as written (for `xhtml`, its text content) with `Attrs["media_type"]`; no child is made for a title |
 | on the heading | `feed.link`, `feed.published` (`pubDate`, Atom `published`), `feed.updated`, `feed.date` (`dc:date`), `feed.guid_is_permalink`, `feed.itunes_duration`, `_episode`, `_season`, `_episode_type`, `_explicit`, `_block`, `feed.georss_point`, `feed.geo_lat`, `feed.geo_long` (the first of each; a second is read by the rule below), and `children` |
 | `description`, `content:encoded`, `itunes:summary`, `dc:description`, `media:description` | `when: markup`: a child document (`text/html`), else a paragraph; `media:description type="html"` is always a child |
@@ -57,7 +57,10 @@ See the README, "Embedded documents". The child's name is
 `item/description#<guid>`; the item's heading carries `children`; each
 child carries `xml.parent_offset`, `xml.parent_length`,
 `xml.parent_anchor`, `xml.parent_element`. Without a child extractor,
-the text is kept as a paragraph with `Attrs["media_type"]`.
+the text is kept as a paragraph with `Attrs["media_type"]`. A comment
+inside the element is the child's (in the bytes handed over) and no note
+of the feed; when the text stays in the body, it is a note after that
+paragraph, as anywhere else.
 
 ## Left to generic reading
 
@@ -73,13 +76,29 @@ text as inferred paragraphs, attributes as notes, counted in
 ## Dev set (76 files)
 
 Without a child extractor: 0 errors, 0 Validate failures; blocks:
-heading 5,844, image 1,258, list_item 2,057, note 7,129, paragraph 28,846;
+heading 5,844, image 1,258, list_item 2,057, note 7,128, paragraph 28,843;
 children listed: `text/html` 3,279, `application/xhtml+xml` 1; elements
 kept as paragraphs by `when: markup` 4,468 (counted by element name at the
 block's offset). With a child extractor, the same 3,280 children are
-extracted and paragraphs fall to 25,566. Unmapped elements: 8,660 in all,
-mostly GDACS (188 per element), arXiv `announce_type` (446),
-legislation.gov.uk `facetYear` (241) and PRISM.
+extracted and paragraphs fall to 25,563. Unmapped elements: 8,655 in all,
+mostly GDACS (188 per element, `gdacs:title` and `gdacs:description`
+among them), arXiv `announce_type` (446), legislation.gov.uk `facetYear`
+(241) and PRISM.
+
+`TestFeedOracles` passes over the 76 files in both modes: (a) the body's
+text in order, with each child's text at its place, is the file's
+character data in order, apart from the listed metadata and attribute
+values; (b) every block's text is in the file at its offsets, a fallback
+paragraph's in full (the source unescaped). One file is cut off in an
+item (`unexpected EOF` for `encoding/xml`): (a) compares its text up to
+there.
+
+## Held-out set (25 files)
+
+0 errors, 0 Validate failures; 24 read with `feed`, 1 not. Without a child extractor: heading 2,895, image
+1,772, note 12,367, paragraph 19,282; `text/html` children 4,762. With
+one, all 4,762 are extracted and paragraphs fall to 14,520. Unmapped
+elements: 6,570.
 
 ## Not tested
 

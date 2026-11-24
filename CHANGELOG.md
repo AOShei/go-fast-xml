@@ -16,6 +16,12 @@
   2.0, RSS 1.0 and Atom 1.0 with their common extensions (Dublin Core,
   `content:`, iTunes, Podcasting 2.0, Media RSS, GeoRSS, Slash,
   syndication). Feeds were read generically. See `profiles/feed.md`.
+- **Embedded documents: comments and empty sections.** A comment inside a
+  `document` element is the child's, a note of the parent only when the
+  text stays in the body. A section that makes no block writes what it
+  read for its first block and anchor as blocks of its own (profiles with
+  a `document` rule). The fallback text of HTML with element children
+  closes its start tags. RSS `textInput` is mapped.
 - **Embedded documents.** A new rule kind, `"as": "document"`, with
   `media_type` and `when`, hands an element's content to
   `Options.ExtractChild` and appends the result to `Document.Children`
