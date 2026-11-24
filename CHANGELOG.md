@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.1.0 (unreleased)
+## v0.1.0 (2026-11-24)
 
 First release. Requires go-fast-core v0.1.4. Standard library only.
 
