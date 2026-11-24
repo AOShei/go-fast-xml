@@ -28,6 +28,7 @@ built-in profile's selector names these roots.
 | `dc:creator`, `itunes:author`, `googleplay:author`, Atom `author/name` | `Metadata.Authors` |
 | `link`, `generator` (+ Atom `@uri`, `@version`), `copyright`, `dc:rights`, Atom `rights`, `managingEditor`, `webMaster`, `docs`, `ttl`, `dc:publisher`, `dc:source`, `sy:update*`, `itunes:keywords`, `explicit`, `type`, `new-feed-url`, `owner/name`, `owner/email`, Atom `id`, `icon`, `logo`, `contributor/name`, `author/uri`, `author/email` | `Metadata.Extra` under `feed.*` keys (as written) |
 | `image` (RSS) | an image block: id `url`, alt `title`, `Attrs` `feed.link`, `feed.width`, `feed.height`, `feed.description` |
+| `textInput` (RSS 2.0), `textinput` (RSS 0.91, 1.0) | a paragraph whose text is its `title`, `Attrs` `feed.field=textInput`, `feed.description`, `feed.name`, `feed.link`; anchor `rdf:about` |
 | `itunes:image@href`, `media:thumbnail@url` | image blocks |
 | `channel/items/rdf:Seq/rdf:li@rdf:resource` (RSS 1.0) | attribute notes, `feed.field=items` |
 
@@ -60,8 +61,10 @@ the text is kept as a paragraph with `Attrs["media_type"]`.
 
 ## Left to generic reading
 
-`textinput`/`textInput`, `skipDays`, `skipHours`, `cloud`, `rating`,
-Atom `source`, OpenSearch, PRISM, arXiv, GDACS, legislation.gov.uk
+`skipDays`, `skipHours`, `cloud`, `rating`,
+Atom `source`, OpenSearch, PRISM, arXiv, GDACS (its `gdacs:title` and
+`gdacs:description` too: an extension's vocabulary, read as the rest of
+it is), legislation.gov.uk
 facets, WordPress `post-id`, Creative Commons `license`, `admin:`,
 `podcast:` elements other than those above, and any other extension:
 text as inferred paragraphs, attributes as notes, counted in

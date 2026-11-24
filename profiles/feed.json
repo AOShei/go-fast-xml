@@ -69,6 +69,8 @@
     {"match": "rdf:Seq/rdf:li", "as": "note", "type": "attribute", "value": {"attr": "rdf:resource"}, "attrs": {"feed.field": "items"}},
     {"match": "channel/image[@rdf:resource]", "as": "note", "type": "attribute", "value": {"attr": "rdf:resource"}, "attrs": {"feed.field": "image"}},
     {"match": "channel/textinput[@rdf:resource]", "as": "note", "type": "attribute", "value": {"attr": "rdf:resource"}, "attrs": {"feed.field": "textinput"}},
+    {"match": "textinput", "as": "block", "kind": "paragraph", "value": {"child": "title"}, "anchor": {"attr": "rdf:about"}, "attrs": {"feed.field": "textInput", "feed.description": {"child": "description"}, "feed.name": {"child": "name"}, "feed.link": {"child": "link"}}},
+    {"match": "textInput", "as": "block", "kind": "paragraph", "value": {"child": "title"}, "attrs": {"feed.field": "textInput", "feed.description": {"child": "description"}, "feed.name": {"child": "name"}, "feed.link": {"child": "link"}}},
     {"match": "image", "as": "image", "id": {"child": "url"}, "alt": {"child": "title"}, "anchor": {"attr": "rdf:about"}, "attrs": {"feed.link": {"child": "link"}, "feed.width": {"child": "width"}, "feed.height": {"child": "height"}, "feed.description": {"child": "description"}}},
 
     {"match": "channel/itunes:summary", "as": "document", "media_type": "text/html", "when": "markup"},
