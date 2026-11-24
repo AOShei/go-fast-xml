@@ -131,7 +131,7 @@ func oneParagraph(b []byte) *gofastcore.Document {
 		return r
 	}, strings.ToValidUTF8(string(b), "�")))
 	d := gofastcore.New("fake")
-	d.Parts = []gofastcore.Part{{Kind: gofastcore.PartBody, Number: 1}}
+	d.Parts = []gofastcore.Part{{Kind: gofastcore.PartBody, Number: 1, Blocks: []gofastcore.Block{}}}
 	if text != "" {
 		d.Parts[0].Blocks = []gofastcore.Block{{Kind: gofastcore.KindParagraph, Origin: gofastcore.OriginNative, Text: text}}
 	}
