@@ -48,7 +48,7 @@ func docHas(d *gofastcore.Document, code string) bool {
 	return false
 }
 
-const docProf =`{"profile": "docs", "format": 1, "match": [{"root": "doc"}], "rules": [
+const docProf = `{"profile": "docs", "format": 1, "match": [{"root": "doc"}], "rules": [
 	{"match": "/doc", "as": "transparent"},
 	{"match": "sec", "as": "section", "anchor": {"attr": "id"}},
 	{"match": "sec/t", "as": "heading", "level": "nesting"},

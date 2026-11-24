@@ -320,12 +320,12 @@ type Engine struct {
 	// came from, in file order. DocsCut counts contents cut to
 	// MaxBlockBytes, ChildrenCut those not handed over past MaxChildren,
 	// Plain those kept as a paragraph because they held no markup.
-	Children                   []*gofastcore.Document
-	ChildLocs                  []ChildLoc
+	Children                    []*gofastcore.Document
+	ChildLocs                   []ChildLoc
 	DocsCut, ChildrenCut, Plain int
-	docs                       bool
-	doc                        *docCap
-	scratchTag                 []byte
+	docs                        bool
+	doc                         *docCap
+	scratchTag                  []byte
 
 	com      generic.Builder
 	inCom    bool
