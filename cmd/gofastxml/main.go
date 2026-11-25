@@ -4,8 +4,8 @@
 //
 //	gofastxml [flags] file-or-directory...
 //
-// A directory stands for the XML files in it and below it (.xml, .dita, .ditamap,
-// .docbook, .tei). With one input
+// A directory stands for the XML files in it and below it (.xml, .dita,
+// .ditamap, .docbook, .tei, .rss, .atom). With one input
 // the JSON is indented; with several, each document is one line. Only the
 // documents go to standard output: everything said about them goes to
 // standard error, and the exit status is 1 if any input could not be
@@ -67,7 +67,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	flags.Lookup("stored").Usage += " (this library writes markup_comment, the file's <!-- --> comments)"
 	flags.Usage = func() {
 		fmt.Fprintln(stderr, "usage: gofastxml [flags] file-or-directory...")
-		fmt.Fprintln(stderr, "Extracts XML documents. A directory stands for the files in it and below it named .xml, .dita, .ditamap, .docbook or .tei.")
+		fmt.Fprintln(stderr, "Extracts XML documents. A directory stands for the files in it and below it named .xml, .dita, .ditamap, .docbook, .tei, .rss or .atom.")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -302,11 +302,11 @@ func moduleVersion() string {
 
 // xmlName reports whether a file found in a directory is read: its name
 // ends in .xml or in an extension only XML documents have (DITA topics
-// and maps, DocBook, TEI), in any case. They are the names the gofast
-// command takes for XML too.
+// and maps, DocBook, TEI, RSS and Atom feeds), in any case. They are the
+// names the gofast command takes for XML too.
 func xmlName(path string) bool {
 	switch strings.ToLower(filepath.Ext(path)) {
-	case ".xml", ".dita", ".ditamap", ".docbook", ".tei":
+	case ".xml", ".dita", ".ditamap", ".docbook", ".tei", ".rss", ".atom":
 		return true
 	}
 	return false

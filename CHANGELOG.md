@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **A directory given to `gofastxml` stands for `.rss` and `.atom` files
+  too** (in any case), as the `gofast` command's does since go-fast v0.1.2.
+  The walk takes `.xml`, `.dita`, `.ditamap`, `.docbook`, `.tei`, `.rss`
+  and `.atom`. A file named on the command line is read whatever its name,
+  as before.
+
 ## v0.2.0 (2026-11-24)
 
 - **`xml.unmapped_attributes` no longer counts attributes that are in the

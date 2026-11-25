@@ -91,7 +91,7 @@ func TestCommand(t *testing.T) {
 // any case, and no others.
 func TestDirectoryNames(t *testing.T) {
 	dir := t.TempDir()
-	for _, name := range []string{"a.xml", "b.DITA", "c.ditamap", "d.docbook", "e.Tei", "f.txt", "g.html", "h.xml.bak", "xml"} {
+	for _, name := range []string{"a.xml", "b.DITA", "c.ditamap", "d.docbook", "e.Tei", "f.txt", "i.rss", "j.ATOM", "k.rss2", "g.html", "h.xml.bak", "xml"} {
 		os.WriteFile(filepath.Join(dir, name), []byte("<doc><p>"+name+"</p></doc>"), 0o644)
 	}
 	var out, errs bytes.Buffer
@@ -105,7 +105,7 @@ func TestDirectoryNames(t *testing.T) {
 		}
 	}
 	got := strings.Join(texts, " ")
-	if got != "a.xml b.DITA c.ditamap d.docbook e.Tei" {
+	if got != "a.xml b.DITA c.ditamap d.docbook e.Tei i.rss j.ATOM" {
 		t.Errorf("read %q", got)
 	}
 }
