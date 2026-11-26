@@ -52,6 +52,25 @@
   element written with the file's own element path, attributes as `/@`
   rows, `RowLocs` on the value's element) and `rest_table` (what a row
   holds beyond its column cells, as a table of id, name and value).
+- **New built-in profiles `tmx`, `xliff` and `xliff2`** for translation
+  files. `tmx`: root `tmx` with a `version` attribute; one table per
+  body, a row per `tu`, a column per language as written. `xliff`: XLIFF
+  1.0 to 1.2; `xliff2`: XLIFF 2.0 to 2.2; a section with a heading and a
+  table per `file`, a row per `trans-unit` or per `segment` and
+  `ignorable`, with `RowLocs` and the unit's id as anchor. See
+  `profiles/tmx.md`, `profiles/xliff.md` and `profiles/xliff2.md`.
+- **Fixed: table row locations in files not in UTF-8.** `Table.RowLocs`
+  held offsets in the decoded text, not bytes of the file, when the file
+  was in UTF-16, windows-1252 or another encoding; blocks' own locations
+  were right. In every profile. On the dev corpus only TMX files are
+  affected.
+- Profile keys: `column_key` (a cell's column chosen by an attribute's
+  value, the value being the header cell); `heading` on a `section` (a
+  heading from an attribute of the section's element); `table_header` on
+  a `section` (the section is also a table); a `cells` entry may read a
+  child's or an ancestor's attribute; a row with `cells` and `rest` stays
+  open for its content; a row of attributes with none present makes no
+  row.
 
 ## v0.2.1 (2026-11-25)
 

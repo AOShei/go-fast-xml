@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff xmlns="urn:oasis:names:tc:xliff:document:2.0" xmlns:mtc="urn:oasis:names:tc:xliff:matches:2.0" xmlns:gls="urn:oasis:names:tc:xliff:glossary:2.0" version="2.1" srcLang="en" trgLang="fr">
+ <file id="f1" original="weather.html">
+  <notes><note id="n1" category="context">Written for the tests.</note></notes>
+  <group id="g1" name="greetings">
+   <unit id="u1" name="hello">
+    <notes><note priority="2">Keep the brace.</note></notes>
+    <originalData><data id="d1">&lt;b&gt;</data><data id="d2">&lt;/b&gt;</data></originalData>
+    <segment id="s1" state="translated"><source>Hello <pc id="1" dataRefStart="d1" dataRefEnd="d2">world</pc><ph id="2"/>!</source><target>Bonjour <pc id="1" dataRefStart="d1" dataRefEnd="d2">le monde</pc> !</target></segment>
+    <ignorable><source> </source></ignorable>
+    <segment id="s2"><source>Bye<cp hex="2014"/>now<cp hex="0001"/>.</source></segment>
+    <mtc:matches><mtc:match ref="#s1" similarity="80"><source>Hello world!</source><target>Salut le monde !</target></mtc:match></mtc:matches>
+    <gls:glossary><gls:glossEntry><gls:term source="tb">world</gls:term><gls:translation>monde</gls:translation></gls:glossEntry></gls:glossary>
+   </unit>
+  </group>
+  <unit id="u2"><segment><source>It is <sm id="m1" type="comment" value="x"/>cold<em startRef="m1"/>.</source></segment></unit>
+ </file>
+</xliff>

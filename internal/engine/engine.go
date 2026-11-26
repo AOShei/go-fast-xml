@@ -144,6 +144,7 @@ type slot struct {
 	key    string
 	use    useKind
 	filled bool
+	col    int // useCell: the row's column
 }
 
 type useKind uint8
@@ -161,6 +162,7 @@ const (
 	useLink
 	useTitle
 	useAnchor
+	useCell // a row's cell read from a child's attribute
 )
 
 type held struct {
@@ -208,6 +210,7 @@ type frame struct {
 	table *table
 	owner *table // the table of a row or cell
 	cell  bool
+	col   int    // a column cell's column, 0-based (-1: past the bound)
 	cals  string // the element of the CALS model this is
 
 	partAt *gofastcore.Part
@@ -1196,6 +1199,23 @@ func (e *Engine) startRule(f *frame, el *xmlread.Element) {
 	switch r.As {
 	case profile.AsSection:
 		f.sections++
+		for _, v := range r.Heading {
+			// The section's heading from its own attribute (XLIFF
+			// file@original), located at its start tag.
+			if s, _ := e.value(v); s != "" {
+				e.flushStray()
+				b := gofastcore.Block{Kind: gofastcore.KindHeading, Text: s, Level: uint8(min(max(e.p.HeadingBase+f.sections-1, 1), 255)),
+					Loc:   gofastcore.Location{Offset: el.Start, Length: max(el.End-el.Start, 0)},
+					Attrs: map[string]string{generic.AttrAttribute: v.Attr.Local}}
+				e.add(b, f, true)
+				break
+			}
+		}
+		if r.SectionTable {
+			// The section is also a table (XLIFF 2's file).
+			f.table = newTable(e, "")
+			e.headerRow(f.table, r.HeaderText)
+		}
 	case profile.AsHeading, profile.AsBlock, profile.AsNote:
 		if r.Value != nil {
 			f.val, f.hasVal = e.resolve(f, r.Value, "", useValue)
@@ -1275,10 +1295,21 @@ func (e *Engine) startRule(f *frame, el *xmlread.Element) {
 		}
 	case profile.AsRow:
 		if t := e.tableOf(); t != nil {
+			if r.Rest == 0 && len(r.Cells) > 0 && e.noCells(r.Cells) {
+				// A row of attributes with none present (an XLIFF group
+				// with no id or name) makes no row.
+				break
+			}
 			f.owner = t
 			t.startRow(e.test(r.Header))
 			if len(r.Cells) > 0 {
-				e.attrRow(t, r.Cells)
+				e.attrRow(f, t, r.Cells, r.Rest > 0)
+				if r.Rest == 0 && el.End > el.Start {
+					// The row is its start tag's attributes, ended there:
+					// rows inside its element (an XLIFF group's units)
+					// come after it, each with its own location.
+					t.rowDone(el.Start, el.End, f.anchor)
+				}
 			}
 			if r.RestTable != nil {
 				e.startRest(f, t)
@@ -1293,6 +1324,11 @@ func (e *Engine) startRule(f *frame, el *xmlread.Element) {
 			if row := e.rowFrame(); row != nil {
 				f.owner = row.owner
 				f.cell = true
+				f.col = r.Column - 1
+				if r.ColumnKey != nil && f.owner != nil {
+					key, _ := e.value(r.ColumnKey)
+					f.col = f.owner.keyColumn(e, r.Column-1, key)
+				}
 				e.openSink(f, skCell, el.Start)
 			}
 			break
@@ -2350,6 +2386,10 @@ func (e *Engine) fill(o *frame, s *slot, v string) {
 		}
 	case useValue:
 		o.val, o.hasVal = v, true
+	case useCell:
+		if o.owner != nil && o.rest {
+			o.owner.columnCell(s.col, v, "")
+		}
 	case useLink:
 		o.href = v
 	case useTitle:
@@ -2466,7 +2506,7 @@ func (e *Engine) endRule(f *frame, end int64) blockRef {
 		if f.sink != nil {
 			s := e.closeSink(f)
 			if t := f.owner; t != nil && r.Column > 0 {
-				t.columnCell(r.Column-1, s.b.String(), s.href)
+				t.columnCell(f.col, s.b.String(), s.href)
 			} else if t != nil {
 				t.endCell(s.b.String(), s.href)
 			}
@@ -2506,6 +2546,13 @@ func (e *Engine) endRule(f *frame, end int64) blockRef {
 				if b, ok := e.restBlock(t.rest); ok {
 					e.add(b, f, false)
 				}
+			}
+		}
+	case profile.AsSection:
+		if t := f.table; t != nil {
+			e.flushStray()
+			if b, ok := t.block(e, f.start, end); ok {
+				e.add(b, f, false)
 			}
 		}
 	case profile.AsImage:

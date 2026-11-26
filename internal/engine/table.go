@@ -61,20 +61,95 @@ type table struct {
 	// rest: the table of names and values its rows' "rest_table" fills,
 	// written after it.
 	rest *table
+	// keys are the values of a cell rule's "column_key" met so far, in
+	// order of first appearance; key i has column keyBase+i, and its
+	// header cell is the key as written.
+	keys    []string
+	keyBase int
+}
+
+// keyColumn returns the column (0-based) of a "column_key" cell whose
+// attribute has the value key, the keyed columns starting at base: a new
+// key takes the next column. Past MaxTableColumns it returns -1 and the
+// cut is counted (limit.exceeded).
+func (t *table) keyColumn(e *Engine, base int, key string) int {
+	if len(t.keys) == 0 {
+		t.keyBase = base
+		t.cost += int64(t.ncols) * gofastcore.CellCost // the header row
+	}
+	if i := slices.Index(t.keys, key); i >= 0 {
+		return t.keyBase + i
+	}
+	if t.keyBase+len(t.keys) >= MaxTableColumns {
+		if !t.cut {
+			t.cut = true
+			e.ColumnsCut++
+		}
+		return -1
+	}
+	t.keys = append(t.keys, key)
+	t.cost += int64(len(key)) + gofastcore.CellCost
+	return t.keyBase + len(t.keys) - 1
+}
+
+// keyHeader puts the keys in the table's header row: the profile's, when
+// it has one, else a header row of their own before the first row, whose
+// cells before the keyed columns are empty.
+func (t *table) keyHeader() {
+	if len(t.keys) == 0 {
+		return
+	}
+	width := max(t.ncols, t.keyBase+len(t.keys))
+	if !t.fromProfile {
+		t.rows = slices.Insert(t.rows, 0, make([]string, width))
+		t.locs = slices.Insert(t.locs, 0, gofastcore.Location{})
+		t.header++
+		for i := range t.merges {
+			t.merges[i].Row++
+		}
+		for i := range t.cells {
+			t.cells[i].Row++
+		}
+	}
+	h := t.rows[0]
+	for len(h) < width {
+		h = append(h, "")
+	}
+	for i, k := range t.keys {
+		h[t.keyBase+i] = k
+	}
+	t.rows[0] = h
+	t.ncols = max(t.ncols, width)
 }
 
 // attrRow fills the row just started from its element's attributes
-// (a row rule's "cells"); an absent attribute gives an empty cell.
-func (e *Engine) attrRow(t *table, cells []*profile.Value) {
+// (a row rule's "cells"); an absent attribute gives an empty cell. A row
+// with "rest" stays open: its element's content fills the columns after
+// (column cells, rest).
+func (e *Engine) attrRow(f *frame, t *table, cells []*profile.Value, open bool) {
 	for _, cv := range cells {
+		n := cv.Attr.Local
 		v, _ := e.value(cv)
 		t.startCell(e, 1, 1, false)
+		if cv.Of != nil {
+			// An ancestor's attribute (XLIFF 2's unit@id on each
+			// segment's row).
+			n = cv.Of.Local + "@" + n
+		}
+		if cv.AttrChild != nil {
+			// A child's attribute (XLIFF target@state): the cell is
+			// empty until the child starts, then filled in its column.
+			n = cv.AttrChild.Source + "@" + n
+			f.slots = append(f.slots, slot{v: cv, use: useCell, col: t.col})
+		}
 		t.endCell(v, "")
-		if n := cv.Attr.Local; !slices.Contains(t.attrNames, n) && len(t.attrNames) < profile.MaxCells {
+		if !slices.Contains(t.attrNames, n) && len(t.attrNames) < profile.MaxCells {
 			t.attrNames = append(t.attrNames, n)
 		}
 	}
-	t.endRow()
+	if !open {
+		t.endRow()
+	}
 	e.tableCost(t)
 }
 
@@ -320,6 +395,7 @@ func (t *table) block(e *Engine, start, end int64) (gofastcore.Block, bool) {
 		// TaxTotal with no TaxSubtotal) makes no table.
 		return gofastcore.Block{}, false
 	}
+	t.keyHeader()
 	for i, r := range t.rows {
 		for len(r) < t.ncols {
 			r = append(r, "")
@@ -345,14 +421,22 @@ func (t *table) block(e *Engine, start, end int64) (gofastcore.Block, bool) {
 	}
 	b := gofastcore.Block{Kind: gofastcore.KindTable, Table: tb,
 		Loc: gofastcore.Location{Offset: start, Length: max(end-start, 0)}}
-	if t.fromProfile || len(t.attrNames) > 0 {
+	if t.fromProfile || len(t.attrNames) > 0 || len(t.keys) > 0 {
 		b.Attrs = map[string]string{}
+	}
+	if len(t.keys) > 0 && !t.fromProfile {
+		// The header row holds the keys, attribute values of the file.
+		b.Attrs[AttrHeaderSource] = "attribute"
 	}
 	if t.fromProfile {
 		// The header row is the profile's text, not the file's; the
 		// table is still native: every row and cell is declared by the
 		// file, nothing is guessed (core's inferred).
 		b.Attrs[AttrHeaderSource] = "profile"
+	}
+	if len(t.keys) > 0 && t.fromProfile {
+		// The profile's header text, then the keys.
+		b.Attrs[AttrHeaderSource] = "profile attribute"
 	}
 	if len(t.attrNames) > 0 {
 		b.Attrs[generic.AttrAttribute] = strings.Join(t.attrNames, " ")
@@ -503,4 +587,14 @@ func (e *Engine) calsEnd(f *frame, start, end int64) {
 			e.putSink(s)
 		}
 	}
+}
+
+// noCells reports that none of a row's attribute cells has a value.
+func (e *Engine) noCells(cells []*profile.Value) bool {
+	for _, cv := range cells {
+		if v, _ := e.value(cv); v != "" {
+			return false
+		}
+	}
+	return true
 }
