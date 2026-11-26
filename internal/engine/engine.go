@@ -208,6 +208,7 @@ type frame struct {
 	table *table
 	owner *table // the table of a row or cell
 	cell  bool
+	col   int    // a column cell's column, 0-based (-1: past the bound)
 	cals  string // the element of the CALS model this is
 
 	partAt *gofastcore.Part
@@ -1258,6 +1259,11 @@ func (e *Engine) startRule(f *frame, el *xmlread.Element) {
 			if row := e.rowFrame(); row != nil {
 				f.owner = row.owner
 				f.cell = true
+				f.col = r.Column - 1
+				if r.ColumnKey != nil && f.owner != nil {
+					key, _ := e.value(r.ColumnKey)
+					f.col = f.owner.keyColumn(e, r.Column-1, key)
+				}
 				e.openSink(f, skCell, el.Start)
 			}
 			break
@@ -2429,7 +2435,7 @@ func (e *Engine) endRule(f *frame, end int64) blockRef {
 		if f.sink != nil {
 			s := e.closeSink(f)
 			if t := f.owner; t != nil && r.Column > 0 {
-				t.columnCell(r.Column-1, s.b.String(), s.href)
+				t.columnCell(f.col, s.b.String(), s.href)
 			} else if t != nil {
 				t.endCell(s.b.String(), s.href)
 			}

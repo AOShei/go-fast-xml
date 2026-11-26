@@ -89,7 +89,7 @@ var (
 		AsItem:        append(slices.Clone(common), "marker", "value"),
 		AsTable:       append(slices.Clone(common), "model", "header", "one_row", "rest"),
 		AsRow:         append(slices.Clone(common), "header", "cells", "rest"),
-		AsCell:        append(slices.Clone(common), "header", "colspan", "rowspan", "column", "with"),
+		AsCell:        append(slices.Clone(common), "header", "colspan", "rowspan", "column", "column_key", "with"),
 		AsInline:      {"match", "as", "style", "link", "title", "attrs", "extra", "space", "value", "with"},
 		AsLabel:       {"match", "as"},
 		AsImage:       append(slices.Clone(common), "id", "alt"),
@@ -217,8 +217,13 @@ type Rule struct {
 	// cells ("one_row", table: CII's monetary summation).
 	Column int
 	Rest   int
-	With   []*Value
-	OneRow bool
+	// ColumnKey: the cell's column is chosen by this attribute's value
+	// ("column_key", cell with "column"): each value as written has a
+	// column of its own, from Column on, in order of first appearance in
+	// the table, and its header cell is the value (TMX tuv@xml:lang).
+	ColumnKey *Value
+	With      []*Value
+	OneRow    bool
 
 	// A "document" rule: the media type handed over, a constant
 	// (MediaType) or chosen by an attribute (MediaAttr, MediaMap: a value
@@ -595,6 +600,9 @@ func (r *Rule) values() []*Value {
 		}
 	}
 	vs = append(vs, r.With...)
+	if r.ColumnKey != nil {
+		vs = append(vs, r.ColumnKey)
+	}
 	return append(vs, r.Cells...)
 }
 
@@ -869,6 +877,19 @@ func compileRule(raw json.RawMessage, i int, f *fileJSON, builtin bool) (*Rule, 
 				return nil, fmt.Errorf("%s: %q is a column number, 1 to %d", where, x.key, MaxCells)
 			}
 		}
+	}
+	if v, ok := m["column_key"]; ok {
+		kv, err := c.value("column_key", v)
+		if err != nil {
+			return nil, err
+		}
+		if kv.IsLiteral || kv.Attr.Local == "" || kv.Of != nil || kv.Claims() != nil || kv.AttrChild != nil || kv.Codepoint {
+			return nil, fmt.Errorf("%s: \"column_key\" is an attribute of the element's own, {\"attr\": \"name\"}", where)
+		}
+		if r.Column == 0 {
+			return nil, fmt.Errorf("%s: \"column_key\" goes with \"column\", the first keyed column", where)
+		}
+		r.ColumnKey = kv
 	}
 	if r.Column > 0 && (r.Colspan != nil || r.Rowspan != nil) {
 		return nil, fmt.Errorf("%s: a cell with \"column\" has no span", where)
