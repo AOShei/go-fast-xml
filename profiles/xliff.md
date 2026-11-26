@@ -77,17 +77,22 @@ by the blocks' `xliff.original`.
 
 ## Measured
 
-- dev: 921 files, 528 read with xliff, 393 with `xliff2` (XLIFF 2.x, see
+- dev: 958 files, 565 read with xliff, 393 with `xliff2` (XLIFF 2.x, see
   `profiles/xliff2.md`); 0 errors, 0 Validate failures, 0 panics; blocks
-  over the whole set: heading 1,145, table 1,103, paragraph 61,901, note
-  (attribute) 182,339, stored 374; `limit.exceeded` 1;
-  `xml.unmapped_elements` 163,814, `xml.unmapped_attributes` 306,706
+  over the whole set: heading 1,182, table 1,140, paragraph 64,038, note
+  (attribute) 212,249, stored 374; `limit.exceeded` 1;
+  `xml.unmapped_elements` 186,156, `xml.unmapped_attributes` 355,919
   (files read with xliff).
-- held-out: 325 files, 192 read with xliff, 133 with `xliff2`; 0 errors,
-  0 Validate failures; over the whole set: heading 434, table 405,
-  paragraph 48,705, note 170,079, stored 135; `limit.exceeded` 1;
-  `xml.unmapped_elements` 161,423, `xml.unmapped_attributes` 110,527
+- held-out: 334 files, 201 read with xliff, 133 with `xliff2`; 0 errors,
+  0 Validate failures; over the whole set: heading 443, table 414,
+  paragraph 49,484, note 172,105, stored 135; `limit.exceeded` 1;
+  `xml.unmapped_elements` 165,412, `xml.unmapped_attributes` 123,793
   (files read with xliff).
+- By the tool that wrote them, among the files read with xliff: Trados
+  `.sdlxliff` 33 dev and 14 held-out, Phrase (Memsource) `.mxliff` 26
+  and 8, memoQ `.mqxliff` 11 and 1. Their own elements and attributes
+  (`sdl:`, `m:`, `mq:`) have no rules: the elements are read
+  generically and the attributes are notes, counted above.
 - Largest dev file (7.0 MB, 4,839 rows): about 360 ms, 420 MiB allocated
   over the read. Where (heap profile of the dev
   set read with xliff, allocated bytes): the growth of the part's block

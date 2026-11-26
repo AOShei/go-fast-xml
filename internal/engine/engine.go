@@ -273,8 +273,11 @@ type frame struct {
 	pairAt    int
 	pairName  string
 	pairAttrs []kv
-	tagEnd    int64
-	pt        *pairTarget
+	// pairMeta: the created or modified rule of a pair element whose
+	// date is its text (pairDate).
+	pairMeta *profile.Rule
+	tagEnd   int64
+	pt       *pairTarget
 }
 
 // waitVal is a value a section waits to place: read from the attribute
@@ -604,6 +607,7 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 		// or it is inside a value with text (mixed content).
 		if e.beforeChild(e.parent()) && !e.keepsRule(rule, at) {
 			e.startPair(f, el, at)
+			e.pairDate(f, rule)
 			return
 		}
 	}
@@ -2804,6 +2808,15 @@ func parseDate(s string) (time.Time, bool) {
 	for _, layout := range []string{time.RFC3339Nano, "2006-01-02T15:04:05", "2006-01-02"} {
 		if t, err := time.Parse(layout, s); err == nil {
 			return t, true
+		}
+	}
+	// ISO 8601 basic date and time, YYYYMMDDThhmmss with Z, a numeric
+	// offset or no zone (NITF's date.issue@norm).
+	if len(s) >= 15 && s[8] == 'T' && strings.Trim(s[:8], "0123456789") == "" {
+		for _, layout := range []string{"20060102T150405Z0700", "20060102T150405"} {
+			if t, err := time.Parse(layout, s); err == nil {
+				return t, true
+			}
 		}
 	}
 	// ISO 8601 basic calendar date, YYYYMMDD (UN/CEFACT format 102, as CII

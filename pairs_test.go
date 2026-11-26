@@ -3,6 +3,7 @@ package gofastxml
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/AOShei/go-fast-core"
 )
@@ -168,6 +169,59 @@ func TestProfilePairsEmpty(t *testing.T) {
 		}
 		if strings.Join(got, " ") != c.want {
 			t.Errorf("%q: got  %s\nwant %s", c.key, strings.Join(got, " "), c.want)
+		}
+	}
+}
+
+// TestProfilePairsDate: inside a names-and-values table a "metadata" rule
+// of field created or modified fills the field when the engine reads the
+// date; the element stays a row as written, and no other field is filled
+// there. The first date read is kept.
+func TestProfilePairsDate(t *testing.T) {
+	prof := head("pairsdate", `{"root": "Doc"}`) + `"rules": [
+		{"match": "/Doc", "as": "transparent"},
+		{"match": "Head", "as": "table", "pairs": "path"},
+		{"match": "Head/Issued", "as": "metadata", "field": "created", "value": {"attr": "norm"}},
+		{"match": "Head/Changed", "as": "metadata", "field": "modified"},
+		{"match": "Head/Name", "as": "metadata", "field": "title"}]}`
+	for _, c := range []struct{ src, created, modified, rows string }{
+		{`<Doc><Head><Issued norm="20020225T143000-0500"/><Issued norm="20030101T000000Z"/><Changed>2002-02-26</Changed><Name>N</Name></Head></Doc>`,
+			"2002-02-25T14:30:00-05:00", "2002-02-26T00:00:00Z",
+			"Head/Issued/@norm=20020225T143000-0500 Head/Issued/@norm=20030101T000000Z Head/Changed=2002-02-26 Head/Name=N"},
+		{`<Doc><Head><Issued norm="20020225T143000"/><Changed>last week</Changed></Head></Doc>`,
+			"2002-02-25T14:30:00Z", "", "Head/Issued/@norm=20020225T143000 Head/Changed=last week"},
+		{`<Doc><Head><Issued norm="2002-02-25 14:30"/><Issued>20020225T143000Z</Issued></Head></Doc>`,
+			"", "", "Head/Issued/@norm=2002-02-25 14:30 Head/Issued=20020225T143000Z"},
+	} {
+		doc := extractWith(t, prof, c.src, nil)
+		if err := doc.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		stamp := func(d time.Time) string {
+			if d.IsZero() {
+				return ""
+			}
+			return d.Format(time.RFC3339)
+		}
+		if got := stamp(doc.Metadata.Created); got != c.created {
+			t.Errorf("%s: Created %q, want %q", c.src, got, c.created)
+		}
+		if got := stamp(doc.Metadata.Modified); got != c.modified {
+			t.Errorf("%s: Modified %q, want %q", c.src, got, c.modified)
+		}
+		if doc.Metadata.Title != "" {
+			t.Errorf("%s: Title %q filled from inside the table", c.src, doc.Metadata.Title)
+		}
+		var got []string
+		for _, b := range blocks(doc) {
+			if b.Kind == gofastcore.KindTable {
+				for _, row := range b.Table.Rows {
+					got = append(got, strings.Join(row, "="))
+				}
+			}
+		}
+		if strings.Join(got, " ") != c.rows {
+			t.Errorf("%s: rows %s\nwant %s", c.src, strings.Join(got, " "), c.rows)
 		}
 	}
 }

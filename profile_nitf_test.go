@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/AOShei/go-fast-core"
 )
@@ -184,7 +185,14 @@ func newsFixture(t *testing.T, c *jatsOracleCase, name string) *gofastcore.Docum
 	return doc
 }
 
-func TestNitfFixtureStory(t *testing.T) { newsFixture(t, nitfCase, "story") }
+// The story's date.issue@norm (20121001T120000Z, ISO 8601 basic) is a row
+// of the head table as written and is also Metadata.Created.
+func TestNitfFixtureStory(t *testing.T) {
+	doc := newsFixture(t, nitfCase, "story")
+	if got := doc.Metadata.Created.Format(time.RFC3339); got != "2012-10-01T12:00:00Z" {
+		t.Errorf("Created: %s", got)
+	}
+}
 
 func TestNitfFixtureNamespace(t *testing.T) { newsFixture(t, nitfCase, "namespace") }
 

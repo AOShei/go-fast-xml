@@ -89,6 +89,37 @@ func (e *Engine) startPair(f *frame, el *xmlread.Element, at int) {
 	e.openSink(f, skCell, el.Start)
 }
 
+// pairDate applies a "metadata" rule of field created or modified to an
+// element read as a name and value: the element stays a row as written,
+// and its date, when the engine reads it and the field is not yet set,
+// is also the document's. The value is the rule's "value" (an
+// attribute), or the element's text, taken when it ends.
+func (e *Engine) pairDate(f *frame, rule *profile.Rule) {
+	if rule == nil || rule.As != profile.AsMetadata || rule.Field != "created" && rule.Field != "modified" {
+		return
+	}
+	if rule.Value == nil {
+		f.pairMeta = rule
+		return
+	}
+	// Only a value known at the start tag (an attribute, a literal).
+	if v, ok := e.value(rule.Value); ok {
+		e.setPairDate(rule, v)
+	}
+}
+
+func (e *Engine) setPairDate(rule *profile.Rule, v string) {
+	t, ok := parseDate(strings.TrimSpace(v))
+	if !ok {
+		return
+	}
+	if m := &e.Meta; rule.Field == "created" && m.Created.IsZero() {
+		m.Created = t
+	} else if rule.Field == "modified" && m.Modified.IsZero() {
+		m.Modified = t
+	}
+}
+
 // pairAttrs keeps the element's attributes, each a row of its own after
 // the element's value, named <name>/@<attribute>.
 func (e *Engine) pairAttrs(f *frame, el *xmlread.Element) {
@@ -147,7 +178,11 @@ func (e *Engine) pairName(at int, local bool) string {
 func (e *Engine) endPair(f *frame, end int64) {
 	if f.sink != nil {
 		s := e.closeSink(f)
-		if text := s.b.String(); text != "" || len(f.pairAttrs) == 0 && e.frames[f.pairAt].pt.empty {
+		text := s.b.String()
+		if f.pairMeta != nil {
+			e.setPairDate(f.pairMeta, text)
+		}
+		if text != "" || len(f.pairAttrs) == 0 && e.frames[f.pairAt].pt.empty {
 			e.pairRow(f, f.pairName, text, end)
 		}
 		for _, b := range s.after {

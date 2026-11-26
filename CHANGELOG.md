@@ -27,6 +27,17 @@
   `catalogItem`, `catalog`). An item's XHTML body is handed to the child
   extractor; NITF inside a NewsML-G2 item is read by the NITF rules. See
   `profiles/nitf.md` and `profiles/newsml-g2.md`.
+- **`nitf`, `newsml-g2`: `Metadata.Created` from NITF's
+  `date.issue@norm`** when it is an ISO 8601 date and time, basic
+  (`20020225T143000-0500`) or extended. The value stays a row of the head
+  table as written. The engine now reads the ISO 8601 basic date and
+  time wherever a profile fills `created` or `modified`; on the corpus
+  this changes 15 NITF files and no other.
+- **A directory given to `gofastxml` also stands for `.sdlxliff`,
+  `.mxliff` and `.mqxliff` files** (XLIFF 1.2 as Trados, Phrase and memoQ
+  write it), read by the `xliff` profile.
+- Profile format: a `metadata` rule of field `created` or `modified` is
+  applied inside a `pairs` table, where the element stays a row.
 - Profile format: `"pairs": "parent"` names a table's values from the
   element its own element stands in (`ProcurementProject/ID`);
   `"pairs_empty": true` writes an element with no content and no

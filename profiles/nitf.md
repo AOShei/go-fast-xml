@@ -42,10 +42,15 @@ stays generic, as does NITF without its root (`TestNitfSelection`).
 | `em`, `strong`, `sub`, `sup`, `a@href` | Inline styles and links; `a@rel`, `@rev`, `@name` in the link's record |
 | `person`, `org`, `function`, `location`, `sublocation`, `city`, `state`, `region`, `country`, `chron`, `money`, `num`, `frac`, `event`, `object.title`, `alt-code`, `virtloc`, `classifier`, `copyrite`, `q`, `pronounce`, `name.given`, `name.family` | Inline: their text stays in the paragraph. Their attributes (`@idsrc`, `@value`, `chron@norm`, `money@unit`, `num@units`, `location@location-code`, `country@iso-cc`, ...) go, under their own names, in the record in the stored part an inline with `attrs` makes (as Service-Public's `TermeEtranger@langue`) |
 
-`Metadata.Created` is not filled from `date.issue@norm`: the value is an
-ISO 8601 basic date-time (`20020225T143000-0500`), and no profile fills
-`Created` from that form (the engine reads ISO 8601 extended, RFC 822 and
-`YYYYMMDD`). It is in the head table as written.
+`Metadata.Created` is the first `docdata/date.issue@norm` the engine
+reads as a date: ISO 8601 basic date and time (`20020225T143000-0500`,
+with `Z`, a numeric offset or no zone, which is read as UTC) or ISO 8601
+extended. The value is also a row of the head table, as written. A date
+written another way (`2022-07-11 18:33`, with a space) is only the row.
+`date.release` and `date.expire` are rows only. On the dev set 15 of the
+17 files have `Created`; the 2 others write the date with a space. NITF
+inside a NewsML-G2 item fills it the same way (1 dev file has one, with
+a space).
 
 `Loc.Anchor`: `doc-id@id-string` is an attribute of a child of `head`;
 the engine's `"heading": "anchor"` takes only a child's text and a
