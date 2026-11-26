@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.0 (2026-11-26)
 
 - **New built-in profile `dila-juri`** for DILA's case law: roots
   `TEXTE_JURI_JUDI` (CASS, INCA, CAPP), `TEXTE_JURI_ADMIN` (JADE) and
