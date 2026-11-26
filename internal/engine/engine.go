@@ -351,9 +351,9 @@ type Engine struct {
 	// MaxAttachmentBytes or MaxChildren; AttachmentsBad those whose text
 	// is not base64.
 	AttachmentsCut, AttachmentsBad int
-	docs                        bool
-	doc                         *docCap
-	scratchTag                  []byte
+	docs                           bool
+	doc                            *docCap
+	scratchTag                     []byte
 
 	com      generic.Builder
 	inCom    bool
