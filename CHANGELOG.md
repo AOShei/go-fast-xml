@@ -5,6 +5,27 @@
 - **A directory given to `gofastxml` stands for `.xlf`, `.xliff` and `.tmx`
   files too**, the names of XLIFF and TMX translation files. A file named
   on the command line is read whatever its name, as before.
+- **Built-in profile `eforms`** for EU eForms procurement notices (UBL
+  `ContractNotice`, `ContractAwardNotice`, `PriorInformationNotice` with
+  the eForms extensions): the title and each lot as headings, descriptions
+  as paragraphs, every other value in tables of names and values. See
+  `profiles/eforms.md`.
+- **Built-in profile `ted`** for TED notices before eForms (`TED_EXPORT`,
+  schema R2.0.8 and R2.0.9): coded data, translated titles and form parts
+  as tables; in the 2014 forms the title, lots and awards as headings and
+  sections; text notices (`OTH_NOT`) as headings, paragraphs and lists.
+  See `profiles/ted.md`.
+- **Built-in profile `boamp`** for BOAMP, the French procurement bulletin
+  (DILA open data: root `ann` of schema 3.2.5, and `ANNONCE` of the
+  2015 to 2021 archives). The embedded eForms notice is read as `eforms`
+  reads one; `HTML` and `HTMLSYNTHESE` are handed to the child extractor.
+  See `profiles/boamp.md`.
+- Profile format: `"pairs": "parent"` names a table's values from the
+  element its own element stands in (`ProcurementProject/ID`);
+  `"pairs_empty": true` writes an element with no content and no
+  attributes as a row with an empty value (`PROCEDURE/PT_OPEN`). No
+  earlier profile uses either; the output of every earlier corpus file
+  is unchanged.
 
 ## v0.3.0 (2026-11-26)
 
