@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nitf version="-//IPTC//DTD NITF 3.6//EN" change.date="2012-10-01" change.time="12:00">
+<head>
+<title>Harbour reopens</title>
+<meta name="slug" content="harbour-reopen"/>
+<tobject tobject.type="news"><tobject.subject tobject.subject.refnum="04000000" tobject.subject.type="Economy"/></tobject>
+<docdata management-status="usable">
+<doc-id id-string="ex.2012.0001" regsrc="EX"/>
+<urgency ed-urg="4"/>
+<date.issue norm="20121001T120000Z"/>
+<date.release norm="20121001T130000Z"/>
+<doc.copyright year="2012" holder="Example Wire"/>
+<key-list><keyword key="harbour"/><keyword key="shipping"/></key-list>
+<identified-content><classifier type="genre" value="report"/></identified-content>
+</docdata>
+<pubdata type="print" name="Example Daily" edition.area="North"/>
+</head>
+<body>
+<body.head>
+<hedline><hl1>Harbour <em>reopens</em> after storm</hl1><hl2 id="sub">Ships wait at anchor</hl2></hedline>
+<note noteclass="editorsnote"><body.content><p>Corrects the date.</p></body.content></note>
+<byline>By <person idsrc="ex" value="p1">Ann Writer</person> <byttl>Harbour reporter</byttl></byline>
+<distributor><org>Example Wire</org></distributor>
+<dateline><location><city>Portsmouth</city></location>, <story.date norm="20121001">Oct. 1</story.date></dateline>
+<rights><rights.owner>Example Wire</rights.owner></rights>
+<abstract><p>The harbour opened at dawn.</p></abstract>
+</body.head>
+<body.content>
+<p lede="true">The <org value="hb">harbour board</org> reopened the port on <chron norm="2012-10-01">Monday</chron>.<br/>Fees rose to <money unit="GBP">10 pounds</money>.</p>
+<media media-type="image"><media-reference source="harbour.jpg" alternate-text="The harbour at dawn" mime-type="image/jpeg"/><media-caption>The harbour at dawn.</media-caption><media-producer>A. Photographer</media-producer></media>
+<block class="box"><hl2>Background</hl2><p>See <a href="http://example.com/storm">the storm report</a>.</p></block>
+<bq><block><p>We are open.</p></block><credit>Harbour master</credit></bq>
+<ul><li>Berth 1</li><li>Berth 2</li></ul>
+<dl><dt>Berth</dt><dd>A place for a ship</dd></dl>
+<pre>08:00  open</pre>
+<table><caption>Arrivals</caption><thead><tr><th>Ship</th><th>Time</th></tr></thead><tbody><tr><td>Ada</td><td>09:00</td></tr></tbody></table>
+<p>Text<fn id="f1"><p>A note.</p></fn> ends.</p>
+</body.content>
+<body.end><tagline>Ann Writer reported from Portsmouth.</tagline></body.end>
+</body>
+</nitf>

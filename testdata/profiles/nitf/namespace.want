@@ -1,0 +1,8 @@
+title: Namespaced story
+table anchor_parent=ex.ns.1 header_source=profile
+  name | value
+  head/docdata/doc-id/@id-string | ex.ns.1  <<doc-id id-string="ex.ns
+heading1 anchor_parent=ex.ns.1: Namespaced story
+paragraph anchor_parent=ex.ns.1: One paragraph.
+paragraph anchor_parent=ex.ns.1 element=nitf/body/body.content/extra-thing: Not NITF.
+warning xml.unmapped_elements: elements with no rule in the profile, read generically: 1 in all: extra-thing (1)

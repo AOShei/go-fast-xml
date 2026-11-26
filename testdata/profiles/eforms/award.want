@@ -1,0 +1,108 @@
+title: Fourniture de pain pour la cantine
+extra created=2026-03-02+01:00
+extra eforms.contract_folder_id=00000000-0000-4000-8000-000000000002
+extra eforms.customization_id=eforms-sdk-1.10
+extra eforms.issue_time=09:30:00+01:00
+extra eforms.notice_id=00000000-0000-4000-8000-000000000001
+extra eforms.notice_id_scheme=notice-id
+extra eforms.notice_language=FRA
+extra eforms.notice_language_list=language
+extra eforms.notice_type=can-standard
+extra eforms.notice_type_list=result
+extra eforms.regulatory_domain=32014L0024
+extra eforms.title_language=FRA
+ENG
+extra eforms.ubl_version=2.3
+extra eforms.version_id=01
+extra encoding=utf-8
+extra root=ContractAwardNotice
+extra root_namespace=urn:oasis:names:specification:ubl:schema:xsd:ContractAwardNotice-2
+extra xml.profile=eforms
+table header_source=profile
+  name | value
+  NoticeResult/TotalAmount | 1200.50  <<cbc:TotalAmount currenc
+  NoticeResult/TotalAmount/@currencyID | EUR  <<cbc:TotalAmount currenc
+table header_source=profile
+  name | value
+  NoticeResult/LotResult/ID | RES-0001  <<cbc:ID schemeName="resu
+  NoticeResult/LotResult/ID/@schemeName | result  <<cbc:ID schemeName="resu
+  NoticeResult/LotResult/TenderResultCode | selec-w  <<cbc:TenderResultCode li
+  NoticeResult/LotResult/TenderResultCode/@listName | winner-selection-status  <<cbc:TenderResultCode li
+  NoticeResult/LotResult/LotTender/ID | TEN-0001  <<cbc:ID schemeName="tend
+  NoticeResult/LotResult/LotTender/ID/@schemeName | tender  <<cbc:ID schemeName="tend
+  NoticeResult/LotResult/TenderLot/ID | LOT-0001  <<cbc:ID schemeName="Lot"
+  NoticeResult/LotResult/TenderLot/ID/@schemeName | Lot  <<cbc:ID schemeName="Lot"
+table header_source=profile
+  name | value
+  NoticeResult/LotTender/ID | TEN-0001  <<cbc:ID schemeName="tend
+  NoticeResult/LotTender/ID/@schemeName | tender  <<cbc:ID schemeName="tend
+  NoticeResult/LotTender/LegalMonetaryTotal/PayableAmount | 1200.50  <<cbc:PayableAmount curre
+  NoticeResult/LotTender/LegalMonetaryTotal/PayableAmount/@currencyID | EUR  <<cbc:PayableAmount curre
+  NoticeResult/LotTender/TenderReference/ID | 1. Offre de la boulangerie  <<cbc:ID>1. Offre de la b
+table header_source=profile
+  name | value
+  NoticeSubType/SubTypeCode | 29  <<cbc:SubTypeCode listNam
+  NoticeSubType/SubTypeCode/@listName | notice-subtype  <<cbc:SubTypeCode listNam
+table header_source=profile
+  name | value
+  Organization/Company/PartyIdentification/ID | ORG-0001  <<cbc:ID schemeName="orga
+  Organization/Company/PartyIdentification/ID/@schemeName | organization  <<cbc:ID schemeName="orga
+  Organization/Company/PartyName/Name | Commune de Saint-Exemple  <<cbc:Name languageID="FR
+  Organization/Company/PartyName/Name/@languageID | FRA  <<cbc:Name languageID="FR
+  Organization/Company/PostalAddress/CityName | Saint-Exemple  <<cbc:CityName>Saint-Exem
+  Organization/Company/PostalAddress/PostalZone | 75001  <<cbc:PostalZone>75001</c
+  Organization/Company/PostalAddress/Country/IdentificationCode | FRA  <<cbc:IdentificationCode 
+  Organization/Company/PostalAddress/Country/IdentificationCode/@listName | country  <<cbc:IdentificationCode 
+table header_source=profile
+  name | value
+  Organization/ListedOnRegulatedMarketIndicator | false  <<efbc:ListedOnRegulatedM
+  Organization/Company/PartyIdentification/ID | ORG-0002  <<cbc:ID schemeName="orga
+  Organization/Company/PartyIdentification/ID/@schemeName | organization  <<cbc:ID schemeName="orga
+  Organization/Company/PartyName/Name | Boulangerie Exemple SARL  <<cbc:Name languageID="FR
+  Organization/Company/PartyName/Name/@languageID | FRA  <<cbc:Name languageID="FR
+table header_source=profile
+  name | value
+  AdditionalNoticeLanguage/ID | ENG  <<cbc:ID>ENG</cbc:ID>
+table header_source=profile
+  name | value
+  ContractingParty/ContractingPartyType/PartyTypeCode | la  <<cbc:PartyTypeCode listN
+  ContractingParty/ContractingPartyType/PartyTypeCode/@listName | buyer-legal-type  <<cbc:PartyTypeCode listN
+  ContractingParty/Party/PartyIdentification/ID | ORG-0001  <<cbc:ID schemeName="orga
+  ContractingParty/Party/PartyIdentification/ID/@schemeName | organization  <<cbc:ID schemeName="orga
+table header_source=profile
+  name | value
+  TenderingProcess/ProcedureCode | open  <<cbc:ProcedureCode listN
+  TenderingProcess/ProcedureCode/@listName | procurement-procedure-type  <<cbc:ProcedureCode listN
+table header_source=profile
+  name | value
+  ProcurementProject/ID | 2026/07  <<cbc:ID>2026/07</cbc:ID>
+heading1: Fourniture de pain pour la cantine
+heading1: Supply of bread for the canteen
+paragraph eforms.field=Description eforms.languageID=FRA: Pain frais livré chaque jour d'école.
+note stored=markup_comment: chaque matin
+paragraph eforms.field=Description eforms.languageID=ENG: Fresh bread delivered every school day.
+table header_source=profile
+  name | value
+  ProcurementProject/ProcurementTypeCode | supplies  <<cbc:ProcurementTypeCode
+  ProcurementProject/ProcurementTypeCode/@listName | contract-nature  <<cbc:ProcurementTypeCode
+table header_source=profile
+  name | value
+  ProcurementProject/MainCommodityClassification/ItemClassificationCode | 15811100  <<cbc:ItemClassificationC
+  ProcurementProject/MainCommodityClassification/ItemClassificationCode/@listName | cpv  <<cbc:ItemClassificationC
+heading2 #LOT-0001 eforms.scheme=Lot: LOT-0001
+table anchor_parent=LOT-0001 header_source=profile
+  name | value
+  TenderingTerms/AwardingTerms/AwardingCriterion/SubordinateAwardingCriterion/AwardingCriterionTypeCode | price  <<cbc:AwardingCriterionTy
+  TenderingTerms/AwardingTerms/AwardingCriterion/SubordinateAwardingCriterion/AwardingCriterionTypeCode/@listName | award-criterion-type  <<cbc:AwardingCriterionTy
+  TenderingTerms/AwardingTerms/AwardingCriterion/SubordinateAwardingCriterion/Description | Prix le plus bas  <<cbc:Description languag
+  TenderingTerms/AwardingTerms/AwardingCriterion/SubordinateAwardingCriterion/Description/@languageID | FRA  <<cbc:Description languag
+table anchor_parent=LOT-0001 header_source=profile
+  name | value
+  ProcurementProject/ID | 2026/07-1  <<cbc:ID>2026/07-1</cbc:I
+heading3 anchor_parent=LOT-0001 eforms.languageID=FRA: Lot 1 : pain
+paragraph anchor_parent=LOT-0001 eforms.field=Description eforms.languageID=FRA: Baguettes et pains complets.
+paragraph anchor_parent=LOT-0001 eforms.field=Note eforms.languageID=FRA: Livraison avant 7 h.
+table anchor_parent=LOT-0001 header_source=profile
+  name | value
+  ProcurementProject/PlannedPeriod/DurationMeasure | 12  <<cbc:DurationMeasure uni
+  ProcurementProject/PlannedPeriod/DurationMeasure/@unitCode | MONTH  <<cbc:DurationMeasure uni

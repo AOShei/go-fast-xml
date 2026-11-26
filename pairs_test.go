@@ -105,3 +105,69 @@ func TestProfilePairs(t *testing.T) {
 		}
 	}
 }
+
+// TestProfilePairsParent: "pairs": "parent" names every value from the
+// element the table's element stands in, so that a table that is one
+// value of a record says whose it is.
+func TestProfilePairsParent(t *testing.T) {
+	prof := head("pairsparent", `{"root": "Doc"}`) + `"rules": [
+		{"match": "/Doc", "as": "transparent"},
+		{"match": "Project", "as": "transparent"},
+		{"match": "Project/*", "as": "table", "pairs": "parent"},
+		{"match": "Project/Name", "as": "heading", "level": 1},
+		{"match": "/Doc/Top", "as": "table", "pairs": "parent"}]}`
+	src := `<Doc><Project><ID s="x">7</ID><Name>N</Name><Class><Code list="cpv">15</Code></Class></Project><Top>t</Top></Doc>`
+	doc := extractWith(t, prof, src, nil)
+	if err := doc.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if bad := citeCheck([]byte(src), doc); bad != "" {
+		t.Errorf("cite: %s", bad)
+	}
+	var got []string
+	for _, b := range blocks(doc) {
+		if b.Kind == gofastcore.KindTable {
+			for _, row := range b.Table.Rows {
+				got = append(got, strings.Join(row, "="))
+			}
+		}
+	}
+	want := "Project/ID=7 Project/ID/@s=x Project/Class/Code=15 Project/Class/Code/@list=cpv Doc/Top=t"
+	if strings.Join(got, " ") != want {
+		t.Errorf("got  %s\nwant %s", strings.Join(got, " "), want)
+	}
+}
+
+// TestProfilePairsEmpty: with "pairs_empty" an element with no content
+// and no attributes, whose presence is the value (TED's PT_OPEN), is a
+// row with an empty value; without it, it gives nothing.
+func TestProfilePairsEmpty(t *testing.T) {
+	src := `<Doc><Proc><PT_OPEN/><GPA></GPA><Lang V="EN"/><Date>2022</Date><Box> </Box></Proc><Flag/></Doc>`
+	for _, c := range []struct{ key, want string }{
+		{`, "pairs_empty": true`, "Proc/PT_OPEN= Proc/GPA= Proc/Lang/@V=EN Proc/Date=2022 Proc/Box= Flag="},
+		{``, "Proc/Lang/@V=EN Proc/Date=2022"},
+	} {
+		prof := head("pairsempty", `{"root": "Doc"}`) + `"rules": [
+		{"match": "/Doc", "as": "transparent"},
+		{"match": "Proc", "as": "table", "pairs": "path"` + c.key + `},
+		{"match": "Flag", "as": "table", "pairs": "path"` + c.key + `}]}`
+		doc := extractWith(t, prof, src, nil)
+		if err := doc.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, b := range blocks(doc) {
+			if b.Kind == gofastcore.KindTable {
+				for i, row := range b.Table.Rows {
+					got = append(got, strings.Join(row, "="))
+					if l := b.Table.RowLocs[i]; l.Length == 0 {
+						t.Errorf("row %v has no location", row)
+					}
+				}
+			}
+		}
+		if strings.Join(got, " ") != c.want {
+			t.Errorf("%q: got  %s\nwant %s", c.key, strings.Join(got, " "), c.want)
+		}
+	}
+}

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nitf xmlns="http://iptc.org/std/NITF/2006-10-18/">
+<head><docdata><doc-id id-string="ex.ns.1"/></docdata></head>
+<body>
+<body.head><hedline><hl1>Namespaced story</hl1></hedline></body.head>
+<body.content><p>One paragraph.</p><extra-thing>Not NITF.</extra-thing></body.content>
+</body>
+</nitf>

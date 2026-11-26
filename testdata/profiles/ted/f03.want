@@ -1,0 +1,107 @@
+title: Fourniture de pain pour la cantine
+extra encoding=utf-8
+extra root=TED_EXPORT
+extra root_namespace=http://publications.europa.eu/resource/schema/ted/R2.0.9/publication
+extra ted.doc_id=000001-2022
+extra ted.edition=2022010
+extra ted.version=R2.0.9.S05.E01
+extra xml.profile=ted
+table header_source=profile
+  name | value
+  TECHNICAL_SECTION/RECEPTION_ID | 22-000001-001  <<RECEPTION_ID>22-000001-
+  TECHNICAL_SECTION/DELETION_DATE | 20220420  <<DELETION_DATE>20220420<
+table header_source=profile
+  name | value
+  LINKS_SECTION/OFFICIAL_FORMS_LINK/@type | simple  <<OFFICIAL_FORMS_LINK xli
+  LINKS_SECTION/OFFICIAL_FORMS_LINK/@href | https://example.org/forms  <<OFFICIAL_FORMS_LINK xli
+table header_source=profile
+  name | value
+  REF_OJS/COLL_OJ | S  <<COLL_OJ>S</COLL_OJ>
+  REF_OJS/NO_OJ | 10  <<NO_OJ>10</NO_OJ>
+  REF_OJS/DATE_PUB | 20220114  <<DATE_PUB>20220114</DATE
+table header_source=profile
+  name | value
+  NOTICE_DATA/NO_DOC_OJS | 2022/S 010-000001  <<NO_DOC_OJS>2022/S 010-0
+  NOTICE_DATA/LG_ORIG | FR  <<LG_ORIG>FR</LG_ORIG>
+  NOTICE_DATA/ISO_COUNTRY/@VALUE | FR  <<ISO_COUNTRY VALUE="FR"/
+  NOTICE_DATA/ORIGINAL_CPV | Bread  <<ORIGINAL_CPV CODE="1581
+  NOTICE_DATA/ORIGINAL_CPV/@CODE | 15811100  <<ORIGINAL_CPV CODE="1581
+  NOTICE_DATA/PERFORMANCE_NUTS | Paris  <<n2021:PERFORMANCE_NUTS 
+  NOTICE_DATA/PERFORMANCE_NUTS/@CODE | FR101  <<n2021:PERFORMANCE_NUTS 
+table header_source=profile
+  name | value
+  CODIF_DATA/TD_DOCUMENT_TYPE | Contract award notice  <<TD_DOCUMENT_TYPE CODE="
+  CODIF_DATA/TD_DOCUMENT_TYPE/@CODE | 7  <<TD_DOCUMENT_TYPE CODE="
+  CODIF_DATA/PR_PROC | Open procedure  <<PR_PROC CODE="1">Open p
+  CODIF_DATA/PR_PROC/@CODE | 1  <<PR_PROC CODE="1">Open p
+table attribute=LG header_source=profile
+  language | country | town | title
+  EN | France | Saint-Exemple | Bread  <<ML_TI_DOC LG="EN"><TI_C
+  FR | France | Saint-Exemple | Pain  <<ML_TI_DOC LG="FR"><TI_C
+table attribute=LG header_source=profile
+  language | name
+  FR | Commune de Saint-Exemple  <<AA_NAME LG="FR">Commune
+heading1 attribute=LG ted.category=ORIGINAL ted.form=F03: FR
+table header_source=profile
+  name | value
+  LEGAL_BASIS/@VALUE | 32014L0024  <<LEGAL_BASIS VALUE="3201
+table header_source=profile
+  name | value
+  CONTRACTING_BODY/ADDRESS_CONTRACTING_BODY/OFFICIALNAME | Commune de Saint-Exemple  <<OFFICIALNAME>Commune de
+  CONTRACTING_BODY/ADDRESS_CONTRACTING_BODY/TOWN | Saint-Exemple  <<TOWN>Saint-Exemple</TOW
+  CONTRACTING_BODY/ADDRESS_CONTRACTING_BODY/COUNTRY/@VALUE | FR  <<COUNTRY VALUE="FR"/>
+  CONTRACTING_BODY/CA_TYPE/@VALUE | REGIONAL_AUTHORITY  <<CA_TYPE VALUE="REGIONAL
+heading2: Fourniture de pain pour la cantine
+table header_source=profile
+  name | value
+  OBJECT_CONTRACT/REFERENCE_NUMBER | 2022/07  <<REFERENCE_NUMBER>2022/0
+table header_source=profile
+  name | value
+  OBJECT_CONTRACT/CPV_MAIN/CPV_CODE/@CODE | 15811100  <<CPV_CODE CODE="15811100
+table header_source=profile
+  name | value
+  OBJECT_CONTRACT/TYPE_CONTRACT/@CTYPE | SUPPLIES  <<TYPE_CONTRACT CTYPE="SU
+paragraph ted.field=SHORT_DESCR: Pain frais livré chaque jour d'école.
+paragraph ted.field=SHORT_DESCR: Deux lots.
+table header_source=profile
+  name | value
+  OBJECT_CONTRACT/VAL_TOTAL | 1200.50  <<VAL_TOTAL CURRENCY="EUR
+  OBJECT_CONTRACT/VAL_TOTAL/@CURRENCY | EUR  <<VAL_TOTAL CURRENCY="EUR
+table header_source=profile
+  name | value
+  OBJECT_CONTRACT/LOT_DIVISION |   <<LOT_DIVISION/>
+heading3 ted.item=1: Baguettes
+table header_source=profile
+  name | value
+  OBJECT_DESCR/LOT_NO | 1  <<LOT_NO>1</LOT_NO>
+table header_source=profile
+  name | value
+  OBJECT_DESCR/NUTS/@CODE | FR101  <<n2021:NUTS CODE="FR101"
+paragraph ted.field=SHORT_DESCR: Baguettes de 250 g, m2 de stockage non requis.
+table header_source=profile
+  name | value
+  OBJECT_DESCR/AC/AC_PRICE |   <<AC_PRICE/>
+table header_source=profile
+  name | value
+  OBJECT_DESCR/NO_OPTIONS |   <<NO_OPTIONS/>
+paragraph ted.field=INFO_ADD: Livraison avant 7 h.
+table header_source=profile
+  name | value
+  PROCEDURE/PT_OPEN |   <<PT_OPEN/>
+  PROCEDURE/NO_CONTRACT_COVERED_GPA |   <<NO_CONTRACT_COVERED_GPA
+  PROCEDURE/NOTICE_NUMBER_OJ | 2021/S 117-000002  <<NOTICE_NUMBER_OJ>2021/S
+table header_source=profile ted.item=1
+  name | value
+  AWARD_CONTRACT/LOT_NO | 1  <<LOT_NO>1</LOT_NO>
+heading3: Baguettes
+table header_source=profile
+  name | value
+  AWARD_CONTRACT/AWARDED_CONTRACT/DATE_CONCLUSION_CONTRACT | 2021-12-01  <<DATE_CONCLUSION_CONTRAC
+  AWARD_CONTRACT/AWARDED_CONTRACT/CONTRACTORS/CONTRACTOR/ADDRESS_CONTRACTOR/OFFICIALNAME | Boulangerie Exemple SARL  <<OFFICIALNAME>Boulangeri
+  AWARD_CONTRACT/AWARDED_CONTRACT/CONTRACTORS/CONTRACTOR/SME |   <<SME/>
+  AWARD_CONTRACT/AWARDED_CONTRACT/VALUES/VAL_TOTAL | 1200.50  <<VAL_TOTAL CURRENCY="EUR
+  AWARD_CONTRACT/AWARDED_CONTRACT/VALUES/VAL_TOTAL/@CURRENCY | EUR  <<VAL_TOTAL CURRENCY="EUR
+paragraph ted.field=INFO_ADD: Marché reconductible.
+table header_source=profile
+  name | value
+  COMPLEMENTARY_INFO/DATE_DISPATCH_NOTICE | 2022-01-10  <<DATE_DISPATCH_NOTICE>20

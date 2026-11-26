@@ -1,0 +1,22 @@
+title: 
+extra encoding=utf-8
+extra root=TED_EXPORT
+extra root_namespace=http://publications.europa.eu/TED_schema/Export
+extra ted.doc_id=000003-2016
+extra ted.edition=2016010
+extra xml.profile=ted
+heading1 attribute=LG ted.category=ORIGINAL ted.version=R2.0.8.S03.E01: EN
+heading2: FR-Saint-Exemple: Bread
+paragraph ted.field=STI_DOC: Corrigendum
+paragraph: Commune de Saint-Exemple , 1 place du Marché , Saint-Exemple 75001 , FR . Telephone: +33 100000000
+paragraph: Instead of 7:00 read 6:30.
+heading2: Other information
+paragraph: Nothing else changes.
+list_item1(1.) ted.no_seq=001 ted.sep=:: Publication reference:
+paragraph: 2016/S 002-000004.
+heading1 attribute=LG ted.category=ORIGINAL ted.version=R2.0.8.S03.E01: DE
+table header_source=profile
+  name | value
+  FD_CONTRACT/@CTYPE | SUPPLIES  <<FD_CONTRACT CTYPE="SUPP
+  FD_CONTRACT/OBJECT_CONTRACT_INFORMATION/DESCRIPTION_CONTRACT_INFORMATION/TITLE_CONTRACT/P | Brot  <<P>Brot</P>
+  FD_CONTRACT/PROCEDURE_DEFINITION_CONTRACT_NOTICE/TYPE_OF_PROCEDURE/TYPE_OF_PROCEDURE_DETAIL_FOR_CONTRACT_NOTICE/PT_OPEN |   <<PT_OPEN/>

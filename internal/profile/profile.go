@@ -87,7 +87,7 @@ var (
 		AsBlock:       append(slices.Clone(common), "kind", "language", "notation", "marker", "value", "duplicate_of", "key", "out_of_line", "split", "with"),
 		AsList:        append(slices.Clone(common), "ordered", "split"),
 		AsItem:        append(slices.Clone(common), "marker", "value"),
-		AsTable:       append(slices.Clone(common), "model", "header", "one_row", "rest", "pairs", "rest_table"),
+		AsTable:       append(slices.Clone(common), "model", "header", "one_row", "rest", "pairs", "pairs_empty", "rest_table"),
 		AsRow:         append(slices.Clone(common), "header", "cells", "rest", "rest_table"),
 		AsCell:        append(slices.Clone(common), "header", "colspan", "rowspan", "column", "column_key", "with"),
 		AsInline:      {"match", "as", "style", "link", "title", "attrs", "extra", "space", "value", "with"},
@@ -242,11 +242,15 @@ type Rule struct {
 	OneRow    bool
 	// Pairs: the table's element is read as names and values, a row for
 	// each element with text inside it and each of their attributes
-	// ("pairs", table: "path" or "local"). RestTable: what a row (or a
+	// ("pairs", table: "path", "parent" (the path with the name of the
+	// table's parent element before it) or "local"). RestTable: what a row (or a
 	// one_row table) holds that no column cell takes is a table of names
 	// and values after the table ("rest_table", row and table).
-	Pairs     string
-	RestTable *RestTable
+	Pairs string
+	// PairsEmpty: in a "pairs" table an element with no content and no
+	// attributes is a row of its name and an empty value ("pairs_empty").
+	PairsEmpty bool
+	RestTable  *RestTable
 
 	// A "document" rule: the media type handed over, a constant
 	// (MediaType) or chosen by an attribute (MediaAttr, MediaMap: a value
@@ -941,9 +945,17 @@ func compileRule(raw json.RawMessage, i int, f *fileJSON, builtin bool) (*Rule, 
 	if r.As == AsTable && r.Rest > 0 && !r.OneRow {
 		return nil, fmt.Errorf("%s: a table's \"rest\" goes with \"one_row\"", where)
 	}
+	if v, ok := m["pairs_empty"]; ok {
+		if err := json.Unmarshal(v, &r.PairsEmpty); err != nil {
+			return nil, fmt.Errorf("%s: \"pairs_empty\" is true or false", where)
+		}
+		if _, ok := m["pairs"]; !ok {
+			return nil, fmt.Errorf("%s: \"pairs_empty\" goes with \"pairs\"", where)
+		}
+	}
 	if v, ok := m["pairs"]; ok {
-		if err := json.Unmarshal(v, &r.Pairs); err != nil || r.Pairs != "path" && r.Pairs != "local" {
-			return nil, fmt.Errorf("%s: \"pairs\" is \"path\" or \"local\"", where)
+		if err := json.Unmarshal(v, &r.Pairs); err != nil || r.Pairs != "path" && r.Pairs != "local" && r.Pairs != "parent" {
+			return nil, fmt.Errorf("%s: \"pairs\" is \"path\", \"parent\" or \"local\"", where)
 		}
 		if r.OneRow || r.Rest > 0 || r.Model == "cals" {
 			return nil, fmt.Errorf("%s: a \"pairs\" table has no \"one_row\", \"rest\" or \"cals\" model", where)
