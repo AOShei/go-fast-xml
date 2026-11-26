@@ -17,9 +17,9 @@ corpus to test against (`TestPubmedSelection`).
 
 | Source | Output |
 |---|---|
-| `PubmedArticle`, `PubmedBookArticle` | A `section` per record; its anchor is the PMID as written (`MedlineCitation/PMID`, `BookDocument/PMID`), which is not body text. Every block of the record carries it in `anchor_parent`; `PMID@Version` is `pubmed.pmid_version` on the record's first block |
-| `MedlineCitation/Article/ArticleTitle` | Heading level 1, `Loc.Anchor` the PMID (`anchor_of`) |
-| `Book/BookTitle`, `BookDocument/ArticleTitle` | Headings 1 and 2, in file order; the first has the PMID as `Loc.Anchor`; `@book`, `@part`, `@sec` as `pubmed.book`, `pubmed.part`, `pubmed.sec` |
+| `PubmedArticle`, `PubmedBookArticle` | A `section` per record; its anchor is the PMID as written (`MedlineCitation/PMID`, `BookDocument/PMID`), and the PMID is also the record's **heading, level 1**, where it stands (`"heading": "anchor"`), with the PMID as `Loc.Anchor`. The file puts a record's dates and journal before its title, so without it those tables would stand before any heading of their record. Every other block of the record carries the PMID in `anchor_parent`; `PMID@Version` is `pubmed.pmid_version` on the record's first block |
+| `MedlineCitation/Article/ArticleTitle` | Heading level 2 |
+| `Book/BookTitle`, `BookDocument/ArticleTitle` | Headings 2 and 3, in file order; `@book`, `@part`, `@sec` as `pubmed.book`, `pubmed.part`, `pubmed.sec` |
 | `VernacularTitle` | A paragraph with `pubmed.field=VernacularTitle`: a title in the original language, read as its own block where the file puts it (after the publication types), not a heading, so as not to split the record |
 | `MedlineCitation@Status`, `@Owner`, `@IndexingMethod`, `@VersionID`, `@VersionDate`; `Article@PubModel` | `pubmed.status`, `pubmed.owner`, `pubmed.indexing_method`, `pubmed.version_id`, `pubmed.version_date`, `pubmed.pub_model` on the first block made inside the element (a dates or journal table) |
 | `Abstract`, `OtherAbstract` | Their blocks are marked `pubmed.in`; `OtherAbstract@Language` and `@Type` as `pubmed.language`, `pubmed.abstract_type` |
@@ -27,22 +27,23 @@ corpus to test against (`TestPubmedSelection`).
 | `CopyrightInformation`, `CoiStatement`, `GeneralNote` | Paragraphs with `pubmed.field`; `GeneralNote@Owner` as `pubmed.owner` |
 | `AuthorList`, `InvestigatorList` | A table, header the profile's: last name, fore name, initials, suffix, collective name, identifier (`Identifier` with its `Source` after it), affiliation (each `AffiliationInfo` a line: `Affiliation`, then its `Identifier`s with their `Source`). A row per author, `RowLocs` on the `Author` element. `@CompleteYN`, `@Type` as `pubmed.complete`, `pubmed.list_type`. The rows' attributes (`ValidYN`, `EqualContrib`) are a rest table right after it: last name, `Author/@ValidYN`, value |
 | `KeywordList` | A list, an item per `Keyword` (inline markup kept), `@MajorTopicYN` as `pubmed.major_topic`, the list's `@Owner` as `pubmed.owner` |
-| `ReferenceList` | A list (`pubmed.in=ReferenceList`), an item per `Reference` with its `Citation` text; its `ArticleIdList` is a name and value table after the item (`ArticleId`, `ArticleId/@IdType`). `ReferenceList/Title` is a heading level 2 |
+| `ReferenceList` | A list (`pubmed.in=ReferenceList`), an item per `Reference` with its `Citation` text; its `ArticleIdList` is a name and value table after the item (`ArticleId`, `ArticleId/@IdType`). `ReferenceList/Title` is a heading level 3 |
 | `Sections/Section` (books) | A list, an item per `Section`: `LocationLabel` and `SectionTitle`; a nested `Section` is an item one level deeper. `SectionTitle@book/@part/@sec` and `LocationLabel@Type` in `Attrs` |
 | `ItemList/Item` (books) | A list, `@ListType` as `pubmed.list_type` |
 | `DeleteCitation` | A name and value table (`PMID`, `PMID/@Version`), `pubmed.field=DeleteCitation` |
 | `i`, `b`, `sup`, `sub`, `u`, MathML | Inline, as in `jats` (`DispFormula` a formula block) |
 
 Every other group is a **name and value table** (`pairs`, header
-`name | value`, the names the file's, attributes as `<name>/@<attribute>`
+`name | value`, the names the file's paths starting with the group's own
+element (`Journal/ISSN`), attributes as `<name>/@<attribute>`
 rows, `RowLocs` on each value's element), as the invoice profiles read
 parties: `DateCompleted`, `DateRevised`, `ArticleDate`, `ContributionDate`,
 `Journal` (ISSN, `JournalIssue` with volume, issue, `PubDate`, title,
 abbreviation), `Pagination`, `ELocationID`, `Language`, `DataBankList`,
 `GrantList`, `PublicationTypeList`, `MedlineJournalInfo`, `ChemicalList`,
 `SupplMeshList`, `CitationSubset`, `CommentsCorrectionsList`,
-`GeneSymbolList`, `MeshHeadingList` (`MeshHeading/DescriptorName`,
-`.../@UI`, `.../@MajorTopicYN`, `MeshHeading/QualifierName`, ...),
+`GeneSymbolList`, `MeshHeadingList` (`MeshHeadingList/MeshHeading/DescriptorName`,
+`.../@UI`, `.../@MajorTopicYN`, `.../QualifierName`, ...),
 `NumberOfReferences`, `PersonalNameSubjectList`, `OtherID`,
 `SpaceFlightMission`, `History`, `PublicationStatus`, `ArticleIdList`,
 `ObjectList`, and in books `Publisher`, `PubDate`, `BeginningDate`,
@@ -71,13 +72,13 @@ for that reason. Not met on dev in the other tables.
 ## Dev set (146 files)
 
 146 read, 0 errors, 0 `Validate` failures, unmapped elements and
-attributes none. Blocks: heading 1471, list_item 25075, paragraph 3244,
+attributes none. Blocks: heading 2897, list_item 25075, paragraph 3244,
 table 39921. Warnings: `input.external_reference` 146 (the external DTD,
 not loaded).
 
 Oracles (`TestPubmedOracles`): (a) the body's block and cell text in
 order equals the file's character data in order, white space aside, with
-one exception, the PMID that opens a record (the anchor); the profile's
+no exception; the profile's
 header rows, the name column and attribute rows of name and value tables,
 an identifier's `Source` and `AbstractText@Label` (the marker) are not
 compared, being attribute or profile text. (b) Every block's text is in
@@ -86,5 +87,5 @@ the source at its offsets. Both pass.
 ## Held-out set (53 files)
 
 53 read, 0 errors, 0 `Validate` failures, unmapped elements and
-attributes 0. Blocks: heading 599, list_item 10909, paragraph 1366, table
+attributes 0. Blocks: heading 1192, list_item 10909, paragraph 1366, table
 15893. Warnings: `input.external_reference` 53, `part.no_text` 1.

@@ -58,12 +58,9 @@ func pubmedDump(doc *gofastcore.Document, src []byte) string {
 	return b.String()
 }
 
-// pubmedCase: the PMID that opens a record is its section's anchor (the
-// heading's Loc.Anchor, the other blocks' anchor_parent), not body text.
-var pubmedCase = &jatsOracleCase{profile: "pubmed", format: "xml-pubmed", skip: map[string]string{
-	"PubmedArticle/MedlineCitation/PMID":  "Loc.Anchor",
-	"PubmedBookArticle/BookDocument/PMID": "Loc.Anchor",
-}, prep: pubmedPrep}
+// pubmedCase: the PMID that opens a record is its heading and its
+// anchor, so no character data of the file is left out of oracle (a).
+var pubmedCase = &jatsOracleCase{profile: "pubmed", format: "xml-pubmed", prep: pubmedPrep}
 
 // pubmedPrep leaves in the document only text the file holds as
 // character data, for oracle (a): the profile's header rows, the name

@@ -82,14 +82,14 @@ func (a As) String() string {
 var (
 	common  = []string{"match", "as", "anchor", "attrs", "mark", "display", "extra"}
 	allowed = map[As][]string{
-		AsSection:     common,
+		AsSection:     append(slices.Clone(common), "heading", "table_header"),
 		AsHeading:     append(slices.Clone(common), "level", "marker", "duplicate_of", "key"),
 		AsBlock:       append(slices.Clone(common), "kind", "language", "notation", "marker", "value", "duplicate_of", "key", "out_of_line", "split", "with"),
 		AsList:        append(slices.Clone(common), "ordered", "split"),
 		AsItem:        append(slices.Clone(common), "marker", "value"),
 		AsTable:       append(slices.Clone(common), "model", "header", "one_row", "rest", "pairs", "rest_table"),
 		AsRow:         append(slices.Clone(common), "header", "cells", "rest", "rest_table"),
-		AsCell:        append(slices.Clone(common), "header", "colspan", "rowspan", "column", "with"),
+		AsCell:        append(slices.Clone(common), "header", "colspan", "rowspan", "column", "column_key", "with"),
 		AsInline:      {"match", "as", "style", "link", "title", "attrs", "extra", "space", "value", "with"},
 		AsLabel:       {"match", "as"},
 		AsImage:       append(slices.Clone(common), "id", "alt"),
@@ -212,6 +212,18 @@ type Rule struct {
 	// table).
 	Cells      []*Value
 	HeaderText []string
+	// Heading: a section's heading from its own attributes, the first
+	// present and not empty ("heading", section: XLIFF file@original).
+	Heading []*Value
+	// HeadingAnchor: the child the section's anchor is read from is also
+	// its heading, where the child stands ("heading": "anchor": a PubMed
+	// record's PMID).
+	HeadingAnchor bool
+	// SectionTable: the section is also a table whose header row is
+	// HeaderText ("table_header", section: an XLIFF 2 file, whose rows
+	// have no table element of their own); its table block comes where
+	// the section ends.
+	SectionTable bool
 	// Column: a cell placed in this column (1-based) of the row it stands
 	// in, at any depth inside the row element ("column", cell). Rest: the
 	// column that takes the row's content no column cell takes ("rest",
@@ -221,8 +233,13 @@ type Rule struct {
 	// cells ("one_row", table: CII's monetary summation).
 	Column int
 	Rest   int
-	With   []*Value
-	OneRow bool
+	// ColumnKey: the cell's column is chosen by this attribute's value
+	// ("column_key", cell with "column"): each value as written has a
+	// column of its own, from Column on, in order of first appearance in
+	// the table, and its header cell is the value (TMX tuv@xml:lang).
+	ColumnKey *Value
+	With      []*Value
+	OneRow    bool
 	// Pairs: the table's element is read as names and values, a row for
 	// each element with text inside it and each of their attributes
 	// ("pairs", table: "path" or "local"). RestTable: what a row (or a
@@ -606,6 +623,10 @@ func (r *Rule) values() []*Value {
 		}
 	}
 	vs = append(vs, r.With...)
+	if r.ColumnKey != nil {
+		vs = append(vs, r.ColumnKey)
+	}
+	vs = append(vs, r.Heading...)
 	return append(vs, r.Cells...)
 }
 
@@ -825,8 +846,15 @@ func compileRule(raw json.RawMessage, i int, f *fileJSON, builtin bool) (*Rule, 
 	if r.Ordered, err = c.test("ordered"); err != nil {
 		return nil, err
 	}
-	if r.As == AsTable {
-		if v, ok := m["header"]; ok {
+	if r.As == AsTable || r.As == AsSection {
+		key := "header"
+		if r.As == AsSection {
+			// "table_header": the section is also a table (XLIFF 2's
+			// file, whose units have no body element around them).
+			key = "table_header"
+		}
+		if v, ok := m[key]; ok {
+			r.SectionTable = r.As == AsSection
 			if err := json.Unmarshal(v, &r.HeaderText); err != nil || len(r.HeaderText) == 0 || len(r.HeaderText) > MaxCells {
 				return nil, fmt.Errorf("%s: a table's \"header\" is a list of 1 to %d strings", where, MaxCells)
 			}
@@ -849,10 +877,15 @@ func compileRule(raw json.RawMessage, i int, f *fileJSON, builtin bool) (*Rule, 
 			if err != nil {
 				return nil, err
 			}
-			if cv.IsLiteral || cv.Of != nil || cv.Claims() != nil || cv.AttrChild != nil {
-				return nil, fmt.Errorf("%s: a cell of \"cells\" is an attribute of the row's element, {\"attr\": \"name\"}", where)
+			if cv.IsLiteral || cv.Claims() != nil || cv.Codepoint || cv.Of != nil && cv.AttrChild != nil {
+				return nil, fmt.Errorf("%s: a cell of \"cells\" is an attribute of the row's element, {\"attr\": \"name\"}, of a child, {\"attr\": \"name\", \"child\": \"selector\"}, or of an ancestor, {\"attr\": \"name\", \"of\": \"name\"}", where)
 			}
 			r.Cells = append(r.Cells, cv)
+		}
+	}
+	if slices.ContainsFunc(r.Cells, func(v *Value) bool { return v.AttrChild != nil }) {
+		if _, ok := m["rest"]; !ok {
+			return nil, fmt.Errorf("%s: a cell read from a child's attribute needs \"rest\": the row stays open for its children", where)
 		}
 	}
 	for _, x := range []struct {
@@ -880,6 +913,19 @@ func compileRule(raw json.RawMessage, i int, f *fileJSON, builtin bool) (*Rule, 
 				return nil, fmt.Errorf("%s: %q is a column number, 1 to %d", where, x.key, MaxCells)
 			}
 		}
+	}
+	if v, ok := m["column_key"]; ok {
+		kv, err := c.value("column_key", v)
+		if err != nil {
+			return nil, err
+		}
+		if kv.IsLiteral || kv.Attr.Local == "" || kv.Of != nil || kv.Claims() != nil || kv.AttrChild != nil || kv.Codepoint {
+			return nil, fmt.Errorf("%s: \"column_key\" is an attribute of the element's own, {\"attr\": \"name\"}", where)
+		}
+		if r.Column == 0 {
+			return nil, fmt.Errorf("%s: \"column_key\" goes with \"column\", the first keyed column", where)
+		}
+		r.ColumnKey = kv
 	}
 	if r.Column > 0 && (r.Colspan != nil || r.Rowspan != nil) {
 		return nil, fmt.Errorf("%s: a cell with \"column\" has no span", where)
@@ -969,6 +1015,17 @@ func compileRule(raw json.RawMessage, i int, f *fileJSON, builtin bool) (*Rule, 
 			if *x.dst, err = c.value(x.key, v); err != nil {
 				return nil, err
 			}
+		}
+	}
+	if v, ok := m["heading"]; ok {
+		if string(v) == `"anchor"` {
+			// The section's anchor, read from a child, is its heading.
+			if r.Anchor == nil || r.Anchor.Child == nil {
+				return nil, fmt.Errorf("%s: \"heading\": \"anchor\" needs an \"anchor\" read from a child", where)
+			}
+			r.HeadingAnchor = true
+		} else if r.Heading, err = c.sectionHeading(where, v); err != nil {
+			return nil, err
 		}
 	}
 	if r.As == AsInline && r.Value != nil && (r.Value.IsLiteral || r.Value.Attr.Local == "" || r.Value.Of != nil || r.Value.AttrChild != nil) {
@@ -1304,6 +1361,32 @@ func (c *compiler) kvs(key string, v json.RawMessage) ([]KV, error) {
 		out = append(out, KV{Key: k, Value: val})
 	}
 	return out, nil
+}
+
+// sectionHeading reads a section's "heading": one value source, or a list
+// of 1 to 4, each an attribute of the section's own element; the first
+// that is present and not empty gives the heading.
+func (c *compiler) sectionHeading(where string, raw json.RawMessage) ([]*Value, error) {
+	var raws []json.RawMessage
+	if len(raw) > 0 && raw[0] == '[' {
+		if err := json.Unmarshal(raw, &raws); err != nil || len(raws) == 0 || len(raws) > 4 {
+			return nil, fmt.Errorf("%s: a section's \"heading\" is a value source or a list of 1 to 4", where)
+		}
+	} else {
+		raws = []json.RawMessage{raw}
+	}
+	var vs []*Value
+	for _, x := range raws {
+		v, err := c.value("heading", x)
+		if err != nil {
+			return nil, err
+		}
+		if v.IsLiteral || v.Attr.Local == "" || v.Of != nil || v.Claims() != nil || v.AttrChild != nil || v.Codepoint {
+			return nil, fmt.Errorf("%s: a section's \"heading\" is an attribute of its own element, {\"attr\": \"name\"}", where)
+		}
+		vs = append(vs, v)
+	}
+	return vs, nil
 }
 
 // RestTable is a "rest_table": the rows of names and values a row holds

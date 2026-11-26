@@ -1,15 +1,16 @@
-table anchor_parent=700001 header_source=profile pubmed.pmid_version=1
+heading1 #700001 pubmed.pmid_version=1: 700001
+table anchor_parent=700001 header_source=profile
   name | value
   ArticleId | NBK1  <<ArticleId IdType="booka
   ArticleId/@IdType | bookaccession  <<ArticleId IdType="booka
 table anchor_parent=700001 header_source=profile
   name | value
-  PublisherName | Example Press  <<PublisherName>Example P
-  PublisherLocation | Paris  <<PublisherLocation>Paris
-heading1 #700001 pubmed.book=exbook: Handbook of Examples
+  Publisher/PublisherName | Example Press  <<PublisherName>Example P
+  Publisher/PublisherLocation | Paris  <<PublisherLocation>Paris
+heading2 anchor_parent=700001 pubmed.book=exbook: Handbook of Examples
 table anchor_parent=700001 header_source=profile
   name | value
-  Year | 2020  <<Year>2020</Year>
+  PubDate/Year | 2020  <<Year>2020</Year>
 table anchor_parent=700001 header_source=profile pubmed.list_type=editors
   last name | fore name | initials | suffix | collective name | identifier | affiliation
   Roe | Rex | R |  |  |  |   <<Author ValidYN="Y"><Las
@@ -23,7 +24,7 @@ table anchor_parent=700001 header_source=profile
   name | value
   LocationLabel | 3  <<LocationLabel Type="cha
   LocationLabel/@Type | chapter  <<LocationLabel Type="cha
-heading2 anchor_parent=700001 pubmed.book=exbook pubmed.part=ch3: Chapter three
+heading3 anchor_parent=700001 pubmed.book=exbook pubmed.part=ch3: Chapter three
 table anchor_parent=700001 header_source=profile
   name | value
   Language | eng  <<Language>eng</Language>

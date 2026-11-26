@@ -505,6 +505,11 @@ func sourceOffsets(parts []*gofastcore.Part, locs []engine.ChildLoc, dec *xmlenc
 	for _, part := range parts {
 		for _, b := range part.Blocks {
 			offs = append(offs, b.Loc.Offset, b.Loc.Offset+b.Loc.Length)
+			if b.Table != nil {
+				for _, l := range b.Table.RowLocs {
+					offs = append(offs, l.Offset, l.Offset+l.Length)
+				}
+			}
 		}
 	}
 	for _, l := range locs {
@@ -526,6 +531,17 @@ func sourceOffsets(parts []*gofastcore.Part, locs []engine.ChildLoc, dec *xmlenc
 			l := &part.Blocks[i].Loc
 			start, end := get(l.Offset), get(l.Offset+l.Length)
 			l.Offset, l.Length = start, end-start
+			if t := part.Blocks[i].Table; t != nil {
+				// A row's location is in the file as the block's is; a
+				// row with none (a header row of the profile's) keeps
+				// none.
+				for j := range t.RowLocs {
+					if r := &t.RowLocs[j]; r.Offset != 0 || r.Length != 0 {
+						start, end := get(r.Offset), get(r.Offset+r.Length)
+						r.Offset, r.Length = start, end-start
+					}
+				}
+			}
 		}
 	}
 	for i := range locs {

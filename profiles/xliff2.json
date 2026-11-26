@@ -1,0 +1,78 @@
+{
+  "profile": "xliff2",
+  "title": "XLIFF 2.0 to 2.2, XML Localization Interchange File Format (OASIS), core with the Translation Candidates, Glossary, Metadata and Change Tracking modules",
+  "format": 1,
+  "namespaces": {
+    "mtc": "urn:oasis:names:tc:xliff:matches:2.0",
+    "gls": "urn:oasis:names:tc:xliff:glossary:2.0",
+    "mda": "urn:oasis:names:tc:xliff:metadata:2.0",
+    "ctr": "urn:oasis:names:tc:xliff:changetracking:2.0"
+  },
+  "namespace_aliases": {
+    "urn:oasis:names:tc:xliff:document:2.0": "",
+    "urn:oasis:names:tc:xliff:document:2.2": ""
+  },
+  "match": [
+    {"root": "xliff", "namespace": "urn:oasis:names:tc:xliff:document:2.0"},
+    {"root": "xliff", "namespace": "urn:oasis:names:tc:xliff:document:2.2"}
+  ],
+  "heading_base": 1,
+  "notes": "See profiles/xliff2.md. One section and one table per file, a row per segment and per ignorable (RowLocs, anchor the unit's id).",
+  "rules": [
+    {"match": "/xliff", "as": "transparent", "extra": {"xliff2.version": {"attr": "version"}}, "mark": {
+      "xliff2.source_language": {"attr": "srcLang"}, "xliff2.target_language": {"attr": "trgLang"}}},
+    {"match": "/xliff/file", "as": "section", "heading": [{"attr": "original"}, {"attr": "id"}], "anchor": {"attr": "id"},
+      "mark": {"xliff2.original": {"attr": "original"}},
+      "table_header": ["unit", "name", "type", "segment", "state", "source", "target", "other"]},
+
+    {"match": "notes", "as": "transparent"},
+    {"match": "notes/note", "as": "block", "kind": "paragraph", "attrs": {"xliff2.field": "note", "xliff2.note_id": {"attr": "id"},
+      "xliff2.category": {"attr": "category"}, "xliff2.priority": {"attr": "priority"}, "xliff2.applies_to": {"attr": "appliesTo"}}},
+    {"match": "originalData", "as": "transparent"},
+    {"match": "file/skeleton", "as": "transparent", "mark": {"xliff2.field": "skeleton"}},
+    {"match": "originalData/data", "as": "block", "kind": "paragraph", "attrs": {"xliff2.field": "data", "xliff2.data_id": {"attr": "id"}}},
+
+    {"match": "group", "as": "row", "anchor": {"attr": "id"}, "cells": [{"attr": "id"}, {"attr": "name"}, {"attr": "type"}]},
+    {"match": "unit", "as": "transparent", "anchor": {"attr": "id"}, "mark": {"xliff2.unit_name": {"attr": "name"}, "xliff2.unit_type": {"attr": "type"}}},
+    {"match": "unit/segment", "as": "row", "anchor": {"attr": "id", "of": "unit"},
+      "cells": [{"attr": "id", "of": "unit"}, {"attr": "name", "of": "unit"}, {"attr": "type", "of": "unit"}, {"attr": "id"}, {"attr": "state"}], "rest": 8},
+    {"match": "unit/ignorable", "as": "row", "anchor": {"attr": "id", "of": "unit"},
+      "cells": [{"attr": "id", "of": "unit"}, {"attr": "name", "of": "unit"}, {"attr": "type", "of": "unit"}, {"attr": "id"}], "rest": 8},
+    {"match": "segment/source", "as": "cell", "column": 6},
+    {"match": "segment/target", "as": "cell", "column": 7},
+    {"match": "ignorable/source", "as": "cell", "column": 6},
+    {"match": "ignorable/target", "as": "cell", "column": 7},
+
+    {"match": "mtc:matches", "as": "transparent"},
+    {"match": "mtc:match", "as": "transparent", "mark": {"xliff2.field": "match", "xliff2.match_id": {"attr": "id"}, "xliff2.match_ref": {"attr": "ref"},
+      "xliff2.similarity": {"attr": "similarity"}, "xliff2.match_quality": {"attr": "matchQuality"}, "xliff2.origin": {"attr": "origin"},
+      "xliff2.match_type": {"attr": "type"}, "xliff2.match_subtype": {"attr": "subType"}, "xliff2.reference": {"attr": "reference"}}},
+    {"match": "mtc:match/source", "as": "block", "kind": "paragraph", "attrs": {"xliff2.part": "source"}},
+    {"match": "mtc:match/target", "as": "block", "kind": "paragraph", "attrs": {"xliff2.part": "target"}},
+
+    {"match": "gls:glossary", "as": "transparent"},
+    {"match": "gls:glossEntry", "as": "transparent", "mark": {"xliff2.field": "glossary", "xliff2.gls_id": {"attr": "id"}, "xliff2.gls_ref": {"attr": "ref"}}},
+    {"match": "gls:term", "as": "block", "kind": "paragraph", "attrs": {"xliff2.part": "term", "xliff2.gls_source": {"attr": "source"}}},
+    {"match": "gls:translation", "as": "block", "kind": "paragraph", "attrs": {"xliff2.part": "translation", "xliff2.gls_source": {"attr": "source"},
+      "xliff2.gls_translation_id": {"attr": "id"}, "xliff2.gls_translation_ref": {"attr": "ref"}}},
+    {"match": "gls:definition", "as": "block", "kind": "paragraph", "attrs": {"xliff2.part": "definition", "xliff2.gls_source": {"attr": "source"}}},
+
+    {"match": "mda:metadata", "as": "transparent", "mark": {"xliff2.field": "metadata", "xliff2.mda_id": {"attr": "id"}}},
+    {"match": "mda:metaGroup", "as": "transparent", "mark": {"xliff2.mda_category": {"attr": "category"}, "xliff2.mda_group_id": {"attr": "id"}, "xliff2.mda_applies_to": {"attr": "appliesTo"}}},
+    {"match": "mda:meta", "as": "block", "kind": "paragraph", "attrs": {"xliff2.mda_type": {"attr": "type"}}},
+
+    {"match": "ctr:changeTrack", "as": "transparent", "mark": {"xliff2.field": "change_track"}},
+    {"match": "ctr:revisions", "as": "transparent", "mark": {"xliff2.ctr_applies_to": {"attr": "appliesTo"}, "xliff2.ctr_ref": {"attr": "ref"}, "xliff2.ctr_current_version": {"attr": "currentVersion"}}},
+    {"match": "ctr:revision", "as": "transparent", "mark": {"xliff2.ctr_author": {"attr": "author"}, "xliff2.ctr_datetime": {"attr": "datetime"}, "xliff2.ctr_version": {"attr": "version"}}},
+    {"match": "ctr:item", "as": "block", "kind": "paragraph", "attrs": {"xliff2.ctr_property": {"attr": "property"}}},
+
+    {"match": "pc", "as": "inline"},
+    {"match": "mrk", "as": "inline", "with": [{"attr": "value"}]},
+    {"match": "sm", "as": "inline", "with": [{"attr": "value"}]},
+    {"match": "em", "as": "inline"},
+    {"match": "ph", "as": "inline"},
+    {"match": "sc", "as": "inline"},
+    {"match": "ec", "as": "inline"},
+    {"match": "cp", "as": "inline", "value": {"attr": "hex", "codepoint": "hex"}}
+  ]
+}

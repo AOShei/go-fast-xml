@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2">
+<file original="weather.properties" source-language="en" target-language="fr-FR" datatype="javapropertyresourcebundle">
+<header>
+<tool tool-id="hand" tool-name="Hand"/>
+<note from="editor">Written for the tests.</note>
+</header>
+<body>
+<group id="g1" resname="greetings">
+<trans-unit id="1" resname="hello" approved="yes">
+<source>Hello <g id="1">world</g><x id="2" equiv-text="{0}"/>!</source>
+<target state="translated">Bonjour <g id="1">le monde</g><x id="2" equiv-text="{0}"/> !</target>
+<note from="dev">Keep the brace.</note>
+<alt-trans match-quality="80%" origin="tm"><source>Hello</source><target>Salut</target></alt-trans>
+</trans-unit>
+</group>
+<trans-unit id="2" translate="no">
+<source>It is <bpt id="3">&lt;b&gt;</bpt>cold<ept id="3">&lt;/b&gt;</ept>.</source>
+</trans-unit>
+</body>
+</file>
+</xliff>

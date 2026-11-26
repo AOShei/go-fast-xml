@@ -1,0 +1,42 @@
+{
+  "profile": "tmx",
+  "title": "TMX 1.1 to 1.4b, Translation Memory eXchange (LISA OSCAR, ETSI GS LIS 002)",
+  "format": 1,
+  "match": [
+    {"root": "tmx", "attr": "[@version]"}
+  ],
+  "heading_base": 1,
+  "notes": "See profiles/tmx.md. One table per body, a row per tu, a column per language as written (column_key), the tu's own prop and note in the first column.",
+  "rules": [
+    {"match": "/tmx", "as": "transparent", "extra": {"tmx.version": {"attr": "version"}}},
+    {"match": "/tmx/header", "as": "transparent", "extra": {
+      "tmx.srclang": {"attr": "srclang"}, "tmx.adminlang": {"attr": "adminlang"},
+      "tmx.creationtool": {"attr": "creationtool"}, "tmx.creationtoolversion": {"attr": "creationtoolversion"},
+      "tmx.datatype": {"attr": "datatype"}, "tmx.segtype": {"attr": "segtype"},
+      "tmx.o-tmf": {"attr": "o-tmf"}, "tmx.o-encoding": {"attr": "o-encoding"},
+      "tmx.creationdate": {"attr": "creationdate"}, "tmx.creationid": {"attr": "creationid"},
+      "tmx.changedate": {"attr": "changedate"}, "tmx.changeid": {"attr": "changeid"}}},
+    {"match": "header/note", "as": "block", "kind": "paragraph", "attrs": {"tmx.field": "note", "tmx.lang": {"attr": "xml:lang"}}},
+    {"match": "header/prop", "as": "block", "kind": "paragraph", "attrs": {"tmx.field": "prop", "tmx.type": {"attr": "type"}, "tmx.lang": {"attr": "xml:lang"}}},
+    {"match": "header/ude", "as": "table", "attrs": {"tmx.field": "ude", "tmx.ude_name": {"attr": "name"}, "tmx.ude_base": {"attr": "base"}}},
+    {"match": "ude/map", "as": "row", "cells": [{"attr": "unicode"}, {"attr": "code"}, {"attr": "ent"}, {"attr": "subst"}]},
+
+    {"match": "/tmx/body", "as": "table", "attrs": {"tmx.field": "body"}},
+    {"match": "body/tu", "as": "row", "anchor": {"attr": "tuid"}, "rest": 1},
+    {"match": "tu/tuv", "as": "cell", "column": 2, "column_key": {"attr": "xml:lang"}},
+    {"match": "tu/tuv[@lang]", "as": "cell", "column": 2, "column_key": {"attr": "lang"}, "note": "TMX 1.1 to 1.3 also wrote lang"},
+    {"match": "tu/tuv[@xml:lang]", "as": "cell", "column": 2, "column_key": {"attr": "xml:lang"}},
+    {"match": "tu/prop", "as": "block", "kind": "paragraph", "with": [{"attr": "type"}]},
+    {"match": "tu/note", "as": "block", "kind": "paragraph"},
+    {"match": "tuv/prop", "as": "block", "kind": "paragraph", "with": [{"attr": "type"}]},
+    {"match": "tuv/note", "as": "block", "kind": "paragraph"},
+    {"match": "tuv/seg", "as": "block", "kind": "paragraph"},
+    {"match": "bpt", "as": "inline", "style": "code"},
+    {"match": "ept", "as": "inline", "style": "code"},
+    {"match": "ph", "as": "inline", "style": "code"},
+    {"match": "it", "as": "inline", "style": "code"},
+    {"match": "ut", "as": "inline", "style": "code"},
+    {"match": "sub", "as": "inline"},
+    {"match": "hi", "as": "inline"}
+  ]
+}
