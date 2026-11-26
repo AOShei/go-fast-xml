@@ -39,7 +39,20 @@ type transCase struct {
 	// another order, the text must be the same characters, and (b)
 	// places each row.
 	keyed bool
+	// codepoint: elements whose rule writes the character an attribute
+	// holds in hexadecimal (XLIFF 2 cp@hex), path to the attribute; a
+	// control character (Cc) is not written.
+	codepoint map[string]string
+	// ancestorCols: the leading columns of a row taken from an
+	// ancestor's attributes (XLIFF 2 unit@id, name, type), outside the
+	// row's span; attrCols, when not 0, the number of leading columns
+	// made from attributes.
+	ancestorCols, attrCols int
 }
+
+// cpRE is an XLIFF 2 cp, whose hex code point is written as its
+// character (hexChar, profile_akn_test.go).
+var cpRE = regexp.MustCompile(`<(?:[\w-]+:)?cp\b[^>]*?\bhex="([^"]*)"[^>]*/>`)
 
 // sameChars reports whether a and b hold the same characters, in any
 // order.
@@ -88,6 +101,12 @@ func (c *transCase) sourceText(data []byte, used map[string]bool) (string, error
 				skip, used[k] = 1, true
 			} else if c.skipEl != nil && c.skipEl(tk) {
 				skip, used["skipEl"] = 1, true
+			} else if k, ok := pathMatch(c.codepoint, stack); ok {
+				for _, at := range tk.Attr {
+					if at.Name.Local == c.codepoint[k] {
+						a, used["@"+k] = noSpace(hexChar(at.Value)), true
+					}
+				}
 			} else if k, ok := pathMatch(c.with, stack); ok {
 				for _, name := range strings.Fields(c.with[k]) {
 					for _, at := range tk.Attr {
@@ -119,7 +138,11 @@ func (c *transCase) sourceText(data []byte, used map[string]bool) (string, error
 // profile's words or attribute values (TMX languages), not character data.
 // No list is ever in a cell of these profiles, so a cell's text is taken
 // as it is (jatsDocText drops "1. " at a line's start as a list number).
-func transDocText(doc *gofastcore.Document) string {
+func transDocText(doc *gofastcore.Document) string { return transDocTextN(doc, 0) }
+
+// transDocTextN is transDocText with n leading attribute columns, when n
+// is not 0.
+func transDocTextN(doc *gofastcore.Document, n int) string {
 	var b strings.Builder
 	for _, p := range doc.Parts {
 		if p.Kind == gofastcore.PartStored {
@@ -141,6 +164,9 @@ func transDocText(doc *gofastcore.Document) string {
 					cols[n[strings.LastIndex(n, "@")+1:]] = true
 				}
 				skip := len(cols)
+				if n > 0 {
+					skip = n
+				}
 				for _, r := range x.Table.Rows[from:] {
 					for _, c := range r[min(skip, len(r)):] {
 						b.WriteString(noSpace(c))
@@ -160,7 +186,11 @@ func transDocText(doc *gofastcore.Document) string {
 // row's location: each line of a cell in the row's span with markup
 // stripped, or, for a line with text written from attributes ("with"),
 // each of its words in the span as written.
-func rowCite(src []byte, doc *gofastcore.Document) string {
+func rowCite(src []byte, doc *gofastcore.Document) string { return rowCiteFrom(src, doc, 0) }
+
+// rowCiteFrom is rowCite without the first columns of each row, an
+// ancestor's attributes outside the row's span.
+func rowCiteFrom(src []byte, doc *gofastcore.Document, first int) string {
 	for _, x := range blocks(doc) {
 		if x.Table == nil {
 			continue
@@ -184,7 +214,11 @@ func rowCite(src []byte, doc *gofastcore.Document) string {
 			data := noSpace(charData([]byte(raw)))
 			// An empty placeholder's equiv-text is written where it stands.
 			data += "\x00" + noSpace(charData([]byte(equivRE.ReplaceAllString(raw, "$2"))))
-			for _, cell := range r {
+			// A cp's character (XLIFF 2) is written where it stands.
+			data += "\x00" + noSpace(charData([]byte(cpRE.ReplaceAllStringFunc(raw, func(m string) string {
+				return hexChar(cpRE.FindStringSubmatch(m)[1])
+			}))))
+			for _, cell := range r[min(first, len(r)):] {
 				for line := range strings.SplitSeq(cell, "\n") {
 					if l := noSpace(gofastcore.ExpandLigatures(line)); strings.Contains(span, l) || strings.Contains(data, l) {
 						continue
@@ -297,7 +331,7 @@ func (c *transCase) oracles(t *testing.T) {
 		files++
 		name := filepath.Base(path)
 		src, serr := c.sourceText(data, used)
-		got := transDocText(doc)
+		got := transDocTextN(doc, c.attrCols)
 		ok := got == src || jatsEntityRE.MatchString(src) && jatsInOrder(got, jatsEntityRE.Split(src, -1))
 		if serr != nil {
 			// encoding/xml stops (not well-formed, another encoding): the
@@ -325,7 +359,7 @@ func (c *transCase) oracles(t *testing.T) {
 			// text the oracle cannot compare as written.
 			wide++
 		} else if bad = jatsCiteCheck(data, doc); bad == "" {
-			bad = rowCite(data, doc)
+			bad = rowCiteFrom(data, doc, c.ancestorCols)
 		}
 		if bad != "" && fails < 10 {
 			fails++
@@ -336,6 +370,11 @@ func (c *transCase) oracles(t *testing.T) {
 	for k := range c.skip {
 		if !used[k] {
 			t.Errorf("exception %q is met nowhere in the dev set", k)
+		}
+	}
+	for k := range c.codepoint {
+		if !used["@"+k] {
+			t.Errorf("code point attribute %q is met nowhere in the dev set", k)
 		}
 	}
 	for k := range c.with {

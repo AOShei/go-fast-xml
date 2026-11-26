@@ -12,7 +12,7 @@ aliases of no namespace (`namespace_aliases`), so one set of rules reads
 all three. An `xliff` root in another namespace (XLIFF 2.x, `urn:x`), or
 in none with another or no `version`, stays generic
 (`TestXLIFFSelection`). XLIFF 2.0 to 2.2 are **not** read by this
-profile: they stay generic (393 dev files).
+profile: they are read with `xliff2` (393 dev files).
 
 Dev roots: 1.2 namespace 500 files (408 also carry `its:version="2.0"`,
 the ITS version), 1.1 namespace 7, no namespace 12 (`version` 1.0: 1,
