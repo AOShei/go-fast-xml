@@ -1,0 +1,60 @@
+title: Fourniture de pain pour la cantine
+extra encoding=utf-8
+extra no_namespace_schema_location=http://schemas.journal-officiel.gouv.fr/schemabook/boamp/Boamp_v230.xsd
+extra root=ANNONCE
+extra xml.profile=boamp
+table header_source=profile
+  name | value
+  REFERENCE/IDWEB | 19-0001  <<IDWEB>19-0001</IDWEB>
+  REFERENCE/TYPE_AVIS/FAMILLE/JOUE |   <<JOUE/>
+  REFERENCE/TYPE_AVIS/NATURE/APPEL_OFFRE/STANDARD |   <<STANDARD/>
+table header_source=profile
+  name | value
+  NOM_HTML | 19-0001.html  <<NOM_HTML>19-0001.html</
+table header_source=profile
+  name | value
+  INDEXATION/DATE_PUBLICATION | 2019-01-04  <<DATE_PUBLICATION>2019-0
+  INDEXATION/DESCRIPTEURS/DESCRIPTEUR/CODE | 162  <<CODE>162</CODE>
+  INDEXATION/DESCRIPTEURS/DESCRIPTEUR/LIBELLE | Pain  <<LIBELLE>Pain</LIBELLE>
+  INDEXATION/DEP_PUBLICATION | 75  <<DEP_PUBLICATION>75</DEP
+  INDEXATION/RESUME_OBJET | fourniture de pain  <<RESUME_OBJET>fourniture
+table header_source=profile
+  name | value
+  IDENTITE/DENOMINATION | Commune de Saint-Exemple  <<DENOMINATION>Commune de
+  IDENTITE/CP | 75001  <<CP>75001</CP>
+  IDENTITE/VILLE | Saint-Exemple  <<VILLE>Saint-Exemple</VI
+  IDENTITE/ORGANISME_ACHETEUR_CENTRAL_NON |   <<ORGANISME_ACHETEUR_CENT
+heading1: Fourniture de pain pour la cantine
+table header_source=profile
+  name | value
+  OBJET/TYPE_MARCHE/FOURNITURES |   <<FOURNITURES/>
+table header_source=profile
+  name | value
+  OBJET/CPV/PRINCIPAL | 15811100  <<PRINCIPAL>15811100</PRI
+paragraph boamp.field=OBJET_COMPLET: Pain frais livré chaque jour d'école.
+table header_source=profile
+  name | value
+  OBJET/DIV_EN_LOTS/OUI |   <<OUI/>
+heading2: Baguettes
+table header_source=profile
+  name | value
+  LOT/NUM | 1  <<NUM>1</NUM>
+paragraph boamp.field=DESCRIPTION: Baguettes de 250 g.
+table header_source=profile
+  name | value
+  LOT/CPV/PRINCIPAL | 15811100  <<PRINCIPAL>15811100</PRI
+table header_source=profile
+  name | value
+  LOT/DUREE_MOIS | 12  <<DUREE_MOIS>12</DUREE_MO
+table header_source=profile
+  name | value
+  LOT/OPTIONS_NON |   <<OPTIONS_NON/>
+paragraph boamp.field=INFO_COMPL: Livraison avant 7 h.
+table header_source=profile
+  name | value
+  PROCEDURE/TYPE_PROCEDURE/OUVERT |   <<OUVERT/>
+  PROCEDURE/AMP_OUI |   <<AMP_OUI/>
+paragraph boamp.field=RENS_COMPLEMENT: Marché reconductible.
+table header_source=profile
+  name | value
+  RENSEIGNEMENTS_COMPLEMENTAIRES/FACTURATION_ELECTRONIQUE_OUI |   <<FACTURATION_ELECTRONIQU

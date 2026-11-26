@@ -1,0 +1,53 @@
+title: Fourniture de pain pour la cantine
+extra boamp.title_language=FRA
+extra encoding=utf-8
+extra root=jo:ann
+extra root_namespace=http://boamp.journal-officiel.gouv.fr/XML/3.2.5
+extra xml.profile=boamp
+table header_source=profile
+  name | value
+  Organization/Company/PartyIdentification/ID | ORG-0001  <<cbc:ID schemeName="orga
+  Organization/Company/PartyIdentification/ID/@schemeName | organization  <<cbc:ID schemeName="orga
+  Organization/Company/PartyName/Name | Commune de Saint-Exemple  <<cbc:Name languageID="FR
+  Organization/Company/PartyName/Name/@languageID | FRA  <<cbc:Name languageID="FR
+table header_source=profile
+  name | value
+  ID | 00000000-0000-4000-8000-000000000001  <<cbc:ID schemeName="noti
+  ID/@schemeName | notice-id  <<cbc:ID schemeName="noti
+table header_source=profile
+  name | value
+  IssueDate | 2026-03-02+01:00  <<cbc:IssueDate>2026-03-0
+table header_source=profile
+  name | value
+  ContractingParty/Party/PartyIdentification/ID | ORG-0001  <<cbc:ID schemeName="orga
+  ContractingParty/Party/PartyIdentification/ID/@schemeName | organization  <<cbc:ID schemeName="orga
+table header_source=profile
+  name | value
+  ProcurementProject/ID | 2026/07  <<cbc:ID>2026/07</cbc:ID>
+heading1: Fourniture de pain pour la cantine
+paragraph boamp.field=Description boamp.languageID=FRA: Pain frais livré chaque jour d'école.
+table header_source=profile
+  name | value
+  ProcurementProject/ProcurementTypeCode | supplies  <<cbc:ProcurementTypeCode
+  ProcurementProject/ProcurementTypeCode/@listName | contract-nature  <<cbc:ProcurementTypeCode
+heading2 #LOT-0001 boamp.scheme=Lot: LOT-0001
+table anchor_parent=LOT-0001 header_source=profile
+  name | value
+  TenderingProcess/ProcedureCode | open  <<cbc:ProcedureCode listN
+  TenderingProcess/ProcedureCode/@listName | procurement-procedure-type  <<cbc:ProcedureCode listN
+heading3 anchor_parent=LOT-0001 boamp.languageID=FRA: Lot 1 : baguettes
+paragraph anchor_parent=LOT-0001 boamp.field=Description boamp.languageID=FRA: Baguettes de 250 g.
+table header_source=profile
+  name | value
+  REFERENCE/IDWEB | 26-0001  <<IDWEB>26-0001</IDWEB>
+  REFERENCE/TYPE_AVIS/FAMILLE/JOUE |   <<JOUE/>
+  REFERENCE/TYPE_AVIS/STATUT/INITIAL |   <<INITIAL/>
+table header_source=profile
+  name | value
+  INDEXATION/SCHEMA | 3.2.5  <<SCHEMA>3.2.5</SCHEMA>
+  INDEXATION/NOMORGANISME | Commune de Saint-Exemple  <<NOMORGANISME>Commune de
+  INDEXATION/TYPE_PROCEDURE/OUVERT |   <<OUVERT/>
+  INDEXATION/DATE_PUBLICATION | 2026-03-03  <<DATE_PUBLICATION>2026-0
+  INDEXATION/RESUME_OBJET | Fourniture de pain pour la cantine  <<RESUME_OBJET>Fourniture
+paragraph boamp.field=HTML media_type=text/html: <!DOCTYPE HTML><html><body><h3>Avis de marché</h3><p>Fourniture de <b>pain</b>.</p></body></html>
+paragraph boamp.field=HTMLSYNTHESE media_type=text/html: <html><body><ul><li>Acheteur : Commune de Saint-Exemple</li></ul></body></html>

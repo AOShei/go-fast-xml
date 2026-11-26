@@ -142,14 +142,15 @@ func TestProfilePairsParent(t *testing.T) {
 // and no attributes, whose presence is the value (TED's PT_OPEN), is a
 // row with an empty value; without it, it gives nothing.
 func TestProfilePairsEmpty(t *testing.T) {
-	src := `<Doc><Proc><PT_OPEN/><GPA></GPA><Lang V="EN"/><Date>2022</Date><Box> </Box></Proc></Doc>`
+	src := `<Doc><Proc><PT_OPEN/><GPA></GPA><Lang V="EN"/><Date>2022</Date><Box> </Box></Proc><Flag/></Doc>`
 	for _, c := range []struct{ key, want string }{
-		{`, "pairs_empty": true`, "Proc/PT_OPEN= Proc/GPA= Proc/Lang/@V=EN Proc/Date=2022 Proc/Box="},
+		{`, "pairs_empty": true`, "Proc/PT_OPEN= Proc/GPA= Proc/Lang/@V=EN Proc/Date=2022 Proc/Box= Flag="},
 		{``, "Proc/Lang/@V=EN Proc/Date=2022"},
 	} {
 		prof := head("pairsempty", `{"root": "Doc"}`) + `"rules": [
 		{"match": "/Doc", "as": "transparent"},
-		{"match": "Proc", "as": "table", "pairs": "path"` + c.key + `}]}`
+		{"match": "Proc", "as": "table", "pairs": "path"` + c.key + `},
+		{"match": "Flag", "as": "table", "pairs": "path"` + c.key + `}]}`
 		doc := extractWith(t, prof, src, nil)
 		if err := doc.Validate(); err != nil {
 			t.Fatal(err)

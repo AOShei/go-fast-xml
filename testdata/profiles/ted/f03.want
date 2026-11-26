@@ -67,6 +67,9 @@ table header_source=profile
   name | value
   OBJECT_CONTRACT/VAL_TOTAL | 1200.50  <<VAL_TOTAL CURRENCY="EUR
   OBJECT_CONTRACT/VAL_TOTAL/@CURRENCY | EUR  <<VAL_TOTAL CURRENCY="EUR
+table header_source=profile
+  name | value
+  OBJECT_CONTRACT/LOT_DIVISION |   <<LOT_DIVISION/>
 heading3 ted.item=1: Baguettes
 table header_source=profile
   name | value
@@ -78,6 +81,9 @@ paragraph ted.field=SHORT_DESCR: Baguettes de 250 g, m2 de stockage non requis.
 table header_source=profile
   name | value
   OBJECT_DESCR/AC/AC_PRICE |   <<AC_PRICE/>
+table header_source=profile
+  name | value
+  OBJECT_DESCR/NO_OPTIONS |   <<NO_OPTIONS/>
 paragraph ted.field=INFO_ADD: Livraison avant 7 h.
 table header_source=profile
   name | value

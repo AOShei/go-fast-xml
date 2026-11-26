@@ -3,9 +3,11 @@ package gofastxml
 import (
 	"context"
 	"flag"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -197,5 +199,85 @@ func TestTedSelection(t *testing.T) {
 		`<TED_EXPORT xmlns="http://formex.publications.europa.eu/ted/schema/export/R2.0.9.S01.E01"/>`: "ted",
 		`<TED_EXPORT/>`:                     "",
 		`<TED_EXPORT xmlns="urn:example"/>`: "",
+	})
+}
+
+// boampCase: HTML and HTMLSYNTHESE, the notice as a page, are embedded
+// documents handed to the child extractor (at most 1 MiB each, the rest
+// reported with limit.exceeded); with none, as here, each is a paragraph
+// of its markup, which boampPrep takes out of oracle (a).
+var boampCase = &jatsOracleCase{profile: "boamp", format: "xml-boamp", prep: boampPrep, rawCells: true, skip: map[string]string{
+	"/ann/HTML":         "embedded document",
+	"/ann/HTMLSYNTHESE": "embedded document",
+}}
+
+func boampPrep(doc *gofastcore.Document) {
+	for pi := range doc.Parts {
+		bs := doc.Parts[pi].Blocks[:0:0]
+		for _, x := range doc.Parts[pi].Blocks {
+			if f := x.Attrs["boamp.field"]; f == "HTML" || f == "HTMLSYNTHESE" {
+				continue
+			}
+			bs = append(bs, x)
+		}
+		doc.Parts[pi].Blocks = bs
+	}
+	pubmedPrep(doc)
+}
+
+func TestBoampCensus(t *testing.T)  { jatsCensus(t, "xml-boamp") }
+func TestBoampCorpus(t *testing.T)  { boampCase.run(t) }
+func TestBoampOracles(t *testing.T) { boampCase.oracles(t) }
+
+func TestBoampFixtureAnnonce(t *testing.T) {
+	doc := procFixture(t, boampCase, "annonce")
+	if doc.Metadata.Title != "Fourniture de pain pour la cantine" {
+		t.Errorf("title %q", doc.Metadata.Title)
+	}
+}
+
+// An eForms notice inside a BOAMP file, and the notice as two HTML
+// pages: with a child extractor each page is a child and the body has no
+// block for it; the heading of the notice carries the link.
+func TestBoampFixtureEforms(t *testing.T) {
+	doc := procFixture(t, boampCase, "eforms")
+	if doc.Metadata.Title != "Fourniture de pain pour la cantine" {
+		t.Errorf("title %q", doc.Metadata.Title)
+	}
+	data, err := os.ReadFile(filepath.Join("testdata", "profiles", "boamp", "eforms.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	opts := &gofastcore.Options{Child: func(ctx context.Context, name, mediaType string, r io.ReaderAt, size int64, o *gofastcore.Options) (*gofastcore.Document, error) {
+		got = append(got, name+" "+mediaType+" "+strconv.FormatInt(size, 10))
+		return &gofastcore.Document{}, nil
+	}}
+	doc, err = ExtractBytes(context.Background(), data, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Children) != 2 || len(got) != 2 {
+		t.Fatalf("children %d, handed over %v", len(doc.Children), got)
+	}
+	for _, p := range doc.Parts {
+		for _, x := range p.Blocks {
+			if x.Attrs["boamp.field"] == "HTML" || x.Attrs["boamp.field"] == "HTMLSYNTHESE" {
+				t.Errorf("a block for an extracted child: %q", x.Text)
+			}
+		}
+	}
+	t.Log(got)
+}
+
+// The profile is chosen by the root ann in BOAMP's namespace and by the
+// root ANNONCE in no namespace (the files before schema 3).
+func TestBoampSelection(t *testing.T) {
+	procSelection(t, map[string]string{
+		`<jo:ann xmlns:jo="http://boamp.journal-officiel.gouv.fr/XML/3.2.5"/>`: "boamp",
+		`<ANNONCE><GESTION/></ANNONCE>`:                                        "boamp",
+		`<ann/>`:                                                               "",
+		`<ANNONCE xmlns="urn:example"/>`:                                       "",
+		`<annonce/>`:                                                           "",
 	})
 }

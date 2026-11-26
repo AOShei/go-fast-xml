@@ -147,7 +147,7 @@ func (e *Engine) pairName(at int, local bool) string {
 func (e *Engine) endPair(f *frame, end int64) {
 	if f.sink != nil {
 		s := e.closeSink(f)
-		if text := s.b.String(); text != "" || len(f.pairAttrs) == 0 && e.frames[f.pairAt].pt.empty && f.pairAt != len(e.frames)-1 {
+		if text := s.b.String(); text != "" || len(f.pairAttrs) == 0 && e.frames[f.pairAt].pt.empty {
 			e.pairRow(f, f.pairName, text, end)
 		}
 		for _, b := range s.after {
