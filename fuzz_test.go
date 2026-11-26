@@ -24,6 +24,9 @@ func FuzzExtract(f *testing.F) {
 		`<d xml:space="preserve"> a  b <e xml:space="default"> c  d </e></d>`,
 		`<r xmlns:x="http://www.w3.org/2001/XInclude"><x:include href="a"/>t<p>u</p>v</r>`,
 		`<a><b>x</a> < & </c>`,
+		// canada-laws: a section's label before a numbered subsection,
+		// a marginal note holding a historical note, a CALS table.
+		`<Statute xmlns:lims="http://justice.gc.ca/lims" lims:id="1" xml:lang="en"><Body><Section lims:id="2"><MarginalNote>M<HistoricalNote>h</HistoricalNote></MarginalNote><Label>1</Label><Subsection in-force="no"><Label>(1)</Label><Text>t<FootnoteRef idref="f">a</FootnoteRef></Text><TableGroup><table><tgroup cols="1"><tbody><row><entry>c</entry></row></tbody></tgroup></table></TableGroup></Subsection></Section></Body></Statute>`,
 	} {
 		f.Add([]byte(s), false)
 	}

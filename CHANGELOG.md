@@ -14,6 +14,20 @@
   get its text; an anchor read from a grandchild reaches the blocks after
   the elements between. The output of every earlier corpus file is
   unchanged.
+- **Built-in profile `canada-laws`** for Justice Canada's federal acts,
+  regulations and annual statutes (`github.com/justicecanada/laws-lois-xml`,
+  English and French): roots `Statute`, `Regulation` and `Bill` with the
+  `lims` namespace declared or a Justice Canada DOCTYPE. See
+  `profiles/canada-laws.md`.
+- **A label written as a paragraph of its own takes its own container's
+  attributes.** A waiting label that cannot be the marker of the next
+  block (a section's number before a numbered subsection) is a paragraph;
+  it took the `attrs`, `mark` values and `anchor_parent` of the element
+  opened after it (the subsection), and now takes those of the element
+  that holds it. Text is unchanged. On the dev corpus this corrects
+  attributes in 32 `clml`, 14 `akn` and 1 `jats` files: a section number's
+  `anchor_parent`, URIs and dates are now the section's, not those of its
+  first subsection.
 
 ## v0.2.1 (2026-11-25)
 
