@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.4.0 (2026-11-26)
 
 - **A directory given to `gofastxml` stands for `.xlf`, `.xliff` and `.tmx`
   files too**, the names of XLIFF and TMX translation files. A file named
