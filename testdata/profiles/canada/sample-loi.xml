@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Statute lims:fid="200" lims:id="200" xml:lang="fr" xmlns:lims="http://justice.gc.ca/lims">
+<Identification><LongTitle>Loi concernant les échantillons</LongTitle><ShortTitle status="official">Loi sur les échantillons</ShortTitle></Identification>
+<Body>
+<Section lims:fid="201" lims:id="201">
+<MarginalNote lims:fid="202" lims:id="202">Définitions</MarginalNote>
+<Label>1</Label>
+<Text>Les définitions qui suivent s’appliquent à la présente loi.</Text>
+<Definition lims:fid="203" lims:id="203"><Text><DefinedTermFr>échantillon</DefinedTermFr> Chose énumérée. (<DefinedTermEn>sample</DefinedTermEn>)</Text></Definition>
+</Section>
+</Body>
+</Statute>

@@ -310,6 +310,10 @@ type Engine struct {
 	marks   []mark
 	anchors []anchorAt
 	label   *labelAt
+	// within, when above zero, is the number of open frames a block
+	// being added stands in: a label written as a paragraph of its own
+	// belongs to its container, not to the element opened after it.
+	within int
 	// readAttrs: the attributes of the element being started that a
 	// rule of an open element read ({"attr": ..., "child": ...}).
 	readAttrs     []profile.QName
@@ -1431,15 +1435,20 @@ func (e *Engine) add(b gofastcore.Block, f *frame, own bool) blockRef {
 		}
 		attrs[k] = v
 	}
-	for _, m := range e.marks {
+	frames, marks := e.frames, e.marks
+	if e.within > 0 && e.within < len(frames) {
+		frames = frames[:e.within]
+		marks = marks[:min(len(marks), max(e.frames[e.within].marks, 0))]
+	}
+	for _, m := range marks {
 		set(m.k, m.v)
 	}
 	// A container's attrs go to the first block made inside it.
-	for i := range e.frames {
+	for i := range frames {
 		if b.Attrs[gofastcore.AttrStored] != "" || b.Origin == gofastcore.OriginInferred && b.Kind == gofastcore.KindNote {
 			break
 		}
-		c := &e.frames[i]
+		c := &frames[i]
 		if len(c.firstSet) > 0 && !c.first.ok() {
 			for _, x := range c.firstSet {
 				set(x.k, x.v)
@@ -1458,7 +1467,7 @@ func (e *Engine) add(b gofastcore.Block, f *frame, own bool) blockRef {
 		}
 	}
 	if b.Loc.Anchor == "" {
-		depth := len(e.frames) + 1
+		depth := len(frames) + 1
 		if own && f != nil {
 			depth = e.depthOf(f)
 		}
@@ -2489,6 +2498,8 @@ func (e *Engine) flushLabel() {
 	var f *frame
 	if l.depth >= 0 && l.depth < len(e.frames) {
 		f = &e.frames[l.depth]
+		e.within = l.depth + 1
+		defer func() { e.within = 0 }()
 	}
 	e.add(gofastcore.Block{Kind: gofastcore.KindParagraph, Text: l.text,
 		Loc: gofastcore.Location{Offset: l.start, Length: max(l.end-l.start, 0)}}, f, false)
