@@ -264,6 +264,17 @@ type frame struct {
 	// element read for a value, for the block it would have been.
 	waiting []waitVal
 	capRule *profile.Rule
+
+	// pair: the element is read as a name and value of the "pairs" table
+	// or "rest_table" at frame index pairAt, named pairName; pairAttrs:
+	// its attributes, rows after its value; tagEnd: the end of its start
+	// tag. pt: on the frame of the scope itself, where its rows go.
+	pair      bool
+	pairAt    int
+	pairName  string
+	pairAttrs []kv
+	tagEnd    int64
+	pt        *pairTarget
 }
 
 // waitVal is a value a section waits to place: read from the attribute
@@ -587,6 +598,15 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 		}
 	}
 	rule := e.lookup()
+	if at := e.pairScope(); at >= 0 {
+		// Inside a "pairs" table or a row's "rest_table": a name and
+		// value, unless its rule is kept (an attachment, a column cell)
+		// or it is inside a value with text (mixed content).
+		if e.beforeChild(e.parent()) && !e.keepsRule(rule, at) {
+			e.startPair(f, el, at)
+			return
+		}
+	}
 	f.rule = rule
 	if rule == nil {
 		e.startUnmapped(f, el)
@@ -699,6 +719,9 @@ func (e *Engine) count(m map[string]int, name string) {
 
 // countAttrs counts the attributes of a mapped element no rule reads.
 func (e *Engine) countAttrs(f *frame, el *xmlread.Element) {
+	if f.rule.Pairs != "" {
+		return // each attribute is a row of the table
+	}
 	for i := range el.Attrs {
 		a := &el.Attrs[i]
 		if generic.Skipped(el, a) || a.URI == xmlscan.XMLNamespace && a.Local == "id" {
@@ -1260,6 +1283,15 @@ func (e *Engine) startRule(f *frame, el *xmlread.Element) {
 				e.openSink(f, skCell, el.Start)
 				f.rest = true
 			}
+			if r.RestTable != nil {
+				e.startRest(f, f.table)
+			}
+		}
+		if r.Pairs != "" {
+			// Names and values: the element's own text, if any, is a
+			// row named by its local name.
+			f.pt = &pairTarget{t: f.table, local: r.Pairs == "local"}
+			e.startPair(f, el, len(e.frames)-1)
 		}
 	case profile.AsRow:
 		if t := e.tableOf(); t != nil {
@@ -1278,6 +1310,9 @@ func (e *Engine) startRule(f *frame, el *xmlread.Element) {
 					// come after it, each with its own location.
 					t.rowDone(el.Start, el.End, f.anchor)
 				}
+			}
+			if r.RestTable != nil {
+				e.startRest(f, t)
 			}
 			if r.Rest > 0 {
 				e.openSink(f, skCell, el.Start)
@@ -2074,6 +2109,8 @@ func (e *Engine) EndElement(r *xmlread.Reader, el *xmlread.Element, start, end i
 		}
 	case f.cals != "":
 		e.calsEnd(f, f.start, end)
+	case f.pair && f.rule == nil:
+		e.endPair(f, end)
 	default:
 		ref = e.endRule(f, end)
 	}
@@ -2481,13 +2518,18 @@ func (e *Engine) endRule(f *frame, end int64) blockRef {
 	case profile.AsRow:
 		e.endRest(f)
 		if t := f.owner; t != nil {
+			e.endRestTable(f, t)
 			t.endRow()
 			t.rowDone(f.start, end, f.anchor)
 		}
 	case profile.AsTable:
+		if f.pair {
+			e.endPair(f, end)
+		}
 		if r.OneRow {
 			e.endRest(f)
 			if t := f.owner; t != nil {
+				e.endRestTable(f, t)
 				t.endRow()
 				t.rowDone(f.start, end, "")
 			}
@@ -2496,6 +2538,14 @@ func (e *Engine) endRule(f *frame, end int64) blockRef {
 		if t := f.table; t != nil {
 			if b, ok := t.block(e, f.start, end); ok {
 				f.ref = e.add(b, f, true)
+				if r.Pairs != "" {
+					f.secFirst = f.ref // where its children are linked
+				}
+			}
+			if t.rest != nil {
+				if b, ok := e.restBlock(t.rest); ok {
+					e.add(b, f, false)
+				}
 			}
 		}
 	case profile.AsSection:

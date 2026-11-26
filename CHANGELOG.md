@@ -32,9 +32,11 @@
   (EN 16931). `cii`: root `CrossIndustryInvoice` in
   `urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100` (Factur-X,
   ZUGFeRD 2, XRechnung). `ubl`: roots `Invoice` and `CreditNote` of UBL 2
-  (Peppol BIS Billing 3.0). Header values in `Extra` `inv.*`, parties as
-  sections whose paragraphs carry `inv.party` and `inv.field`, one lines
-  table with `RowLocs`, tables for the VAT breakdown, allowances and
+  (Peppol BIS Billing 3.0). Header values in `Extra` `inv.*`, every value
+  written with the name the file gives it: parties and groups as tables
+  of names and values (`SellerTradeParty/Name`; `inv.party`, `inv.group`),
+  one lines table with `RowLocs` followed by a table of line id, name and
+  value for what a line holds beyond its columns, tables for the VAT breakdown, allowances and
   charges, and totals. ZUGFeRD 1.0 (`CrossIndustryDocument`) is read
   generically. See `profiles/cii.md` and `profiles/ubl.md`.
 - **Base64 attachments are handed to the child extractor.** A `document`
@@ -46,6 +48,10 @@
   nested elements); on `document` rules `encoding` and `name`. A metadata
   date of eight digits (`YYYYMMDD`) fills `Created`/`Modified`. A table
   holding only the profile's header row makes no block.
+- Profile keys `pairs` (a table of names and values: each value of an
+  element written with the file's own element path, attributes as `/@`
+  rows, `RowLocs` on the value's element) and `rest_table` (what a row
+  holds beyond its column cells, as a table of id, name and value).
 
 ## v0.2.1 (2026-11-25)
 

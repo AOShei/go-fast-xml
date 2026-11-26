@@ -58,6 +58,9 @@ type table struct {
 	// are the attributes rows were made from, in order of first use.
 	fromProfile bool
 	attrNames   []string
+	// rest: the table of names and values its rows' "rest_table" fills,
+	// written after it.
+	rest *table
 	// keys are the values of a cell rule's "column_key" met so far, in
 	// order of first appearance; key i has column keyBase+i, and its
 	// header cell is the key as written.
