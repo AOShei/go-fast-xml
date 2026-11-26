@@ -28,6 +28,24 @@
   attributes in 32 `clml`, 14 `akn` and 1 `jats` files: a section number's
   `anchor_parent`, URIs and dates are now the section's, not those of its
   first subsection.
+- **New built-in profiles `cii` and `ubl`** for electronic invoices
+  (EN 16931). `cii`: root `CrossIndustryInvoice` in
+  `urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100` (Factur-X,
+  ZUGFeRD 2, XRechnung). `ubl`: roots `Invoice` and `CreditNote` of UBL 2
+  (Peppol BIS Billing 3.0). Header values in `Extra` `inv.*`, parties as
+  sections whose paragraphs carry `inv.party` and `inv.field`, one lines
+  table with `RowLocs`, tables for the VAT breakdown, allowances and
+  charges, and totals. ZUGFeRD 1.0 (`CrossIndustryDocument`) is read
+  generically. See `profiles/cii.md` and `profiles/ubl.md`.
+- **Base64 attachments are handed to the child extractor.** A `document`
+  rule with `"encoding": "base64"` decodes the element's text and hands
+  the bytes to `Options.ExtractChild` under the file's `filename` and
+  `mimeCode`; the base64 is not written in the body. Used by `cii` and
+  `ubl`. New constant `MaxAttachmentBytes` (64 MiB of base64).
+- Profile keys: `column`, `rest`, `one_row` and `with` (tables built from
+  nested elements); on `document` rules `encoding` and `name`. A metadata
+  date of eight digits (`YYYYMMDD`) fills `Created`/`Modified`. A table
+  holding only the profile's header row makes no block.
 
 ## v0.2.1 (2026-11-25)
 

@@ -10,7 +10,7 @@ if err != nil { ... }
 fmt.Println(doc.Text())
 ```
 
-A document whose schema has a **profile** is read with it: the profile maps the schema's elements onto headings, paragraphs, lists, tables, links, notes and metadata (see [Profiles](#profiles)). Fifteen profiles are built in: Akoma Ntoso, Canadian federal laws (Justice Canada), HL7 CDA, CLML (legislation.gov.uk), DILA case law, DITA, DocBook, web feeds (RSS and Atom), Formex (EUR-Lex), JATS, Légifrance, patents (USPTO and EPO), S1000D, Service-Public.fr and TEI. A profile can hand an element's content to a child extractor as an embedded document (escaped HTML in a feed; see [Embedded documents](#embedded-documents)). A profile is a JSON file, so other schemas can be given one without code, and `-draft-profile` drafts one from an XSD. Any other XML document is read generically: its text in document order, as inferred paragraphs, with its attributes and comments as notes.
+A document whose schema has a **profile** is read with it: the profile maps the schema's elements onto headings, paragraphs, lists, tables, links, notes and metadata (see [Profiles](#profiles)). Seventeen profiles are built in: Akoma Ntoso, Canadian federal laws (Justice Canada), HL7 CDA, Cross Industry Invoice (Factur-X, ZUGFeRD 2, XRechnung), CLML (legislation.gov.uk), DILA case law, DITA, DocBook, web feeds (RSS and Atom), Formex (EUR-Lex), JATS, Légifrance, patents (USPTO and EPO), S1000D, Service-Public.fr, TEI and UBL invoices (Peppol). A profile can hand an element's content to a child extractor as an embedded document (escaped HTML in a feed, an invoice's attachments; see [Embedded documents](#embedded-documents)). A profile is a JSON file, so other schemas can be given one without code, and `-draft-profile` drafts one from an XSD. Any other XML document is read generically: its text in document order, as inferred paragraphs, with its attributes and comments as notes.
 
 The document is read as a stream, never as a tree: besides the document it returns, memory is bounded by the fixed bounds below (one tag, one block, the blocks waiting for an undecided element, the namespace declarations in scope), not by the file. For input not read as UTF-8, the map back to the file's bytes adds 16 bytes per 32 KiB of input. A generated 200 MiB document of small elements is read with a peak heap of about 1 MiB (`TestLargeStream`).
 
@@ -23,7 +23,7 @@ The document is read as a stream, never as a tree: besides the document it retur
 - `LoadProfile(io.Reader) (*Profile, error)` reads and validates a profile; `BuiltinProfiles()` lists the built-in ones in the order they are tried, `BuiltinProfile(name)` returns one. A `Profile` (`Name()`, `Title()`) is immutable and safe for concurrent `Extract` calls.
 - `Extractor.Charset`: the encoding of the input given from outside the file (see [Encodings](#encodings)).
 - `DraftProfile(ctx, path) (*Draft, error)` drafts a profile from an XSD (see [Drafting a profile](#drafting-a-profile-from-an-xsd)).
-- Embedded documents: `AttrChildren` (`children`), `AttrMediaType` (`media_type`), and the keys of each child's `Metadata.Extra` `ExtraParentOffset` (`xml.parent_offset`), `ExtraParentLength` (`xml.parent_length`), `ExtraParentAnchor` (`xml.parent_anchor`), `ExtraParentElement` (`xml.parent_element`); `MaxChildren` (10,000). See [Embedded documents](#embedded-documents).
+- Embedded documents: `AttrChildren` (`children`), `AttrMediaType` (`media_type`), and the keys of each child's `Metadata.Extra` `ExtraParentOffset` (`xml.parent_offset`), `ExtraParentLength` (`xml.parent_length`), `ExtraParentAnchor` (`xml.parent_anchor`), `ExtraParentElement` (`xml.parent_element`); `MaxChildren` (10,000), `MaxAttachmentBytes` (64 MiB). See [Embedded documents](#embedded-documents).
 
 ## Embedded documents
 
@@ -34,9 +34,10 @@ A profile's `document` rule (PROFILE_FORMAT.md section 3) says that an element's
 - **Citing text of a child.** A block of a child is cited by the child's own `Loc` (offsets in the text handed over) within the element at `xml.parent_offset` of the feed file, and by `xml.parent_anchor`.
 - **Without a child extractor** (no `Options.Child`, the depth limit, or the child extractor refused or failed), the child is still listed (the stub `ExtractChild` returns, with its `child.*` warning and the keys above), and the text is also kept in the body as a paragraph with `Attrs["media_type"]`: the markup as text for HTML, the text content for XHTML. No text is lost when go-fast-xml is used alone. When the child was extracted, the body has no block for the element: no text is in the output twice.
 - Past `MaxChildren` (10,000) documents, the text stays in the body as that paragraph, with `limit.exceeded` once saying how many were not handed over. `Options.Parts` leaving a part out leaves its children out.
+- **Base64 attachments** (a `document` rule with `"encoding": "base64"`: CII `AttachmentBinaryObject`, UBL `EmbeddedDocumentBinaryObject`). The text is decoded and the bytes handed over under the name and media type the file gives (`filename`, `mimeCode`; `application/octet-stream` when it gives none). The base64 is never written in the body: a child that was not extracted is listed, as core's stub, with the same keys and link. Text that is not valid base64 stays in the body as a paragraph with `Attrs["media_type"]`, with `input.stream_damaged`. At most `MaxAttachmentBytes` (64 MiB) of base64 is read for one attachment, and one attachment is held at a time; a longer one, or one past `MaxChildren`, is not handed over and not written, and `limit.exceeded` says how many.
 - **Comments inside the element** are the child's: in the bytes handed over, and no note of the parent. When the text stays in the body, each is a note after its paragraph, as anywhere else.
 - **A section that makes no block** (an RSS item with only a `link` or a `guid`), in a profile with a `document` rule, writes the values it read for its first block and its anchor as blocks of their own: one read from an element as the block that element's rule makes, one read from an attribute as an attribute note.
-- **The command** reads `text/html` and `application/xhtml+xml` children with go-fast-html (its `Options.Child`); every other type is refused with `ErrUnsupported`. This is why the module's `go.mod` requires go-fast-html; the library package imports only go-fast-core and the standard library. `-children=false` leaves children out of Markdown and text; JSON always has them.
+- **The command** reads `text/html` and `application/xhtml+xml` children with go-fast-html (its `Options.Child`); every other type is refused with `ErrUnsupported`, so an invoice's PDF attachment is listed, not read. This is why the module's `go.mod` requires go-fast-html; the library package imports only go-fast-core and the standard library. `-children=false` leaves children out of Markdown and text; JSON always has them.
 
 ## Command
 
@@ -61,7 +62,7 @@ The render flags are the series' shared ones (`COMMAND_FLAGS.md`), defined by co
 
 A profile is a JSON file that says what a schema's elements mean. How to write one: [PROFILE_FORMAT.md](PROFILE_FORMAT.md).
 
-**How one is chosen.** When the root element starts, the profiles of `Extractor.Profiles` are tried in order, then the built-in ones in the order `BuiltinProfiles()` and `gofastxml -profiles` list them (by name: `akn`, `canada-laws`, `cda`, `clml`, `dila-juri`, `dita`, `docbook`, `feed`, `formex`, `jats`, `legifrance`, `patent`, `s1000d`, `service-public`, `tei`); the first whose `match` the root meets (local name, namespace, optionally a DOCTYPE public identifier prefix and attribute tests) is used, else the document is read generically. `Extractor.Profile` / `-profile` forces one, or `none`. `Metadata.Extra["xml.profile"]` names the profile used; it is absent for generic reading.
+**How one is chosen.** When the root element starts, the profiles of `Extractor.Profiles` are tried in order, then the built-in ones in the order `BuiltinProfiles()` and `gofastxml -profiles` list them (by name: `akn`, `canada-laws`, `cda`, `cii`, `clml`, `dila-juri`, `dita`, `docbook`, `feed`, `formex`, `jats`, `legifrance`, `patent`, `s1000d`, `service-public`, `tei`, `ubl`); the first whose `match` the root meets (local name, namespace, optionally a DOCTYPE public identifier prefix and attribute tests) is used, else the document is read generically. `Extractor.Profile` / `-profile` forces one, or `none`. `Metadata.Extra["xml.profile"]` names the profile used; it is absent for generic reading.
 
 **What a profile gives.** Blocks of every kind core has for text (headings with levels from nesting, paragraphs, quotes, code, captions, footnotes, formulas, notes, list items with depth and `Marker`, tables in the rows or CALS model with header rows and merges, images), inline styles and links as `Spans` with `Options.Spans`, metadata, parts, and the stored part. Blocks a rule makes are `native`; what the profile does not map is read generically (`inferred`) and counted. A profile only chooses how the file's text is cut and labelled: it cannot add words, drop text or evaluate a condition.
 
@@ -92,6 +93,10 @@ Selected by the roots `Statute`, `Regulation` and `Bill` (no namespace) when the
 #### HL7 CDA (`cda`)
 
 Selected by the root `ClinicalDocument` in `urn:hl7-org:v3` (a `ClinicalDocument` with no namespace is read generically). Maps the header (patient, author, custodian, participants, dates, codes) to `Metadata` and `Extra` `cda.*`, sections with their titles, their `code` and `templateId` as attribute notes, narrative blocks (paragraphs, lists, tables, `content` styles, `linkHtml`), and `nonXMLBody`. Structured entries are read generically, every value an attribute note, recorded as written, never interpreted. Keys: `cda.*`. Cite: `Loc.Anchor` from `@ID`. Tested: CDA R2 with C-CDA R1.1 and R2.1 templates, structured and unstructured; not tested: CDA R2.1 or R3, signature data. [profiles/cda.md](profiles/cda.md)
+
+#### Cross Industry Invoice (`cii`)
+
+Selected by the root `CrossIndustryInvoice` in `urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100` (Factur-X, ZUGFeRD 2, XRechnung CII, EN 16931). Number, type, currency, guideline in `Extra` `inv.*`; the issue date in `Metadata.Created` (format 102). Parties are sections with no heading whose paragraphs carry `inv.party` and `inv.field`; the lines are one table (a row per `IncludedSupplyChainTradeLineItem`, `RowLocs`, a profile header row, an `other` column for the rest of each line); the VAT breakdown, allowances and charges and totals are tables. Amounts keep `currencyID`, codes their `schemeID`/`listID`. Attachments (`AttachmentBinaryObject`) are decoded and handed to `Options.ExtractChild` under their `filename` and `mimeCode`. ZUGFeRD 1.0 (`CrossIndustryDocument`) is read generically. Keys: `inv.*`. [profiles/cii.md](profiles/cii.md)
 
 #### CLML (`clml`)
 
@@ -173,6 +178,10 @@ For the XML of Service-Public.fr published by DILA (schema Publication 3.5): the
 On the public corpus (Service-Public, 4,194 dev and 1,362 held-out files), every element has a rule: `xml.unmapped_elements` is empty on both sets. The only unmapped attributes on dev are `Colonne@largeur` and `Colonne@type` (3,558 each, column layout); held-out has 2,728 unmapped attributes in all.
 
 Keys: `sp.*`. Tested: Publication schema 3.5 (the dev and held-out sets above); not tested: earlier schema versions.
+
+#### UBL invoices (`ubl`)
+
+Selected by the roots `Invoice` (`urn:oasis:names:specification:ubl:schema:xsd:Invoice-2`) and `CreditNote` (`...:CreditNote-2`) only (Peppol BIS Billing 3.0, EN 16931); other UBL documents are read generically. The same mapping as `cii`: `Extra` `inv.*`, parties as sections with `inv.party`, one lines table (`InvoiceLine`, `CreditNoteLine`), tax subtotals, allowances and charges and the legal monetary total as tables. `EmbeddedDocumentBinaryObject` attachments are handed over likewise. Keys: `inv.*`. [profiles/ubl.md](profiles/ubl.md)
 
 ## Drafting a profile from an XSD
 
@@ -317,6 +326,7 @@ Fixed bounds of this library; those named are exported constants. Each cut is `l
 | spans in one block (profiles) | 100,000 | later spans are left out (the text stays) |
 | `MaxChildren` (profiles) | 10,000 documents | the content of later `document` elements is not handed over and stays in the body as a paragraph with `Attrs["media_type"]` |
 | one embedded document (profiles) | `MaxBlockBytes`, 1 MiB | the content handed over, and its fallback paragraph, are cut there |
+| one base64 attachment (profiles) | `MaxAttachmentBytes`, 64 MiB of base64 | a longer attachment is not handed over and not written, with `limit.exceeded` |
 | (decode budget, profiles) | `Limits.MaxDecodedBytes` | the bytes handed to children are taken from it before each child reads; once it is spent, a child is listed but not read, and its text stays in the body |
 | a cell, label or value read from a child (profiles) | 1 MiB (`MaxBlockBytes`) | the text is cut there |
 | parts started by `part` rules | 100,000, and `Limits.MaxParts` | the content stays in the last part; parts past `Limits.MaxParts` are left out |

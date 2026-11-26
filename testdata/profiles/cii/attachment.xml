@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100" xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100" xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">
+<rsm:ExchangedDocument><ram:ID>A-1</ram:ID></rsm:ExchangedDocument>
+<rsm:SupplyChainTradeTransaction>
+<ram:ApplicableHeaderTradeAgreement>
+<ram:AdditionalReferencedDocument><ram:IssuerAssignedID>doc-1</ram:IssuerAssignedID><ram:AttachmentBinaryObject mimeCode="text/plain" filename="note.txt">aGVsbG8g
+d29ybGQ=</ram:AttachmentBinaryObject></ram:AdditionalReferencedDocument>
+<ram:AdditionalReferencedDocument><ram:IssuerAssignedID>doc-2</ram:IssuerAssignedID><ram:AttachmentBinaryObject>JVBERg==</ram:AttachmentBinaryObject></ram:AdditionalReferencedDocument>
+<ram:AdditionalReferencedDocument><ram:IssuerAssignedID>doc-3</ram:IssuerAssignedID><ram:AttachmentBinaryObject mimeCode="application/pdf" filename="bad.pdf">not*base64!</ram:AttachmentBinaryObject></ram:AdditionalReferencedDocument>
+</ram:ApplicableHeaderTradeAgreement>
+</rsm:SupplyChainTradeTransaction>
+</rsm:CrossIndustryInvoice>

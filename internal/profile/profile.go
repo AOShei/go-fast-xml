@@ -58,6 +58,8 @@ const (
 const (
 	MediaHTML  = "text/html"
 	MediaXHTML = "application/xhtml+xml"
+	// MediaOctetStream is the media type of an attachment that says none.
+	MediaOctetStream = "application/octet-stream"
 )
 
 var asNames = map[string]As{
@@ -82,13 +84,13 @@ var (
 	allowed = map[As][]string{
 		AsSection:     common,
 		AsHeading:     append(slices.Clone(common), "level", "marker", "duplicate_of", "key"),
-		AsBlock:       append(slices.Clone(common), "kind", "language", "notation", "marker", "value", "duplicate_of", "key", "out_of_line", "split"),
+		AsBlock:       append(slices.Clone(common), "kind", "language", "notation", "marker", "value", "duplicate_of", "key", "out_of_line", "split", "with"),
 		AsList:        append(slices.Clone(common), "ordered", "split"),
 		AsItem:        append(slices.Clone(common), "marker", "value"),
-		AsTable:       append(slices.Clone(common), "model", "header"),
-		AsRow:         append(slices.Clone(common), "header", "cells"),
-		AsCell:        append(slices.Clone(common), "header", "colspan", "rowspan"),
-		AsInline:      {"match", "as", "style", "link", "title", "attrs", "extra", "space", "value"},
+		AsTable:       append(slices.Clone(common), "model", "header", "one_row", "rest"),
+		AsRow:         append(slices.Clone(common), "header", "cells", "rest"),
+		AsCell:        append(slices.Clone(common), "header", "colspan", "rowspan", "column", "with"),
+		AsInline:      {"match", "as", "style", "link", "title", "attrs", "extra", "space", "value", "with"},
 		AsLabel:       {"match", "as"},
 		AsImage:       append(slices.Clone(common), "id", "alt"),
 		AsNote:        append(slices.Clone(common), "type", "value", "out_of_line", "split"),
@@ -98,7 +100,7 @@ var (
 		AsTransparent: append(slices.Clone(common), "split"),
 		AsSkip:        {"match", "as"},
 		AsBreak:       {"match", "as"},
-		AsDocument:    append(slices.Clone(common), "media_type", "when"),
+		AsDocument:    append(slices.Clone(common), "media_type", "when", "encoding", "name"),
 	}
 	allKeys = map[string]bool{}
 )
@@ -206,6 +208,17 @@ type Rule struct {
 	// table).
 	Cells      []*Value
 	HeaderText []string
+	// Column: a cell placed in this column (1-based) of the row it stands
+	// in, at any depth inside the row element ("column", cell). Rest: the
+	// column that takes the row's content no column cell takes ("rest",
+	// row). With: attributes of the element's own written after its text,
+	// each set off by a space ("with": unitCode, currencyID, schemeID).
+	// OneRow: the table's element is also its one row, filled by column
+	// cells ("one_row", table: CII's monetary summation).
+	Column int
+	Rest   int
+	With   []*Value
+	OneRow bool
 
 	// A "document" rule: the media type handed over, a constant
 	// (MediaType) or chosen by an attribute (MediaAttr, MediaMap: a value
@@ -216,6 +229,13 @@ type Rule struct {
 	MediaAttr  *QName
 	MediaMap   map[string]string
 	WhenMarkup bool
+	// Base64: "encoding": "base64", the element's text is base64, decoded
+	// before it is handed over (an attachment); with it, MediaAttr may
+	// have no map: the attribute's value is the media type as written.
+	// NameAttr: "name": {"attr": ...}, the attribute that names the
+	// child (a file name).
+	Base64   bool
+	NameAttr *QName
 
 	// Reads lists the attributes of the element the rule reads.
 	Reads []QName
@@ -324,6 +344,13 @@ func (r *Rule) Media(path Path) (string, bool) {
 		return r.MediaType, true
 	}
 	v, ok := path.Attr(0, *r.MediaAttr)
+	if r.MediaMap == nil {
+		// An attachment's own media type, as written; none said.
+		if v = strings.TrimSpace(v); !ok || v == "" {
+			return MediaOctetStream, true
+		}
+		return v, true
+	}
 	if !ok {
 		return "", false
 	}
@@ -332,7 +359,7 @@ func (r *Rule) Media(path Path) (string, bool) {
 }
 
 func (r *Rule) mediaTests() int {
-	if r.MediaAttr != nil {
+	if r.MediaAttr != nil && r.MediaMap != nil {
 		return 1
 	}
 	return 0
@@ -567,6 +594,7 @@ func (r *Rule) values() []*Value {
 			vs = append(vs, kv.Value)
 		}
 	}
+	vs = append(vs, r.With...)
 	return append(vs, r.Cells...)
 }
 
@@ -832,6 +860,46 @@ func compileRule(raw json.RawMessage, i int, f *fileJSON, builtin bool) (*Rule, 
 			*x.dst = &q
 		}
 	}
+	for _, x := range []struct {
+		key string
+		dst *int
+	}{{"column", &r.Column}, {"rest", &r.Rest}} {
+		if v, ok := m[x.key]; ok {
+			if err := json.Unmarshal(v, x.dst); err != nil || *x.dst < 1 || *x.dst > MaxCells {
+				return nil, fmt.Errorf("%s: %q is a column number, 1 to %d", where, x.key, MaxCells)
+			}
+		}
+	}
+	if r.Column > 0 && (r.Colspan != nil || r.Rowspan != nil) {
+		return nil, fmt.Errorf("%s: a cell with \"column\" has no span", where)
+	}
+	if v, ok := m["one_row"]; ok {
+		if err := json.Unmarshal(v, &r.OneRow); err != nil {
+			return nil, fmt.Errorf("%s: \"one_row\" must be true or false", where)
+		}
+		if r.OneRow && r.Model == "cals" {
+			return nil, fmt.Errorf("%s: \"one_row\" is for the rows model", where)
+		}
+	}
+	if r.As == AsTable && r.Rest > 0 && !r.OneRow {
+		return nil, fmt.Errorf("%s: a table's \"rest\" goes with \"one_row\"", where)
+	}
+	if v, ok := m["with"]; ok {
+		var raws []json.RawMessage
+		if err := json.Unmarshal(v, &raws); err != nil || len(raws) == 0 || len(raws) > 8 {
+			return nil, fmt.Errorf("%s: \"with\" is a list of 1 to 8 value sources", where)
+		}
+		for _, raw := range raws {
+			wv, err := c.value("with", raw)
+			if err != nil {
+				return nil, err
+			}
+			if wv.IsLiteral || wv.Attr.Local == "" || wv.Of != nil || wv.Claims() != nil || wv.AttrChild != nil || wv.Codepoint {
+				return nil, fmt.Errorf("%s: an entry of \"with\" is an attribute of the element's own, {\"attr\": \"name\"}", where)
+			}
+			r.With = append(r.With, wv)
+		}
+	}
 	if v, ok := m["display"]; ok {
 		var d struct {
 			Attr   string   `json:"attr"`
@@ -903,9 +971,47 @@ func (c *compiler) document(r *Rule) error {
 		}
 		return nil
 	}
+	if e, ok := c.m["encoding"]; ok {
+		var s string
+		if json.Unmarshal(e, &s) != nil || s != "base64" {
+			return fmt.Errorf("%s: \"encoding\" must be \"base64\"", c.where)
+		}
+		r.Base64 = true
+		if _, ok := c.m["when"]; ok {
+			return fmt.Errorf("%s: \"when\" is not for \"encoding\"", c.where)
+		}
+	}
+	if n, ok := c.m["name"]; ok {
+		var a struct {
+			Attr string `json:"attr"`
+		}
+		if err := strict(n, &a); err != nil || a.Attr == "" {
+			return fmt.Errorf("%s: \"name\" must be {\"attr\": name}", c.where)
+		}
+		q, err := ResolveName(a.Attr, c.f.Namespaces, "")
+		if err != nil {
+			return fmt.Errorf("%s: \"name\": %v", c.where, err)
+		}
+		r.NameAttr = &q
+	}
 	v, ok := c.m["media_type"]
 	if !ok {
 		return fmt.Errorf("%s: a \"document\" rule needs \"media_type\"", c.where)
+	}
+	if r.Base64 {
+		// An attachment: its media type as the file writes it.
+		var a struct {
+			Attr string `json:"attr"`
+		}
+		if err := strict(v, &a); err != nil || a.Attr == "" {
+			return fmt.Errorf("%s: with \"encoding\", \"media_type\" must be {\"attr\": name}", c.where)
+		}
+		q, err := ResolveName(a.Attr, c.f.Namespaces, "")
+		if err != nil {
+			return fmt.Errorf("%s: \"media_type\": %v", c.where, err)
+		}
+		r.MediaAttr = &q
+		return nil
 	}
 	if json.Unmarshal(v, &r.MediaType) == nil {
 		if err := media(r.MediaType); err != nil {
@@ -973,6 +1079,9 @@ func (r *Rule) reads() {
 	}
 	if r.MediaAttr != nil {
 		add(*r.MediaAttr)
+	}
+	if r.NameAttr != nil {
+		add(*r.NameAttr)
 	}
 	if r.Level.Attr != nil {
 		add(*r.Level.Attr)

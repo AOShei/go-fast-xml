@@ -484,6 +484,13 @@ func engineWarnings(part *gofastcore.Part, e *engine.Engine) {
 	if e.ChildrenCut > 0 {
 		limit(fmt.Sprintf("%s past %d not handed to the child extractor; their text is in the body", plural(e.ChildrenCut, "embedded document", "embedded documents"), maxChildren))
 	}
+	if e.AttachmentsCut > 0 {
+		limit(fmt.Sprintf("%s longer than %d bytes of base64, or past %d embedded documents, not handed to the child extractor and not in the body", plural(e.AttachmentsCut, "attachment", "attachments"), engine.MaxAttachmentBytes, maxChildren))
+	}
+	if e.AttachmentsBad > 0 {
+		part.Warn(gofastcore.SeverityWarning, gofastcore.WarnInputStreamDamaged,
+			fmt.Sprintf("%s not valid base64: not handed to the child extractor; the text is in the body as written", plural(e.AttachmentsBad, "attachment", "attachments")))
+	}
 	if e.PartsCut > 0 {
 		limit(fmt.Sprintf("%s past %d not started; their content is in the last part", plural(e.PartsCut, "part", "parts"), engine.MaxParts))
 	}
