@@ -1258,10 +1258,21 @@ func (e *Engine) startRule(f *frame, el *xmlread.Element) {
 		}
 	case profile.AsRow:
 		if t := e.tableOf(); t != nil {
+			if r.Rest == 0 && len(r.Cells) > 0 && e.noCells(r.Cells) {
+				// A row of attributes with none present (an XLIFF group
+				// with no id or name) makes no row.
+				break
+			}
 			f.owner = t
 			t.startRow(e.test(r.Header))
 			if len(r.Cells) > 0 {
 				e.attrRow(f, t, r.Cells, r.Rest > 0)
+				if r.Rest == 0 && el.End > el.Start {
+					// The row is its start tag's attributes, ended there:
+					// rows inside its element (an XLIFF group's units)
+					// come after it, each with its own location.
+					t.rowDone(el.Start, el.End, f.anchor)
+				}
 			}
 			if r.Rest > 0 {
 				e.openSink(f, skCell, el.Start)

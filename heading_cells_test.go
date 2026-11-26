@@ -53,6 +53,33 @@ func TestProfileSectionHeading(t *testing.T) {
 	}
 }
 
+// TestProfileRowAroundRows: a row of attributes with no "rest" (an XLIFF
+// group) is its start tag, ended there, so the rows inside its element
+// follow it with their own locations; with none of its attributes it
+// makes no row.
+func TestProfileRowAroundRows(t *testing.T) {
+	prof := head("grouprows", `{"root": "body"}`) + `"rules": [
+		{"match": "/body", "as": "table", "header": ["id", "source", "other"]},
+		{"match": "g", "as": "row", "anchor": {"attr": "id"}, "cells": [{"attr": "id"}]},
+		{"match": "u", "as": "row", "anchor": {"attr": "id"}, "cells": [{"attr": "id"}], "rest": 3},
+		{"match": "u/s", "as": "cell", "column": 2}]}`
+	src := `<body><g id="g1"><u id="1"><s>a</s></u><g><u id="2"><s>b</s></u></g></g></body>`
+	doc := extractWith(t, prof, src, nil)
+	bs := blocks(doc)
+	if len(bs) != 1 || bs[0].Table == nil {
+		t.Fatalf("blocks:\n%s", dump(doc))
+	}
+	var got []string
+	for i, r := range bs[0].Table.Rows {
+		l := bs[0].Table.RowLocs[i]
+		got = append(got, strings.Join(r, "|")+" "+src[l.Offset:l.Offset+l.Length]+" #"+l.Anchor)
+	}
+	want := []string{"id|source|other  #", `g1|| <g id="g1"> #g1`, `1|a| <u id="1"><s>a</s></u> #1`, `2|b| <u id="2"><s>b</s></u> #2`}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("got:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
 // TestProfileCellsFromChildAttribute: a row's cell read from the first
 // matching child's attribute (XLIFF target@state), which is still read by
 // its own rule; the row needs "rest".

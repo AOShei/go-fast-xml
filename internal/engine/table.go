@@ -580,3 +580,13 @@ func (e *Engine) calsEnd(f *frame, start, end int64) {
 		}
 	}
 }
+
+// noCells reports that none of a row's attribute cells has a value.
+func (e *Engine) noCells(cells []*profile.Value) bool {
+	for _, cv := range cells {
+		if v, _ := e.value(cv); v != "" {
+			return false
+		}
+	}
+	return true
+}
