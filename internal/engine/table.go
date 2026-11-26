@@ -58,6 +58,9 @@ type table struct {
 	// are the attributes rows were made from, in order of first use.
 	fromProfile bool
 	attrNames   []string
+	// rest: the table of names and values its rows' "rest_table" fills,
+	// written after it.
+	rest *table
 }
 
 // attrRow fills the row just started from its element's attributes

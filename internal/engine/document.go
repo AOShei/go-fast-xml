@@ -501,7 +501,9 @@ func (e *Engine) childName(f *frame, anchor string) string {
 // linkChild records a child in the innermost section it stands in.
 func (e *Engine) linkChild(idx int) {
 	for i := len(e.frames) - 1; i >= 0; i-- {
-		if c := &e.frames[i]; c.rule != nil && c.rule.As == profile.AsSection {
+		if c := &e.frames[i]; c.rule != nil && (c.rule.As == profile.AsSection || c.rule.Pairs != "") {
+			// A "pairs" table (an invoice's reference with its
+			// attachment) links it from its table.
 			c.kids = append(c.kids, idx)
 			return
 		}

@@ -30,6 +30,7 @@ func rowLocCheck(src []byte, doc *gofastcore.Document) (string, int) {
 			}
 			tStart, tEnd := b.Loc.Offset, b.Loc.Offset+b.Loc.Length
 			prevEnd := int64(-1)
+			var prev gofastcore.Location
 			for r, l := range b.Table.RowLocs {
 				if l == (gofastcore.Location{}) {
 					continue
@@ -41,12 +42,14 @@ func rowLocCheck(src []byte, doc *gofastcore.Document) (string, int) {
 					return fmt.Sprintf("%s row %d: %+v outside the file (%d bytes)", where, r, l, len(src)), rows
 				case l.Offset < tStart || end > tEnd:
 					return fmt.Sprintf("%s row %d: %+v outside the table's [%d,%d)", where, r, l, tStart, tEnd), rows
-				case l.Offset < prevEnd:
+				case l.Offset < prevEnd && l != prev:
+					// A "pairs" row of an attribute cites its element, as
+					// the element's row before it does.
 					return fmt.Sprintf("%s row %d: starts at %d, before the end of the row before (%d)", where, r, l.Offset, prevEnd), rows
 				case src[l.Offset] != '<':
 					return fmt.Sprintf("%s row %d: the source there is %q", where, r, around(string(src[l.Offset:end]), 0)), rows
 				}
-				prevEnd = end
+				prevEnd, prev = end, l
 			}
 		}
 	}

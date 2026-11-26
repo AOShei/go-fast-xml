@@ -87,8 +87,8 @@ var (
 		AsBlock:       append(slices.Clone(common), "kind", "language", "notation", "marker", "value", "duplicate_of", "key", "out_of_line", "split", "with"),
 		AsList:        append(slices.Clone(common), "ordered", "split"),
 		AsItem:        append(slices.Clone(common), "marker", "value"),
-		AsTable:       append(slices.Clone(common), "model", "header", "one_row", "rest"),
-		AsRow:         append(slices.Clone(common), "header", "cells", "rest"),
+		AsTable:       append(slices.Clone(common), "model", "header", "one_row", "rest", "pairs", "rest_table"),
+		AsRow:         append(slices.Clone(common), "header", "cells", "rest", "rest_table"),
 		AsCell:        append(slices.Clone(common), "header", "colspan", "rowspan", "column", "with"),
 		AsInline:      {"match", "as", "style", "link", "title", "attrs", "extra", "space", "value", "with"},
 		AsLabel:       {"match", "as"},
@@ -219,6 +219,13 @@ type Rule struct {
 	Rest   int
 	With   []*Value
 	OneRow bool
+	// Pairs: the table's element is read as names and values, a row for
+	// each element with text inside it and each of their attributes
+	// ("pairs", table: "path" or "local"). RestTable: what a row (or a
+	// one_row table) holds that no column cell takes is a table of names
+	// and values after the table ("rest_table", row and table).
+	Pairs     string
+	RestTable *RestTable
 
 	// A "document" rule: the media type handed over, a constant
 	// (MediaType) or chosen by an attribute (MediaAttr, MediaMap: a value
@@ -884,6 +891,32 @@ func compileRule(raw json.RawMessage, i int, f *fileJSON, builtin bool) (*Rule, 
 	if r.As == AsTable && r.Rest > 0 && !r.OneRow {
 		return nil, fmt.Errorf("%s: a table's \"rest\" goes with \"one_row\"", where)
 	}
+	if v, ok := m["pairs"]; ok {
+		if err := json.Unmarshal(v, &r.Pairs); err != nil || r.Pairs != "path" && r.Pairs != "local" {
+			return nil, fmt.Errorf("%s: \"pairs\" is \"path\" or \"local\"", where)
+		}
+		if r.OneRow || r.Rest > 0 || r.Model == "cals" {
+			return nil, fmt.Errorf("%s: a \"pairs\" table has no \"one_row\", \"rest\" or \"cals\" model", where)
+		}
+	}
+	if v, ok := m["rest_table"]; ok {
+		rt := &RestTable{}
+		if err := strict(v, rt); err != nil || rt.Names != "path" && rt.Names != "local" {
+			return nil, fmt.Errorf("%s: \"rest_table\" is {\"names\": \"path\" or \"local\", \"id\": column, \"header\": [...]}", where)
+		}
+		if rt.ID < 0 || rt.ID > MaxCells || len(rt.Header) > MaxCells {
+			return nil, fmt.Errorf("%s: \"rest_table\": \"id\" is a column number, 1 to %d; \"header\" at most %d strings", where, MaxCells, MaxCells)
+		}
+		for _, h := range rt.Header {
+			if len(h) > MaxHeaderBytes || !utf8.ValidString(h) {
+				return nil, fmt.Errorf("%s: \"header\" text %q is longer than %d bytes or not UTF-8", where, h, MaxHeaderBytes)
+			}
+		}
+		if r.Rest > 0 || r.As == AsTable && !r.OneRow {
+			return nil, fmt.Errorf("%s: \"rest_table\" is on a row or a \"one_row\" table, without \"rest\"", where)
+		}
+		r.RestTable = rt
+	}
 	if v, ok := m["with"]; ok {
 		var raws []json.RawMessage
 		if err := json.Unmarshal(v, &raws); err != nil || len(raws) == 0 || len(raws) > 8 {
@@ -1256,4 +1289,15 @@ func (c *compiler) kvs(key string, v json.RawMessage) ([]KV, error) {
 		out = append(out, KV{Key: k, Value: val})
 	}
 	return out, nil
+}
+
+// RestTable is a "rest_table": the rows of names and values a row holds
+// beyond its column cells, written as a table after the table. Names:
+// "path" (relative to the row's element) or "local". ID: a column of the
+// row whose text is the first cell of each of its rows (the line's id),
+// 0 for none. Header: the table's header row, the profile's text.
+type RestTable struct {
+	Names  string   `json:"names"`
+	ID     int      `json:"id"`
+	Header []string `json:"header"`
 }

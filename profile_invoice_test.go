@@ -94,6 +94,14 @@ func invoiceRowLocs(t *testing.T, data []byte, b *gofastcore.Block, prefix strin
 	}
 }
 
+// invoiceRows checks a table's rows.
+func invoiceRows(t *testing.T, b *gofastcore.Block, want [][]string) {
+	t.Helper()
+	if !slices.EqualFunc(b.Table.Rows, want, slices.Equal) {
+		t.Errorf("rows:\n%q\nwant\n%q", b.Table.Rows, want)
+	}
+}
+
 func TestInvoiceCII(t *testing.T) {
 	data, doc := invoiceFixture(t, "cii/invoice.xml", "cii", nil)
 	patentExtra(t, doc, map[string]string{
@@ -106,42 +114,60 @@ func TestInvoiceCII(t *testing.T) {
 	lines := invoiceTable(t, doc, "line id", 0)
 	invoiceRowLocs(t, data, lines, "<ram:IncludedSupplyChainTradeLineItem>")
 	want := [][]string{
-		{"line id", "item name", "description", "quantity", "net price", "line net amount", "VAT category", "VAT rate", "note", "item identifiers", "gross price", "item attributes", "billing period", "other"},
-		{"1", "Papier A4", "Ramette 500 feuilles", "10 C62", "4.50", "45.00", "S", "20", "Livraison partielle", "4012345000009 0160", "", "Grammage\n80 g", "", "FR\nVAT"},
-		{"2", "Stylo", "", "3 H87", "1.00", "3.00", "S", "20", "", "", "", "", "", "VAT"},
+		{"line id", "item name", "description", "quantity", "net price", "line net amount", "VAT category", "VAT rate", "note", "item identifiers", "gross price", "item attributes", "billing period"},
+		{"1", "Papier A4", "Ramette 500 feuilles", "10 C62", "4.50", "45.00", "S", "20", "Livraison partielle", "4012345000009 0160", "", "Grammage\n80 g", ""},
+		{"2", "Stylo", "", "3 H87", "1.00", "3.00", "S", "20", "", "", "", "", ""},
 	}
 	if !slices.EqualFunc(lines.Table.Rows, want, slices.Equal) {
 		t.Errorf("lines:\n%q\nwant\n%q", lines.Table.Rows, want)
 	}
+	// What the lines hold beyond their columns: after the lines table,
+	// with the line's id and the file's name for each value.
+	rest := invoiceTable(t, doc, "line id", 1)
+	invoiceRowLocs(t, data, rest, "<ram:")
+	invoiceRows(t, rest, [][]string{{"line id", "name", "value"},
+		{"1", "SpecifiedTradeProduct/OriginTradeCountry/ID", "FR"},
+		{"1", "SpecifiedLineTradeSettlement/ApplicableTradeTax/TypeCode", "VAT"},
+		{"2", "SpecifiedLineTradeSettlement/ApplicableTradeTax/TypeCode", "VAT"}})
 	tax := invoiceTable(t, doc, "tax type", 0)
-	if got := tax.Table.Rows[1]; !slices.Equal(got, []string{"VAT", "S", "20", "48.00", "9.60", "", "", ""}) {
+	if got := tax.Table.Rows[1]; !slices.Equal(got, []string{"VAT", "S", "20", "48.00", "9.60", "", ""}) {
 		t.Errorf("VAT breakdown %q", got)
 	}
 	ac := invoiceTable(t, doc, "charge indicator", 0)
-	if got := ac.Table.Rows[1]; !slices.Equal(got, []string{"true", "0.00", "", "", "", "Port", "S", "20", "VAT"}) {
+	if got := ac.Table.Rows[1]; !slices.Equal(got, []string{"true", "0.00", "", "", "", "Port", "S", "20"}) {
 		t.Errorf("allowance/charge %q", got)
 	}
 	tot := invoiceTable(t, doc, "line total", 0)
-	if got := tot.Table.Rows[1]; !slices.Equal(got, []string{"48.00", "", "", "48.00", "9.60 EUR", "", "57.60", "", "57.60", ""}) {
+	if got := tot.Table.Rows[1]; !slices.Equal(got, []string{"48.00", "", "", "48.00", "9.60 EUR", "", "57.60", "", "57.60"}) {
 		t.Errorf("totals %q", got)
 	}
-	for _, c := range []struct {
+	nv := []string{"name", "value"}
+	for i, c := range []struct {
 		attrs map[string]string
-		text  string
+		rows  [][]string
 	}{
-		{map[string]string{"inv.field": "Name", "inv.party": "seller"}, "Exemple SARL"},
-		{map[string]string{"inv.field": "ID", "inv.party": "seller", "inv.group": "SpecifiedTaxRegistration", "inv.schemeID": "VA"}, "FR32123456789"},
-		{map[string]string{"inv.field": "ID", "inv.party": "seller", "inv.group": "SpecifiedLegalOrganization", "inv.schemeID": "0002"}, "123456789"},
-		{map[string]string{"inv.field": "CityName", "inv.party": "seller", "inv.group": "PostalTradeAddress"}, "Paris"},
-		{map[string]string{"inv.field": "Name", "inv.party": "buyer"}, "Client SA"},
-		{map[string]string{"inv.field": "IncludedNote", "inv.subject_code": "AAI"}, "Merci de votre confiance."},
-		{map[string]string{"inv.field": "IBANID", "inv.group": "SpecifiedTradeSettlementPaymentMeans", "inv.account": "PayeePartyCreditorFinancialAccount"}, "FR7630006000011234567890189"},
-		{map[string]string{"inv.field": "DueDateDateTime", "inv.format": "102", "inv.group": "SpecifiedTradePaymentTerms"}, "20260214"},
-		{map[string]string{"inv.field": "Description", "inv.group": "SpecifiedTradePaymentTerms"}, "30 jours net"},
+		{map[string]string{"inv.party": "seller"}, [][]string{nv, {"SellerTradeParty/Name", "Exemple SARL"},
+			{"SellerTradeParty/SpecifiedLegalOrganization/ID", "123456789"}, {"SellerTradeParty/SpecifiedLegalOrganization/ID/@schemeID", "0002"},
+			{"SellerTradeParty/PostalTradeAddress/PostcodeCode", "75001"}, {"SellerTradeParty/PostalTradeAddress/CityName", "Paris"}, {"SellerTradeParty/PostalTradeAddress/CountryID", "FR"},
+			{"SellerTradeParty/SpecifiedTaxRegistration/ID", "FR32123456789"}, {"SellerTradeParty/SpecifiedTaxRegistration/ID/@schemeID", "VA"}}},
+		{map[string]string{"inv.party": "buyer"}, [][]string{nv, {"BuyerTradeParty/Name", "Client SA"}}},
+		{map[string]string{"inv.group": "SpecifiedTradeSettlementPaymentMeans"}, [][]string{nv, {"SpecifiedTradeSettlementPaymentMeans/TypeCode", "58"},
+			{"SpecifiedTradeSettlementPaymentMeans/PayeePartyCreditorFinancialAccount/IBANID", "FR7630006000011234567890189"}}},
+		{nil, [][]string{nv, {"CategoryTradeTax/TypeCode", "VAT"}}},
+		{map[string]string{"inv.group": "SpecifiedTradePaymentTerms"}, [][]string{nv, {"SpecifiedTradePaymentTerms/Description", "30 jours net"},
+			{"SpecifiedTradePaymentTerms/DueDateDateTime/DateTimeString", "20260214"}, {"SpecifiedTradePaymentTerms/DueDateDateTime/DateTimeString/@format", "102"}}},
 	} {
-		if got, ok := invoicePara(doc, c.attrs); !ok || got != c.text {
-			t.Errorf("paragraph %v: %q, %v; want %q", c.attrs, got, ok, c.text)
+		b := invoiceTable(t, doc, "name", i)
+		invoiceRowLocs(t, data, b, "<")
+		invoiceRows(t, b, c.rows)
+		for k, v := range c.attrs {
+			if b.Attrs[k] != v {
+				t.Errorf("table %d: Attrs %v, want %s=%s", i, b.Attrs, k, v)
+			}
 		}
+	}
+	if got, ok := invoicePara(doc, map[string]string{"inv.field": "IncludedNote", "inv.subject_code": "AAI"}); !ok || got != "Merci de votre confiance." {
+		t.Errorf("note %q, %v", got, ok)
 	}
 	for _, w := range doc.AllWarnings() {
 		if w.Code == WarnUnmappedAttributes || w.Code == WarnUnmappedElements {
@@ -162,43 +188,55 @@ func TestInvoiceUBL(t *testing.T) {
 	}
 	lines := invoiceTable(t, doc, "line id", 0)
 	invoiceRowLocs(t, data, lines, "<cac:InvoiceLine>")
-	want := []string{"1", "Consulting", "On-site work", "4 HUR", "25.00 EUR", "100.00 EUR", "S", "20", "Rush order", "SRV-1", "72224000 STI", "", "", "CC-9\nVAT"}
+	want := []string{"1", "Consulting", "On-site work", "4 HUR", "25.00 EUR", "100.00 EUR", "S", "20", "Rush order", "SRV-1", "72224000 STI", "", ""}
 	if got := lines.Table.Rows[1]; !slices.Equal(got, want) {
 		t.Errorf("line:\n%q\nwant\n%q", got, want)
 	}
+	rest := invoiceTable(t, doc, "line id", 1)
+	invoiceRowLocs(t, data, rest, "<cbc:")
+	invoiceRows(t, rest, [][]string{{"line id", "name", "value"}, {"1", "AccountingCost", "CC-9"}, {"1", "Item/ClassifiedTaxCategory/TaxScheme/ID", "VAT"}})
 	tax := invoiceTable(t, doc, "taxable amount", 0)
 	invoiceRowLocs(t, data, tax, "<cac:TaxSubtotal>")
-	if got := tax.Table.Rows[1]; !slices.Equal(got, []string{"95.00 EUR", "19.00 EUR", "S", "20", "", "", "VAT", ""}) {
+	if got := tax.Table.Rows[1]; !slices.Equal(got, []string{"95.00 EUR", "19.00 EUR", "S", "20", "", "", "VAT"}) {
 		t.Errorf("tax subtotal %q", got)
 	}
 	ac := invoiceTable(t, doc, "charge indicator", 0)
-	if got := ac.Table.Rows[1]; !slices.Equal(got, []string{"false", "5.00 EUR", "", "", "", "Discount", "S", "20", "VAT"}) {
+	if got := ac.Table.Rows[1]; !slices.Equal(got, []string{"false", "5.00 EUR", "", "", "", "Discount", "S", "20"}) {
 		t.Errorf("allowance/charge %q", got)
 	}
 	tot := invoiceTable(t, doc, "line extension amount", 0)
-	if got := tot.Table.Rows[1]; !slices.Equal(got, []string{"100.00 EUR", "95.00 EUR", "114.00 EUR", "", "", "", "", "114.00 EUR", ""}) {
+	if got := tot.Table.Rows[1]; !slices.Equal(got, []string{"100.00 EUR", "95.00 EUR", "114.00 EUR", "", "", "", "", "114.00 EUR"}) {
 		t.Errorf("totals %q", got)
 	}
-	// The second TaxTotal has no subtotal: its amount is a paragraph and
-	// no header-only table is made.
-	if got, ok := invoicePara(doc, map[string]string{"inv.field": "TaxTotal/TaxAmount", "inv.currencyID": "GBP"}); !ok || got != "16.40" {
-		t.Errorf("tax total in GBP: %q %v", got, ok)
+	if got, ok := invoicePara(doc, map[string]string{"inv.field": "Note"}); !ok || got != "Thank you." {
+		t.Errorf("note %q, %v", got, ok)
 	}
-	for _, c := range []struct {
+	// Values outside a party or a group are tables of their own; the
+	// second TaxTotal has no subtotal: its amount is such a table and no
+	// header-only table is made.
+	nv := []string{"name", "value"}
+	for i, c := range []struct {
 		attrs map[string]string
-		text  string
+		rows  [][]string
 	}{
-		{map[string]string{"inv.field": "EndpointID", "inv.party": "seller", "inv.schemeID": "0088"}, "7300010000001"},
-		{map[string]string{"inv.field": "Name", "inv.party": "seller", "inv.group": "PartyName"}, "Seller Ltd"},
-		{map[string]string{"inv.field": "CompanyID", "inv.party": "seller", "inv.group": "PartyTaxScheme"}, "GB123456789"},
-		{map[string]string{"inv.field": "Name", "inv.party": "buyer"}, "Buyer plc"},
-		{map[string]string{"inv.field": "Note"}, "Thank you."},
-		{map[string]string{"inv.field": "DueDate"}, "2026-02-14"},
-		{map[string]string{"inv.field": "PaymentMeansCode", "inv.name": "Credit transfer", "inv.group": "PaymentMeans"}, "30"},
-		{map[string]string{"inv.field": "ID", "inv.account": "PayeeFinancialAccount"}, "GB29NWBK60161331926819"},
+		{nil, [][]string{nv, {"DueDate", "2026-02-14"}}},
+		{map[string]string{"inv.party": "seller"}, [][]string{nv, {"AccountingSupplierParty/Party/EndpointID", "7300010000001"}, {"AccountingSupplierParty/Party/EndpointID/@schemeID", "0088"},
+			{"AccountingSupplierParty/Party/PartyName/Name", "Seller Ltd"}, {"AccountingSupplierParty/Party/PostalAddress/CityName", "London"}, {"AccountingSupplierParty/Party/PostalAddress/Country/IdentificationCode", "GB"},
+			{"AccountingSupplierParty/Party/PartyTaxScheme/CompanyID", "GB123456789"}, {"AccountingSupplierParty/Party/PartyTaxScheme/TaxScheme/ID", "VAT"}}},
+		{map[string]string{"inv.party": "buyer"}, [][]string{nv, {"AccountingCustomerParty/Party/PartyName/Name", "Buyer plc"}}},
+		{map[string]string{"inv.group": "PaymentMeans"}, [][]string{nv, {"PaymentMeans/PaymentMeansCode", "30"}, {"PaymentMeans/PaymentMeansCode/@name", "Credit transfer"},
+			{"PaymentMeans/PayeeFinancialAccount/ID", "GB29NWBK60161331926819"}}},
+		{nil, [][]string{nv, {"TaxCategory/TaxScheme/ID", "VAT"}}},
+		{nil, [][]string{nv, {"TaxAmount", "19.00"}, {"TaxAmount/@currencyID", "EUR"}}},
+		{nil, [][]string{nv, {"TaxAmount", "16.40"}, {"TaxAmount/@currencyID", "GBP"}}},
 	} {
-		if got, ok := invoicePara(doc, c.attrs); !ok || got != c.text {
-			t.Errorf("paragraph %v: %q, %v; want %q", c.attrs, got, ok, c.text)
+		b := invoiceTable(t, doc, "name", i)
+		invoiceRowLocs(t, data, b, "<c")
+		invoiceRows(t, b, c.rows)
+		for k, v := range c.attrs {
+			if b.Attrs[k] != v {
+				t.Errorf("table %d: Attrs %v, want %s=%s", i, b.Attrs, k, v)
+			}
 		}
 	}
 	for _, w := range doc.AllWarnings() {

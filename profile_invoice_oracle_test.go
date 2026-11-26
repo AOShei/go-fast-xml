@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -147,12 +148,20 @@ func invoiceBody(doc *gofastcore.Document) (text string, inTable []bool, rows []
 				add(x.Text, false)
 				continue
 			}
+			nameCol, idCol, pairs := pairCols(x)
 			for r, row := range x.Table.Rows {
 				if r == 0 && x.Attrs[AttrHeaderSource] == "profile" {
 					continue
 				}
 				from := b.Len()
-				for _, c := range row {
+				for ci, c := range row {
+					// A table of names and values: the names (and a
+					// line's id) are not the file's character data
+					// there, nor an attribute's value; invoiceNames
+					// checks them.
+					if pairs && (ci == nameCol || ci == idCol || ci == nameCol+1 && strings.Contains(row[nameCol], "/@")) {
+						continue
+					}
 					// A cell's values on lines of their own are pieces.
 					for _, l := range strings.Split(c, "\n") {
 						add(l, true)
@@ -165,6 +174,108 @@ func invoiceBody(doc *gofastcore.Document) (text string, inTable []bool, rows []
 		}
 	}
 	return b.String(), inTable, rows
+}
+
+// pairCols reports whether x is a table of names and values the profile
+// makes ("pairs", "rest_table": a profile header row ending in name,
+// value), with the columns of its names and of its ids (-1: none).
+func pairCols(x gofastcore.Block) (name, id int, ok bool) {
+	if x.Table == nil || x.Attrs[AttrHeaderSource] != "profile" || len(x.Table.Rows) == 0 {
+		return -1, -1, false
+	}
+	h := x.Table.Rows[0]
+	switch n := len(h); {
+	case n == 2 && h[0] == "name" && h[1] == "value":
+		return 0, -1, true
+	case n == 3 && h[1] == "name" && h[2] == "value":
+		return 1, 0, true
+	}
+	return -1, -1, false
+}
+
+// invoiceNames checks the exception of oracle (a): the names a table of
+// names and values writes. Each is the name of the element its row cites
+// (the end of that element's path of local names), and a name ending in
+// /@attribute names an attribute of that element whose value is the
+// row's value. A line's id is the text of a cell of the row (of another
+// table) whose element holds the row's element. It returns the number of
+// names checked.
+func invoiceNames(data []byte, doc *gofastcore.Document) (string, int) {
+	paths := map[int64][]string{}
+	attrs := map[int64]map[string]string{}
+	d := xml.NewDecoder(bytes.NewReader(data))
+	d.Strict = false
+	d.CharsetReader = func(label string, r io.Reader) (io.Reader, error) { return r, nil }
+	var stack []string
+	for {
+		off := d.InputOffset()
+		tok, err := d.Token()
+		if err != nil {
+			break
+		}
+		switch tk := tok.(type) {
+		case xml.StartElement:
+			stack = append(stack, tk.Name.Local)
+			paths[off] = append([]string(nil), stack...)
+			m := map[string]string{}
+			for _, a := range tk.Attr {
+				m[a.Name.Local] = oneSpace(a.Value)
+			}
+			attrs[off] = m
+		case xml.EndElement:
+			stack = stack[:len(stack)-1]
+		}
+	}
+	type lineRow struct {
+		loc   gofastcore.Location
+		cells []string
+	}
+	var lines []lineRow
+	for _, p := range doc.Parts {
+		for _, x := range p.Blocks {
+			if _, _, ok := pairCols(x); ok || x.Table == nil {
+				continue
+			}
+			for r, l := range x.Table.RowLocs {
+				lines = append(lines, lineRow{l, x.Table.Rows[r]})
+			}
+		}
+	}
+	n := 0
+	for _, p := range doc.Parts {
+		for bi, x := range p.Blocks {
+			nameCol, idCol, ok := pairCols(x)
+			if !ok {
+				continue
+			}
+			for r, row := range x.Table.Rows[1:] {
+				l := x.Table.RowLocs[r+1]
+				name, attr, _ := strings.Cut(row[nameCol], "/@")
+				path, ok := paths[l.Offset]
+				steps := strings.Split(name, "/")
+				if !ok || len(steps) > len(path) || strings.Join(path[len(path)-len(steps):], "/") != name {
+					return fmt.Sprintf("block %d row %d: %q is not the name of the element there (%v)", bi, r+1, row[nameCol], path), n
+				}
+				if attr != "" && attrs[l.Offset][attr] != oneSpace(row[nameCol+1]) {
+					return fmt.Sprintf("block %d row %d: %q is not an attribute of the element there with value %q", bi, r+1, row[nameCol], row[nameCol+1]), n
+				}
+				n++
+				if idCol < 0 || row[idCol] == "" {
+					continue
+				}
+				found := false
+				for _, lr := range lines {
+					if lr.loc.Offset <= l.Offset && l.Offset+l.Length <= lr.loc.Offset+lr.loc.Length {
+						found = found || slices.Contains(lr.cells, row[idCol])
+					}
+				}
+				if !found {
+					return fmt.Sprintf("block %d row %d: id %q is no cell of a row holding its element", bi, r+1, row[idCol]), n
+				}
+			}
+		}
+	}
+	return "", n
 }
 
 // invoiceRow is a row's location in the file and its text's in the body.
@@ -398,7 +509,11 @@ func invoiceRowText(data []byte, doc *gofastcore.Document) string {
 					hay += " " + strings.Join(x.attrs, " ")
 				}
 				hay += " " + attrValues(span)
-				for _, c := range b.Table.Rows[r] {
+				nameCol, idCol, pairs := pairCols(b)
+				for ci, c := range b.Table.Rows[r] {
+					if pairs && (ci == nameCol || ci == idCol) {
+						continue // checked by invoiceNames
+					}
 					for _, w := range strings.Fields(c) {
 						if !strings.Contains(hay, w) {
 							return fmt.Sprintf("block %d row %d: %q is not in the row's source", bi, r, w)
@@ -503,7 +618,7 @@ func TestInvoiceOracles(t *testing.T) {
 	used := map[string]bool{}
 	files := 0
 	depths := map[int]int{}
-	kids := 0
+	kids, names := 0, 0
 	for _, path := range patentCorpusFiles(dir) {
 		for _, child := range []bool{false, true} {
 			doc, data, err := feedRead(path, child)
@@ -544,6 +659,13 @@ func TestInvoiceOracles(t *testing.T) {
 			if bad := invoiceRowText(data, doc); bad != "" {
 				t.Errorf("%s (child %v): (b) RowLocs: %s", name, child, bad)
 			}
+			bad, n := invoiceNames(data, doc)
+			if bad != "" {
+				t.Errorf("%s (child %v): (a) names: %s", name, child, bad)
+			}
+			if !child {
+				names += n
+			}
 			for i, k := range doc.Children {
 				off, _ := strconv.ParseInt(k.Metadata.Extra[ExtraParentOffset], 10, 64)
 				n, _ := strconv.ParseInt(k.Metadata.Extra[ExtraParentLength], 10, 64)
@@ -555,7 +677,10 @@ func TestInvoiceOracles(t *testing.T) {
 			}
 		}
 	}
-	t.Logf("%d files read with cii or ubl, %d attachments; character data below a line, by depth: %v", files, kids, depths)
+	t.Logf("%d files read with cii or ubl, %d attachments, %d names of elements and attributes checked; character data below a line, by depth: %v", files, kids, names, depths)
+	if names == 0 {
+		t.Error("no name of a table of names and values met on dev")
+	}
 	for _, m := range []map[string]string{invoiceMeta, invoiceInAttrs, invoiceAttachments} {
 		for k := range m {
 			if !used[k] {
