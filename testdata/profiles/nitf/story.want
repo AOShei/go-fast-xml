@@ -1,0 +1,59 @@
+title: Harbour reopens after storm
+table anchor_parent=ex.2012.0001 header_source=profile nitf.change_date=2012-10-01 nitf.change_time=12:00 nitf.version=-//IPTC//DTD NITF 3.6//EN
+  name | value
+  head/title | Harbour reopens  <<title>Harbour reopens</
+  head/meta/@name | slug  <<meta name="slug" conten
+  head/meta/@content | harbour-reopen  <<meta name="slug" conten
+  head/tobject/@tobject.type | news  <<tobject tobject.type="n
+  head/tobject/tobject.subject/@tobject.subject.refnum | 04000000  <<tobject.subject tobject
+  head/tobject/tobject.subject/@tobject.subject.type | Economy  <<tobject.subject tobject
+  head/docdata/@management-status | usable  <<docdata management-stat
+  head/docdata/doc-id/@id-string | ex.2012.0001  <<doc-id id-string="ex.20
+  head/docdata/doc-id/@regsrc | EX  <<doc-id id-string="ex.20
+  head/docdata/urgency/@ed-urg | 4  <<urgency ed-urg="4"/>
+  head/docdata/date.issue/@norm | 20121001T120000Z  <<date.issue norm="201210
+  head/docdata/date.release/@norm | 20121001T130000Z  <<date.release norm="2012
+  head/docdata/doc.copyright/@year | 2012  <<doc.copyright year="201
+  head/docdata/doc.copyright/@holder | Example Wire  <<doc.copyright year="201
+  head/docdata/key-list/keyword/@key | harbour  <<keyword key="harbour"/>
+  head/docdata/key-list/keyword/@key | shipping  <<keyword key="shipping"/
+  head/docdata/identified-content/classifier/@type | genre  <<classifier type="genre"
+  head/docdata/identified-content/classifier/@value | report  <<classifier type="genre"
+  head/pubdata/@type | print  <<pubdata type="print" na
+  head/pubdata/@name | Example Daily  <<pubdata type="print" na
+  head/pubdata/@edition.area | North  <<pubdata type="print" na
+heading1 anchor_parent=ex.2012.0001: Harbour reopens after storm
+heading2 #sub: Ships wait at anchor
+paragraph anchor_parent=ex.2012.0001 nitf.field=note nitf.noteclass=editorsnote: Corrects the date.
+paragraph anchor_parent=ex.2012.0001 nitf.field=byline: By Ann Writer Harbour reporter
+paragraph anchor_parent=ex.2012.0001 nitf.field=distributor: Example Wire
+paragraph anchor_parent=ex.2012.0001 nitf.field=dateline: Portsmouth, Oct. 1
+paragraph anchor_parent=ex.2012.0001 nitf.field=rights: Example Wire
+paragraph anchor_parent=ex.2012.0001 nitf.field=abstract: The harbour opened at dawn.
+paragraph anchor_parent=ex.2012.0001 nitf.lede=true: The harbour board reopened the port on Monday.
+Fees rose to 10 pounds.
+image anchor_parent=ex.2012.0001 mime-type=image/jpeg nitf.media_type=image: The harbour at dawn
+caption anchor_parent=ex.2012.0001 nitf.media_type=image: The harbour at dawn.
+paragraph anchor_parent=ex.2012.0001 nitf.field=media-producer nitf.media_type=image: A. Photographer
+heading2 anchor_parent=ex.2012.0001 nitf.class=box: Background
+paragraph anchor_parent=ex.2012.0001 nitf.class=box: See the storm report.
+quote1 anchor_parent=ex.2012.0001: We are open.
+Harbour master
+list_item1 anchor_parent=ex.2012.0001: Berth 1
+list_item1 anchor_parent=ex.2012.0001: Berth 2
+list_item1 anchor_parent=ex.2012.0001 nitf.element=dt: Berth
+list_item1 anchor_parent=ex.2012.0001 nitf.element=dd: A place for a ship
+code anchor_parent=ex.2012.0001: 08:00  open
+caption anchor_parent=ex.2012.0001: Arrivals
+table anchor_parent=ex.2012.0001
+  Ship | Time  <<tr><th>Ship</th><th>Tim
+  Ada | 09:00  <<tr><td>Ada</td><td>09:0
+paragraph anchor_parent=ex.2012.0001: Text
+footnote #f1: A note.
+paragraph anchor_parent=ex.2012.0001: ends.
+paragraph anchor_parent=ex.2012.0001 nitf.field=tagline: Ann Writer reported from Portsmouth.
+note idsrc=ex name=person stored=custom_property value=p1: Ann Writer
+note name=story.date norm=20121001 stored=custom_property: Oct. 1
+note name=org stored=custom_property value=hb: harbour board
+note name=chron norm=2012-10-01 stored=custom_property: Monday
+note name=money stored=custom_property unit=GBP: 10 pounds
