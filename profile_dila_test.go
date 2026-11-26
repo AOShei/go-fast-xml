@@ -27,6 +27,7 @@ func dilaCollection(path string) string {
 // dilaProfile is the profile a collection is read with.
 var dilaProfile = map[string]string{
 	"jade": "dila-juri", "cass": "dila-juri", "inca": "dila-juri", "capp": "dila-juri", "constit": "dila-juri",
+	"kali": "legifrance",
 }
 
 // TestDilaCorpus reads every file of the xml-dila dev and held-out sets
@@ -128,6 +129,31 @@ var dilaJuriSpec = &aknOracleSpec{
 
 func TestDilaJuriOracles(t *testing.T) { aknOracles(t, "xml-dila", dilaJuriSpec) }
 
+// dilaLegifranceSpec is the legifrance oracle on the KALI and CNIL files
+// of xml-dila: the metadata blocks are not body text, but for the titles
+// that are also headings (TITREFULL, SECTION_TA/TITRE_TA, an IDCC's
+// TITRE).
+var dilaLegifranceSpec = &aknOracleSpec{
+	skip: map[string]string{
+		"META_COMMUN": "metadata", "META_ARTICLE": "metadata", "META_TEXTE_CHRONICLE": "metadata", "/ID": "metadata",
+		"CONTEXTE": "metadata (lf.texte.*, lf.contexte)", "META_TEXTE_VERSION/TITRE": "metadata", "ETAT": "metadata",
+		"DATE_DEBUT": "metadata", "DATE_FIN": "metadata", "APPLI_GEO": "metadata", "CODES_NOMENCLATURES": "metadata",
+		"LIBELLE_EXTENSION": "metadata", "MCS_TXT": "metadata", "META_CONTENEUR/NUM": "metadata",
+		"META_CONTENEUR/DATE_PUBLI": "metadata", "ACTS_PRO": "metadata", "NUMS_BROCH": "metadata",
+	},
+	outOfLine:  map[string]bool{},
+	blocks:     map[string]bool{"p": true, "LIEN": true, "LIEN_SECTION_TA": true, "CONDITION_DIFFERE": true, "li": true, "blockquote": true},
+	labels:     map[string]bool{},
+	items:      map[string]bool{"li": true},
+	closers:    map[string]bool{"ul": true, "ol": true, "table": true},
+	splits:     map[string]bool{"table": true},
+	cells:      map[string]bool{"td": true, "th": true},
+	attrMarker: map[gofastcore.Kind]bool{},
+	only:       func(path string) bool { return dilaProfile[dilaCollection(path)] == "legifrance" },
+}
+
+func TestDilaLegifranceOracles(t *testing.T) { aknOracles(t, "xml-dila", dilaLegifranceSpec) }
+
 // TestDilaJuriSample checks the dila-juri profile on a synthetic Cour de
 // cassation decision, with exact blocks.
 func TestDilaJuriSample(t *testing.T) {
@@ -204,6 +230,94 @@ paragraph0:"Code civil - art. 1240"
 	src, _ := dilaJuriSpec.sourceText(data, map[string]bool{})
 	if got := dilaJuriSpec.docText(doc); got != src {
 		t.Errorf("oracle (a):\n doc:  %s\n file: %s", got, src)
+	}
+}
+
+// TestLegifranceKali checks the KALI elements of the legifrance profile
+// on synthetic files: an article, a text version and an IDCC container.
+func TestLegifranceKali(t *testing.T) {
+	read := func(src string) (*gofastcore.Document, []gofastcore.Block) {
+		t.Helper()
+		doc, err := ExtractBytes(context.Background(), []byte(src), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := doc.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		if doc.Metadata.Extra[ExtraProfile] != "legifrance" {
+			t.Fatalf("profile %q", doc.Metadata.Extra[ExtraProfile])
+		}
+		for _, w := range doc.AllWarnings() {
+			if w.Code == WarnUnmappedElements || w.Code == WarnUnmappedAttributes {
+				t.Errorf("warning %+v", w)
+			}
+		}
+		return doc, blocks(doc)
+	}
+	doc, bs := read(`<ARTICLE><META><META_COMMUN><ID>KALIARTI000000000001</ID><ORIGINE>KALI</ORIGINE></META_COMMUN><META_SPEC><META_ARTICLE>` +
+		`<NUM>2</NUM><ETAT>VIGUEUR_ETEN</ETAT><CALIPSOS><CALIPSO>SALAIRES</CALIPSO><CALIPSO>DUREE</CALIPSO></CALIPSOS>` +
+		`<HISTORIQUE>Modifié par avenant n° 1</HISTORIQUE><DATE_DEBUT>2022-07-01</DATE_DEBUT><DATE_FIN>2999-01-01</DATE_FIN>` +
+		`<DATE_DEB_EXT>2999-01-01</DATE_DEB_EXT><DATE_FIN_EXT>2999-01-02</DATE_FIN_EXT></META_ARTICLE></META_SPEC></META>` +
+		`<CONTEXTE><TEXTE cid="KALITEXT000000000002"><TITRE_TXT id_txt="KALITEXT000000000002">Avenant n° 61</TITRE_TXT></TEXTE>` +
+		`<CONTENEUR cid="KALICONT000000000003" date_publi="1988-05-18" etat="VIGUEUR_ETEN" nature="IDCC" num="1501" titre="Convention collective" url="conteneur/x.xml"/></CONTEXTE>` +
+		`<BLOC_TEXTUEL><CONTENU><p>Texte.</p></CONTENU></BLOC_TEXTUEL><CONDITION_DIFFERE>Entrera en vigueur au JORF.</CONDITION_DIFFERE>` +
+		`<INFORMATIONS_COMPLEMENTAIRES><CONTENU>Précision.</CONTENU></INFORMATIONS_COMPLEMENTAIRES></ARTICLE>`)
+	m := doc.Metadata.Extra
+	for k, v := range map[string]string{
+		"lf.calipso": "SALAIRES\nDUREE", "lf.historique": "Modifié par avenant n° 1", "lf.date_deb_ext": "2999-01-01",
+		"lf.date_fin_ext": "2999-01-02", "lf.conteneur.cid": "KALICONT000000000003", "lf.conteneur.num": "1501",
+		"lf.conteneur.nature": "IDCC", "lf.conteneur.titre": "Convention collective", "lf.conteneur.etat": "VIGUEUR_ETEN",
+		"lf.conteneur.date_publi": "1988-05-18", "lf.conteneur.url": "conteneur/x.xml", "lf.texte.cid": "KALITEXT000000000002",
+	} {
+		if m[k] != v {
+			t.Errorf("Extra[%s] = %q, want %q", k, m[k], v)
+		}
+	}
+	if got := brief(bs); got != "paragraph:Texte.\nparagraph:Entrera en vigueur au JORF.\nparagraph~:Précision.\n" {
+		t.Errorf("article blocks:\n%s", got)
+	}
+	if bs[1].Attrs["lf.field"] != "CONDITION_DIFFERE" || bs[2].Attrs["lf.field"] != "INFORMATIONS_COMPLEMENTAIRES" {
+		t.Errorf("fields %v %v", bs[1].Attrs, bs[2].Attrs)
+	}
+
+	doc, bs = read(`<TEXTE_VERSION><META><META_COMMUN><ID>KALITEXT000000000004</ID></META_COMMUN><META_SPEC><META_TEXTE_VERSION>` +
+		`<TITREFULL>Accord du 30 novembre 2021</TITREFULL><APPLI_GEO>A NATIONAL</APPLI_GEO><CODES_NOMENCLATURES><CODE>10-71A</CODE><CODE>56-10C</CODE></CODES_NOMENCLATURES>` +
+		`<LIBELLE_EXTENSION>Etendu par arrêté du 23 mai 2022</LIBELLE_EXTENSION><LIBELLE_ELARGISSEMENT>Elargi</LIBELLE_ELARGISSEMENT>` +
+		`<DESCRIPTION_FUSION><CONTENU><p>Fusion.</p></CONTENU></DESCRIPTION_FUSION><INFOS_RESTRUCTURATION_BRANCHE><CONTENU><p>Branche.</p></CONTENU></INFOS_RESTRUCTURATION_BRANCHE>` +
+		`</META_TEXTE_VERSION></META_SPEC></META><SIGNATAIRES><SIGNPATRON><CONTENU><p>Patronat.</p></CONTENU></SIGNPATRON><SIGNSYNDIC><CONTENU><p>Syndicats.</p></CONTENU></SIGNSYNDIC>` +
+		`<ORGADHERE><CONTENU><p>Adhésion.</p></CONTENU></ORGADHERE><ORGDENONCE><CONTENU><p>Dénonciation.</p></CONTENU></ORGDENONCE>` +
+		`<SIGNEXT><CONTENU><p>Extension.</p></CONTENU></SIGNEXT><EXECUTION><CONTENU><p>Exécution.</p></CONTENU></EXECUTION></SIGNATAIRES></TEXTE_VERSION>`)
+	m = doc.Metadata.Extra
+	if m["lf.appli_geo"] != "A NATIONAL" || m["lf.code_nomenclature"] != "10-71A\n56-10C" || m["lf.libelle_extension"] != "Etendu par arrêté du 23 mai 2022" ||
+		m["lf.libelle_elargissement"] != "Elargi" || doc.Metadata.Title != "Accord du 30 novembre 2021" {
+		t.Errorf("text version metadata %v", doc.Metadata)
+	}
+	var b strings.Builder
+	for _, x := range bs {
+		fmt.Fprintf(&b, "%s|%s|%s\n", x.Text, x.Attrs["lf.field"], x.Attrs["lf.signataires"])
+	}
+	want := "Accord du 30 novembre 2021||\nFusion.|DESCRIPTION_FUSION|\nBranche.|INFOS_RESTRUCTURATION_BRANCHE|\n" +
+		"Patronat.|SIGNATAIRES|SIGNPATRON\nSyndicats.|SIGNATAIRES|SIGNSYNDIC\nAdhésion.|SIGNATAIRES|ORGADHERE\n" +
+		"Dénonciation.|SIGNATAIRES|ORGDENONCE\nExtension.|SIGNATAIRES|SIGNEXT\nExécution.|SIGNATAIRES|EXECUTION\n"
+	if got := b.String(); got != want {
+		t.Errorf("text version blocks:\n%s\nwant:\n%s", got, want)
+	}
+
+	doc, bs = read(`<IDCC><META><META_COMMUN><ID>KALICONT000000000005</ID><NATURE>IDCC</NATURE></META_COMMUN><META_SPEC><META_CONTENEUR>` +
+		`<TITRE>Convention collective nationale du 6 mai 1970</TITRE><ETAT>PERIME</ETAT><NUM>562</NUM><DATE_PUBLI>1970-05-06</DATE_PUBLI></META_CONTENEUR></META_SPEC></META>` +
+		`<STRUCTURE_TXT><TM niv="1"><TITRE_TM>Texte de base</TITRE_TM><LIEN_TXT idtxt="KALITEXT000000000006" titretxt="Convention du 6 mai 1970"/></TM></STRUCTURE_TXT>` +
+		`<TXTS_ISO/><ACTS_PRO><ACT_PRO>Aide à domicile</ACT_PRO></ACTS_PRO><NUMS_BROCH><NUM_BROCH>3321</NUM_BROCH></NUMS_BROCH></IDCC>`)
+	m = doc.Metadata.Extra
+	if doc.Metadata.Title != "Convention collective nationale du 6 mai 1970" || m["lf.root"] != "IDCC" || m["lf.id"] != "KALICONT000000000005" ||
+		m["lf.num"] != "562" || m["lf.act_pro"] != "Aide à domicile" || m["lf.num_broch"] != "3321" || m["lf.etat"] != "PERIME" {
+		t.Errorf("idcc metadata %v", doc.Metadata)
+	}
+	if got := brief(bs); got != "heading1:Convention collective nationale du 6 mai 1970\nheading2:Texte de base\nparagraph:Convention du 6 mai 1970\n" {
+		t.Errorf("idcc blocks:\n%s", got)
+	}
+	if x := bs[2]; x.Attrs["lf.idtxt"] != "KALITEXT000000000006" || x.Attrs["lf.group"] != "STRUCTURE_TXT" || x.Attrs[AttrAttribute] != "titretxt" {
+		t.Errorf("idcc link %+v", x)
 	}
 }
 
