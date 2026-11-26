@@ -2498,6 +2498,9 @@ func (e *Engine) endRule(f *frame, end int64) blockRef {
 		if t := f.table; t != nil {
 			if b, ok := t.block(e, f.start, end); ok {
 				f.ref = e.add(b, f, true)
+				if r.Pairs != "" {
+					f.secFirst = f.ref // where its children are linked
+				}
 			}
 			if t.rest != nil {
 				if b, ok := e.restBlock(t.rest); ok {
