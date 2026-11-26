@@ -9,9 +9,8 @@ Root `xliff` in `urn:oasis:names:tc:xliff:document:1.2` or
 `urn:oasis:names:tc:xliff:document:1.1` (any `version`), or in no
 namespace with `version` `1.0`, `1.1` or `1.2`. Both namespaces are
 aliases of no namespace (`namespace_aliases`), so one set of rules reads
-all three. An `xliff` root in another namespace (XLIFF 2.x, `urn:x`), or
-in none with another or no `version`, stays generic
-(`TestXLIFFSelection`). XLIFF 2.0 to 2.2 are **not** read by this
+all three. An `xliff` root in another namespace (`urn:x`), or in none with
+another or no `version`, stays generic (`TestXLIFFSelection`). XLIFF 2.0 to 2.2 are **not** read by this
 profile: they are read with `xliff2` (393 dev files).
 
 Dev roots: 1.2 namespace 500 files (408 also carry `its:version="2.0"`,
@@ -78,17 +77,19 @@ by the blocks' `xliff.original`.
 
 ## Measured
 
-- dev: 921 files, 528 read with xliff, 393 generic (XLIFF 2.x); 0
-  errors, 0 Validate failures, 0 panics; blocks over the set: heading
-  749, table 708, paragraph 63,060, note (attribute) 197,378, stored 374;
-  `limit.exceeded` 1; `xml.unmapped_elements` 163,814,
-  `xml.unmapped_attributes` 306,706 (files read with xliff).
-- held-out: 325 files, 192 read with xliff, 133 generic; 0 errors, 0
-  Validate failures; heading 300, table 272, paragraph 49,023, note
-  172,023, stored 135; `limit.exceeded` 1; `xml.unmapped_elements`
-  161,423, `xml.unmapped_attributes` 110,527.
-- Largest dev file (7.0 MB, 4,839 rows): 359 ms, 420 MiB allocated over
-  the read, 155 MiB heap in use after. Where (heap profile of the dev
+- dev: 921 files, 528 read with xliff, 393 with `xliff2` (XLIFF 2.x, see
+  `profiles/xliff2.md`); 0 errors, 0 Validate failures, 0 panics; blocks
+  over the whole set: heading 1,145, table 1,103, paragraph 61,901, note
+  (attribute) 182,339, stored 374; `limit.exceeded` 1;
+  `xml.unmapped_elements` 163,814, `xml.unmapped_attributes` 306,706
+  (files read with xliff).
+- held-out: 325 files, 192 read with xliff, 133 with `xliff2`; 0 errors,
+  0 Validate failures; over the whole set: heading 434, table 405,
+  paragraph 48,705, note 170,079, stored 135; `limit.exceeded` 1;
+  `xml.unmapped_elements` 161,423, `xml.unmapped_attributes` 110,527
+  (files read with xliff).
+- Largest dev file (7.0 MB, 4,839 rows): about 360 ms, 420 MiB allocated
+  over the read. Where (heap profile of the dev
   set read with xliff, allocated bytes): the growth of the part's block
   slice (`generic.Out.Append`, about 30%), the attribute notes of SDL
   extension elements (`attrNotes`: each note's block and its `Attrs`
