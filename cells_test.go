@@ -43,7 +43,9 @@ func TestProfileCellsFromAttributes(t *testing.T) {
 	}
 	for _, bad := range []string{
 		`{"match": "R", "as": "row", "cells": ["lit"]}`,
-		`{"match": "R", "as": "row", "cells": [{"attr": "a", "of": "T"}]}`,
+		`{"match": "R", "as": "row", "cells": [{"attr": "a", "of": "T", "child": "b"}]}`,
+		`{"match": "S", "as": "section", "table_header": []}`,
+		`{"match": "S", "as": "heading", "level": 1, "table_header": ["a"]}`,
 		`{"match": "R", "as": "row", "cells": [{"child": "a"}]}`,
 		`{"match": "R", "as": "row", "cells": []}`,
 		`{"match": "T", "as": "table", "header": [1]}`,
