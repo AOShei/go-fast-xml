@@ -39,6 +39,7 @@
     {"match": "g:hopHistory", "as": "table", "pairs": "path", "header": ["name", "value"]},
     {"match": "g:pubHistory", "as": "table", "pairs": "path", "header": ["name", "value"]},
     {"match": "g:catalog", "as": "table", "pairs": "path", "header": ["name", "value"]},
+    {"match": "g:catalogContainer", "as": "transparent"},
 
     {"match": "g:itemMeta", "as": "transparent"},
     {"match": "g:itemMeta/*", "as": "table", "pairs": "path", "header": ["name", "value"]},
@@ -56,6 +57,7 @@
     {"match": "g:contentSet/g:inlineXML", "as": "document",
       "media_type": {"attr": "contenttype", "map": {"application/xhtml+xml": "application/xhtml+xml", "application/xhtml+html": "application/xhtml+xml", "xhtml/xml": "application/xhtml+xml", "text/html": "application/xhtml+xml"}},
       "attrs": {"newsml.contenttype": {"attr": "contenttype"}}},
+    {"match": "g:inlineXML/*", "as": "table", "pairs": "path", "pairs_empty": true, "header": ["name", "value"], "note": "another vocabulary (SportsML, EventsML-G2, an agency's own): every value with its name"},
     {"match": "g:inlineXML/x:html", "as": "document", "media_type": "application/xhtml+xml"},
     {"match": "g:inlineXML/g:p", "as": "block", "kind": "paragraph"},
     {"match": "g:contentSet/g:inlineData", "as": "block", "kind": "paragraph", "attrs": {"newsml.contenttype": {"attr": "contenttype"}, "newsml.rendition": {"attr": "rendition"}, "newsml.encoding": {"attr": "encoding"}, "newsml.xml_lang": {"attr": "xml:lang"}}},

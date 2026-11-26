@@ -100,7 +100,7 @@ in no namespace. The prefix `xml` is predefined.
 | `heading` | A heading block | `level`: a number, `"nesting"` (`heading_base` + number of enclosing `section`s - 1), or `{"attr": "level"}`; `marker`; `duplicate_of` and `key` **(added)** |
 | `block` | One block of `kind` `paragraph`, `quote`, `code`, `caption`, `footnote`, `formula` | `kind`; for `code`, `language`; for `formula`, `notation` (`latex`, `unicodemath`, `plain`); `marker`; `value` **(added)**; `duplicate_of` and `key` **(added)** |
 | `list`, `item` | A list and its items; depth from nesting | `ordered`: `true`, `false` or an attribute test `{"attr": "type", "in": ["numero"]}`; on `item`: `marker` |
-| `table` | A table | `model`: `rows` (default) or `cals`; `header`, `one_row`, `rest`, `pairs`, `rest_table` **(added)** |
+| `table` | A table | `model`: `rows` (default) or `cals`; `header`, `one_row`, `rest`, `pairs`, `pairs_empty`, `rest_table` **(added)** |
 | `row`, `cell` | In the `rows` model | `row`: `header` (`true` or an attribute test), `cells` **(added)**, `rest`, `rest_table` **(added)**; `cell`: `header`, `colspan`, `rowspan` (attribute names), `column` and `with` **(added)** |
 | `inline` | Text that stays inside its block | `style`: `bold`, `italic`, `superscript`, `subscript`, `code`; `link`: a value source for the address; `title` and `attrs` **(added)**; `space` **(added)**; `value` **(added)** |
 | `break` **(added)** | A line break written as an element (`br`, `lb`, `eol`): a `\n` in the block it stands in | |

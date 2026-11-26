@@ -2,6 +2,9 @@ package gofastxml
 
 import (
 	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -69,4 +72,37 @@ func TestNewsmlUnmappedPaths(t *testing.T) {
 		}
 	}
 	t.Logf("generic paths: %s", byCount(paths))
+}
+
+// The profile format has no sharing of rules between profiles, so the
+// NITF rules are written twice: in nitf.json and, for NITF inside an
+// inlineXML, in newsml-g2.json. Every rule of nitf but its root's must
+// be in newsml-g2 as written, so that a change to one is made to both.
+func TestNewsmlHoldsNitfRules(t *testing.T) {
+	rules := func(name string) []map[string]any {
+		data, err := os.ReadFile(filepath.Join("profiles", name+".json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var p struct {
+			Rules []map[string]any `json:"rules"`
+		}
+		if err := json.Unmarshal(data, &p); err != nil {
+			t.Fatal(err)
+		}
+		return p.Rules
+	}
+	have := map[string]bool{}
+	for _, r := range rules("newsml-g2") {
+		b, _ := json.Marshal(r)
+		have[string(b)] = true
+	}
+	for _, r := range rules("nitf") {
+		if r["match"] == "/nitf" {
+			continue
+		}
+		if b, _ := json.Marshal(r); !have[string(b)] {
+			t.Errorf("nitf rule %v is not in newsml-g2 as written", r["match"])
+		}
+	}
 }

@@ -20,6 +20,13 @@
   2015 to 2021 archives). The embedded eForms notice is read as `eforms`
   reads one; `HTML` and `HTMLSYNTHESE` are handed to the child extractor.
   See `profiles/boamp.md`.
+- **Built-in profiles `nitf` and `newsml-g2`** for news agency formats:
+  NITF 3.x (root `nitf`, in no namespace or the NITF 2006-10-18
+  namespace) and IPTC NewsML-G2 (`newsItem`, `packageItem`,
+  `newsMessage`, `knowledgeItem`, `conceptItem`, `planningItem`,
+  `catalogItem`, `catalog`). An item's XHTML body is handed to the child
+  extractor; NITF inside a NewsML-G2 item is read by the NITF rules. See
+  `profiles/nitf.md` and `profiles/newsml-g2.md`.
 - Profile format: `"pairs": "parent"` names a table's values from the
   element its own element stands in (`ProcurementProject/ID`);
   `"pairs_empty": true` writes an element with no content and no
