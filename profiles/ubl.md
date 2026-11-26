@@ -20,7 +20,7 @@ later profile (eForms, item 7 of the note) can reuse them.
 | `cac:TaxTotal` | a table, a row per `TaxSubtotal` (`RowLocs`); the total `TaxAmount` is a paragraph (`inv.field=TaxTotal/TaxAmount`, `inv.currencyID`). A `TaxTotal` with no subtotal (the tax currency's) makes only that paragraph |
 | `cac:AllowanceCharge` (document level) | a one-row table each |
 | `cac:LegalMonetaryTotal` | a one-row table |
-| `EmbeddedDocumentBinaryObject` | read generically for now; `cac:ExternalReference/cbc:URI` is a paragraph as written, never fetched |
+| `cac:Attachment/EmbeddedDocumentBinaryObject` | an attachment: decoded from base64 and handed to `Options.ExtractChild` (`"encoding": "base64"`), named by `@filename`, media type `@mimeCode` as written (`application/octet-stream` when absent). The base64 is not in the body; a child not extracted is still listed in `Document.Children`, with `xml.parent_offset`/`length`/`element`, and the section of its `AdditionalDocumentReference` carries `Attrs["children"]`. Text that is not base64 stays as a paragraph with `media_type` and `input.stream_damaged`. `cac:ExternalReference/cbc:URI` is a paragraph as written, never fetched |
 
 **The lines table.** The root element is the table (UBL has no element
 around the lines); everything else in the document is read as blocks made
@@ -40,5 +40,19 @@ value per line of the cell, in file order, with its attributes.
 
 ## Corpus (dev)
 
-82 files (75 `Invoice`, 7 `CreditNote`) read with `ubl`; 14 hold an
-`EmbeddedDocumentBinaryObject`.
+82 files (75 `Invoice`, 7 `CreditNote`) read with `ubl`, no error, no
+`Validate` failure, no element left generic. The figures for the whole
+xml-invoice set (both profiles) are in `profiles/cii.md`.
+
+**Oracles** (`TestInvoiceOracles`, dev, with and without a child
+extractor): (a) every character data run is found exactly once, in its
+row's cells when it is inside a row element, else outside tables in file
+order; the exceptions are tested and each is met: the header values that
+go to `Metadata` (`/Invoice/ID`, `IssueDate`, `InvoiceTypeCode`,
+`DocumentCurrencyCode`, `CustomizationID`, `ProfileID`, `TaxCurrencyCode`,
+and the `CreditNote` ones), the attachments (handed over), and the
+profile's header rows; attribute values written into cells (`with`) are
+matched after their element's text. (b) every block's text is in the
+source at its offsets, every row's `RowLocs` lie in its table and in file
+order, and each word of a row's cells is in the source at its `RowLocs`.
+All pass.

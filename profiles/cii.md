@@ -26,7 +26,8 @@ a namespace alias; it is read generically (16 of 223 dev files).
 | `ApplicableTradeTax` (header) | a one-row table each: tax type, VAT category, rate, basis, tax amount, exemption reason and code, other |
 | `SpecifiedTradeAllowanceCharge` (header) | a one-row table each |
 | `SpecifiedTradeSettlementHeaderMonetarySummation` | a one-row table |
-| `AttachmentBinaryObject` | read generically for now (base64 text as an inferred paragraph, `mimeCode`/`filename` as attribute notes) |
+| `AdditionalReferencedDocument/AttachmentBinaryObject` | an attachment: decoded from base64 and handed to `Options.ExtractChild` (`"encoding": "base64"`), named by `@filename`, media type `@mimeCode` as written (`application/octet-stream` when absent). The base64 is not in the body; a child not extracted is still listed in `Document.Children` with `xml.parent_offset`/`length`/`element`, and the section of its `AdditionalReferencedDocument` carries `Attrs["children"]`. Text that is not base64 stays as a paragraph with `media_type` and `input.stream_damaged` |
+| `SpecifiedLogisticsServiceCharge/AppliedTradeTax` | `CategoryCode` (`inv.listID`) and `RateApplicablePercent` are paragraphs with `inv.field` |
 
 **The lines table.** CII has no element around the lines, so
 `SupplyChainTradeTransaction` is the table; the header agreement, delivery
@@ -55,5 +56,40 @@ each is a table of one row (`one_row`), not one table for all.
 
 123 CII files read with `cii`; 82 UBL with `ubl`; 17 generic (16 ZUGFeRD
 1.0, 1 `CBFBUY` invoice). One file declares `encoding="utf-8-w/o-bom"` and
-is `ErrUnsupported` (the README's rule for unknown encoding labels). 19 CII
-files hold an `AttachmentBinaryObject`.
+is `ErrUnsupported` (the README's rule for unknown encoding labels).
+
+Measured by `TestInvoiceCorpus` and `TestInvoiceOracles` at this commit:
+
+| | dev (223) | held-out (91) |
+|---|---|---|
+| read with `cii` / `ubl` / generic | 123 / 82 / 17 | 56 / 28 / 7 |
+| errors | 1 (`ErrUnsupported`, the encoding label) | 0 |
+| `Validate` failures, panics | 0 | 0 |
+| blocks (all files) | paragraph 7733, table 771, note attribute 546, stored `markup_comment` 892 | paragraph 3950, table 320, note attribute 222, stored 356 |
+| warnings | `xml.unmapped_elements` 2 | `xml.unmapped_elements` 1, `xml.unmapped_attributes` 2 |
+| attachments handed over (cii and ubl) | 29 | not counted |
+
+**Left generic on dev:** `BuyerReference` (2, in two files that write it
+in no namespace, outside the `ram` namespace the rules name): its text is
+an inferred paragraph at its place. Nothing else under `cii` or `ubl`.
+
+**Depth in a line.** The rules for a line's other values go five levels
+below the line element; on dev, character data below a line is at depth
+1 (754 runs), 2 (2077), 3 (2825), 4 (295) and 5 (27), never deeper. An
+element deeper than five levels would have no rule: its text stays in the
+paragraph of the level-five element it stands in (not lost, not moved)
+and it is counted in `xml.unmapped_elements`.
+
+**Oracles** (`TestInvoiceOracles`, dev, with and without a child
+extractor): (a) every character data run is found exactly once, in its
+row's cells when it is inside a row element, else outside tables in file
+order; the exceptions are tested and each is met: the header values that
+go to `Metadata` (`ExchangedDocument/ID`, `TypeCode`, `Name`,
+`IssueDateTime`, guideline and business process `ID`, `TestIndicator`,
+`InvoiceCurrencyCode`, `TaxCurrencyCode`), the note codes that go to
+`Attrs` (`IncludedNote/SubjectCode`, `ContentCode`), the attachments
+(handed over), and the profile's header rows; attribute values written
+into cells (`with`) are matched after their element's text. (b) every
+block's text is in the source at its offsets, every row's `RowLocs` lie in
+its table and in file order, and each word of a row's cells is in the
+source at its `RowLocs`. All pass.
