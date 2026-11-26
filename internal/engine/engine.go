@@ -2142,6 +2142,18 @@ func (e *Engine) endCapture(f *frame, end int64) blockRef {
 			o.waiting = append(o.waiting, waitVal{text: v, rule: f.capRule, start: f.start, end: end})
 		}
 		e.fill(o, f.capture, v)
+		// Other uses the owner has for the same child (dila-juri's root
+		// reads META/META_COMMUN/ID as its anchor and as Extra) get the
+		// same value: a child is read once.
+		if c := f.capture.v.Child; c != nil {
+			for i := range o.slots {
+				t := &o.slots[i]
+				if t != f.capture && !t.filled && t.v.Child != nil && t.v.Child.Source == c.Source {
+					t.filled = true
+					e.fill(o, t, v)
+				}
+			}
+		}
 	}
 	return blockRef{}
 }
@@ -2208,7 +2220,7 @@ func (e *Engine) fill(o *frame, s *slot, v string) {
 		o.title = v
 	case useAnchor:
 		o.anchor = v
-		e.anchors = append(e.anchors, anchorAt{v, e.depthOf(o)})
+		e.lateAnchor(v, e.depthOf(o))
 		if o.partAt == e.out.Part {
 			// Blocks made inside the owner before its identifier came
 			// (an RSS item's title before its guid) are given it too.
@@ -2217,6 +2229,25 @@ func (e *Engine) fill(o *frame, s *slot, v string) {
 					e.patch(blockRef{o.partAt, i}, AttrAnchorParent, v)
 				}
 			}
+		}
+	}
+}
+
+// lateAnchor records an anchor read from a child of the element at depth,
+// known only when the child ends. It goes after the anchors of elements
+// no deeper than depth, so that it outlives the elements still open
+// between that element and the child (META/META_COMMUN/ID of dila-juri's
+// root), which drop what was recorded after they started when they end.
+func (e *Engine) lateAnchor(v string, depth int) {
+	i := len(e.anchors)
+	for i > 0 && e.anchors[i-1].depth > depth {
+		i--
+	}
+	e.anchors = slices.Insert(e.anchors, i, anchorAt{v, depth})
+	for k := depth; k < len(e.frames); k++ {
+		// A captured element keeps everything (math.MaxInt).
+		if a := e.frames[k].anchors; a >= i && a < math.MaxInt {
+			e.frames[k].anchors++
 		}
 	}
 }

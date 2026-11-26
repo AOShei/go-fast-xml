@@ -15,7 +15,10 @@ import (
 // oracle comparison get.
 func noSpace(s string) string {
 	return strings.Map(func(r rune) rune {
-		if unicode.IsSpace(r) {
+		// Controls are removed from text by core's convention
+		// (text.control_characters_removed): C1 controls stand for
+		// windows-1252 characters in some DILA decisions.
+		if unicode.IsSpace(r) || unicode.IsControl(r) {
 			return -1
 		}
 		return r

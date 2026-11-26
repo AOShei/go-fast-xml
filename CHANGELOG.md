@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **New built-in profile `dila-juri`** for DILA's case law: roots
+  `TEXTE_JURI_JUDI` (CASS, INCA, CAPP), `TEXTE_JURI_ADMIN` (JADE) and
+  `TEXTE_JURI_CONSTIT` (CONSTIT). See `profiles/dila-juri.md`.
+- Engine: several value sources of one rule naming the same `child` all
+  get its text; an anchor read from a grandchild reaches the blocks after
+  the elements between. The output of every earlier corpus file is
+  unchanged.
+
 ## v0.2.1 (2026-11-25)
 
 - **A directory given to `gofastxml` stands for `.rss` and `.atom` files

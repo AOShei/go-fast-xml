@@ -107,7 +107,10 @@ const fuzzProfile = `{"profile": "fuzz", "format": 1, "match": [{"root": "r"}], 
   {"match": "dd", "as": "document", "media_type": "text/html", "anchor": {"attr": "id"}},
   {"match": "dm", "as": "document", "media_type": "text/html", "when": "markup"},
   {"match": "dx", "as": "document", "media_type": {"attr": "type", "map": {"html": "text/html", "xhtml": "application/xhtml+xml"}}},
-  {"match": "dx", "as": "block", "kind": "paragraph"}]}`
+  {"match": "dx", "as": "block", "kind": "paragraph"},
+  {"match": "ja", "as": "section", "anchor": {"child": "jm/ji"}, "extra": {"x.ji": {"child": "jm/ji"}}},
+  {"match": "jm", "as": "transparent"},
+  {"match": "ji", "as": "metadata", "field": "extra", "key": "x.j"}]}`
 
 // fuzzChild is a child extractor for the fuzz tests: a document of one
 // paragraph holding what it is given, or ErrUnsupported for an odd size.
@@ -155,6 +158,7 @@ func FuzzProfile(f *testing.F) {
 		`<r><s id="s"><h>H</h><dd id="d">&lt;p&gt;one&lt;/p&gt;</dd><dm>plain</dm><dm><![CDATA[<b>b</b>]]></dm><dm>a &amp;amp; b</dm>` +
 			`<dx type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p>x<br/>y</p></div></dx><dx type="html">&lt;i&gt;</dx><dx type="text">&lt;t&gt;</dx>` +
 			`<p>in <dd>&lt;q&gt;</dd> p</p><dd><x a="1">t<!-- c --></x></dd></s></r>`,
+		`<r><ja><p>before</p><jm><ji>I1</ji><ji>I2</ji></jm><p>after</p><s id="in"><p>x</p><ja><jm><ji>I3</ji></jm><p>y</p></ja></s><p>z</p></ja></r>`,
 	} {
 		f.Add([]byte(s), true)
 	}
