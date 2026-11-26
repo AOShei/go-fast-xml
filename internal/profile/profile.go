@@ -58,6 +58,8 @@ const (
 const (
 	MediaHTML  = "text/html"
 	MediaXHTML = "application/xhtml+xml"
+	// MediaOctetStream is the media type of an attachment that says none.
+	MediaOctetStream = "application/octet-stream"
 )
 
 var asNames = map[string]As{
@@ -98,7 +100,7 @@ var (
 		AsTransparent: append(slices.Clone(common), "split"),
 		AsSkip:        {"match", "as"},
 		AsBreak:       {"match", "as"},
-		AsDocument:    append(slices.Clone(common), "media_type", "when"),
+		AsDocument:    append(slices.Clone(common), "media_type", "when", "encoding", "name"),
 	}
 	allKeys = map[string]bool{}
 )
@@ -227,6 +229,13 @@ type Rule struct {
 	MediaAttr  *QName
 	MediaMap   map[string]string
 	WhenMarkup bool
+	// Base64: "encoding": "base64", the element's text is base64, decoded
+	// before it is handed over (an attachment); with it, MediaAttr may
+	// have no map: the attribute's value is the media type as written.
+	// NameAttr: "name": {"attr": ...}, the attribute that names the
+	// child (a file name).
+	Base64   bool
+	NameAttr *QName
 
 	// Reads lists the attributes of the element the rule reads.
 	Reads []QName
@@ -335,6 +344,13 @@ func (r *Rule) Media(path Path) (string, bool) {
 		return r.MediaType, true
 	}
 	v, ok := path.Attr(0, *r.MediaAttr)
+	if r.MediaMap == nil {
+		// An attachment's own media type, as written; none said.
+		if v = strings.TrimSpace(v); !ok || v == "" {
+			return MediaOctetStream, true
+		}
+		return v, true
+	}
 	if !ok {
 		return "", false
 	}
@@ -343,7 +359,7 @@ func (r *Rule) Media(path Path) (string, bool) {
 }
 
 func (r *Rule) mediaTests() int {
-	if r.MediaAttr != nil {
+	if r.MediaAttr != nil && r.MediaMap != nil {
 		return 1
 	}
 	return 0
@@ -955,9 +971,47 @@ func (c *compiler) document(r *Rule) error {
 		}
 		return nil
 	}
+	if e, ok := c.m["encoding"]; ok {
+		var s string
+		if json.Unmarshal(e, &s) != nil || s != "base64" {
+			return fmt.Errorf("%s: \"encoding\" must be \"base64\"", c.where)
+		}
+		r.Base64 = true
+		if _, ok := c.m["when"]; ok {
+			return fmt.Errorf("%s: \"when\" is not for \"encoding\"", c.where)
+		}
+	}
+	if n, ok := c.m["name"]; ok {
+		var a struct {
+			Attr string `json:"attr"`
+		}
+		if err := strict(n, &a); err != nil || a.Attr == "" {
+			return fmt.Errorf("%s: \"name\" must be {\"attr\": name}", c.where)
+		}
+		q, err := ResolveName(a.Attr, c.f.Namespaces, "")
+		if err != nil {
+			return fmt.Errorf("%s: \"name\": %v", c.where, err)
+		}
+		r.NameAttr = &q
+	}
 	v, ok := c.m["media_type"]
 	if !ok {
 		return fmt.Errorf("%s: a \"document\" rule needs \"media_type\"", c.where)
+	}
+	if r.Base64 {
+		// An attachment: its media type as the file writes it.
+		var a struct {
+			Attr string `json:"attr"`
+		}
+		if err := strict(v, &a); err != nil || a.Attr == "" {
+			return fmt.Errorf("%s: with \"encoding\", \"media_type\" must be {\"attr\": name}", c.where)
+		}
+		q, err := ResolveName(a.Attr, c.f.Namespaces, "")
+		if err != nil {
+			return fmt.Errorf("%s: \"media_type\": %v", c.where, err)
+		}
+		r.MediaAttr = &q
+		return nil
 	}
 	if json.Unmarshal(v, &r.MediaType) == nil {
 		if err := media(r.MediaType); err != nil {
@@ -1025,6 +1079,9 @@ func (r *Rule) reads() {
 	}
 	if r.MediaAttr != nil {
 		add(*r.MediaAttr)
+	}
+	if r.NameAttr != nil {
+		add(*r.NameAttr)
 	}
 	if r.Level.Attr != nil {
 		add(*r.Level.Attr)

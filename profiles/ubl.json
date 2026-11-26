@@ -166,6 +166,7 @@
     {"match": "cac:ProjectReference", "as": "section", "mark": {"inv.group": "ProjectReference"}},
     {"match": "cac:InvoicePeriod", "as": "section", "mark": {"inv.group": "InvoicePeriod"}},
     {"match": "cac:Attachment", "as": "transparent"},
+    {"match": "cac:Attachment/EmbeddedDocumentBinaryObject", "as": "document", "encoding": "base64", "media_type": {"attr": "mimeCode"}, "name": {"attr": "filename"}, "attrs": {"inv.field": "EmbeddedDocumentBinaryObject"}},
     {"match": "cac:ExternalReference", "as": "transparent"},
 
     {"match": "Note", "as": "block", "kind": "paragraph", "attrs": {"inv.field": "Note", "inv.languageID": {"attr": "languageID"}}},

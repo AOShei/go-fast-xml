@@ -347,6 +347,10 @@ type Engine struct {
 	Children                    []*gofastcore.Document
 	ChildLocs                   []ChildLoc
 	DocsCut, ChildrenCut, Plain int
+	// AttachmentsCut counts attachments (base64) not handed over: past
+	// MaxAttachmentBytes or MaxChildren; AttachmentsBad those whose text
+	// is not base64.
+	AttachmentsCut, AttachmentsBad int
 	docs                        bool
 	doc                         *docCap
 	scratchTag                  []byte
@@ -1741,7 +1745,9 @@ func (e *Engine) Text(r *xmlread.Reader, t []byte, start, end int64) {
 		}
 		if s.b.Size()+len(t) > generic.MaxBlockBytes {
 			t = t[:cutAt(t, generic.MaxBlockBytes-s.b.Size())]
-			s.cut, e.doc.cut = true, true
+			// An attachment is handed over up to its own bound; only
+			// its fallback text is cut here.
+			s.cut, e.doc.cut = true, e.doc.cut || !e.doc.base64
 		}
 	}
 	if s.b.Size() > 0 && s.b.Size()+len(t) > generic.MaxBlockBytes {

@@ -2,6 +2,7 @@ package engine
 
 import (
 	"bytes"
+	"encoding/base64"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -51,13 +52,17 @@ type docCap struct {
 	// text stays in the body. coms: where they are in buf.
 	notes []gofastcore.Block
 	coms  [][2]int
+	// base64: an attachment, decoded before it is handed over; name: the
+	// name its rule's "name" attribute gives it.
+	base64 bool
+	name   string
 }
 
 // comment writes a comment inside the element to what is handed over
 // (for XHTML read from the file, it is there already): begin starts it,
 // final ends it.
 func (d *docCap) comment(t []byte, begin, final bool) {
-	if d.raw {
+	if d.raw || d.base64 {
 		return
 	}
 	if begin {
@@ -115,16 +120,37 @@ func (e *Engine) startDocument(f *frame, el *xmlread.Element) {
 	e.openSink(f, skBlock, el.Start)
 	f.isDoc = true
 	e.doc = &docCap{media: media, sink: f.sink, from: el.End,
-		raw: media == profile.MediaXHTML && e.opts.Raw != nil}
+		raw: media == profile.MediaXHTML && e.opts.Raw != nil && !f.rule.Base64, base64: f.rule.Base64}
+	if q := f.rule.NameAttr; q != nil {
+		if v, ok := e.Attr(0, *q); ok {
+			e.doc.name = e.clean(v)
+		}
+	}
 }
+
+// MaxAttachmentBytes bounds the base64 text of one attachment (an
+// "encoding": "base64" document rule) that is decoded and handed over:
+// 64 MiB, 48 MiB decoded. A longer one is not handed over.
+const MaxAttachmentBytes = 64 << 20
 
 // put appends b to what is handed over, up to the bound.
 func (d *docCap) put(b []byte) {
 	if d.cut {
 		return
 	}
-	if len(d.buf)+len(b) > generic.MaxBlockBytes {
-		b = b[:cutAt(b, generic.MaxBlockBytes-len(d.buf))]
+	bound := generic.MaxBlockBytes
+	if d.base64 {
+		bound = MaxAttachmentBytes
+		// White space between the lines of base64 is not kept.
+		b = bytes.Map(func(r rune) rune {
+			if r == ' ' || r == '\t' || r == '\n' || r == '\r' {
+				return -1
+			}
+			return r
+		}, b)
+	}
+	if len(d.buf)+len(b) > bound {
+		b = b[:cutAt(b, bound-len(d.buf))]
 		d.cut = true
 	}
 	d.buf = append(d.buf, b...)
@@ -318,6 +344,9 @@ func (e *Engine) endDocument(f *frame, cstart, end int64) blockRef {
 	s := e.closeSink(f)
 	defer e.putSink(s)
 	d.closeTag()
+	if d.base64 {
+		return e.endAttachment(f, d, s, end)
+	}
 	data := d.buf
 	d.buf = nil
 	if d.raw {
@@ -384,6 +413,69 @@ func (e *Engine) endDocument(f *frame, cstart, end int64) blockRef {
 		return blockRef{}
 	}
 	return paragraph(d.media)
+}
+
+// endAttachment ends the element of an "encoding": "base64" document
+// rule: its text is decoded and handed over, under the name its "name"
+// attribute gives (else the element's), with its media type as written.
+// The base64 is not written in the body, whether the child was extracted
+// or not (the child is listed either way). Text that is not base64 stays
+// in the body as a paragraph with media_type (AttachmentsBad); one past
+// MaxAttachmentBytes, or past MaxChildren, is not handed over and not
+// written (AttachmentsCut).
+func (e *Engine) endAttachment(f *frame, d *docCap, s *sink, end int64) blockRef {
+	none := func() blockRef {
+		s.after = append(s.after, d.notes...)
+		e.keepAfter(s, f)
+		return blockRef{}
+	}
+	if len(d.buf) == 0 {
+		// No text: the paragraph of what the element holds, if anything.
+		return e.finishSink(s, f, gofastcore.KindParagraph, gofastcore.OriginNative, end)
+	}
+	if e.opts.PartWanted != nil && !e.opts.PartWanted(e.out.Part.Number) {
+		return none()
+	}
+	if d.cut {
+		e.AttachmentsCut++
+		return none()
+	}
+	data := make([]byte, base64.StdEncoding.DecodedLen(len(d.buf)))
+	n, err := base64.StdEncoding.Decode(data, d.buf)
+	if err != nil {
+		n, err = base64.RawStdEncoding.Decode(data, bytes.TrimRight(d.buf, "="))
+	}
+	if err != nil {
+		e.AttachmentsBad++
+		s.after = append(s.after, d.notes...)
+		ref := e.finishSink(s, f, gofastcore.KindParagraph, gofastcore.OriginNative, end)
+		e.patch(ref, AttrMediaType, d.media)
+		return ref
+	}
+	data = data[:n]
+	d.buf = nil
+	if e.opts.Child == nil || len(e.Children) >= e.opts.MaxChildren {
+		e.AttachmentsCut++
+		return none()
+	}
+	loc := ChildLoc{Offset: f.start, Length: max(end-f.start, 0), Element: e.pathTo(f)}
+	depth := e.depthOf(f)
+	for i := len(e.anchors) - 1; i >= 0; i-- {
+		if e.anchors[i].depth < depth {
+			loc.Anchor = e.anchors[i].v
+			break
+		}
+	}
+	loc.name = d.name
+	if loc.name == "" {
+		loc.name = e.childName(f, loc.Anchor)
+	}
+	child, _ := e.opts.Child(loc.name, d.media, data)
+	idx := len(e.Children)
+	e.Children = append(e.Children, child)
+	e.ChildLocs = append(e.ChildLocs, loc)
+	e.linkChild(idx)
+	return none()
 }
 
 // childName is the element's name and its parent's, and the anchor:
