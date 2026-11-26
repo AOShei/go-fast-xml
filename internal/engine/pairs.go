@@ -101,15 +101,22 @@ func (e *Engine) pairAttrs(f *frame, el *xmlread.Element) {
 }
 
 // pairName is the name of the element on top of the stack: its local
-// name, or ("path") its path of local names below the scope's element.
-// The scope's own element is named by its local name.
+// name, or ("path") its path of local names. In a "pairs" table the path
+// starts with the table's own element (SellerTradeParty/Name), which is
+// what tells one party's table from another's in rendered text; in a
+// "rest_table" it starts below the row's element, whose id is the row's
+// first cell. The scope's own element is named by its local name.
 func (e *Engine) pairName(at int, local bool) string {
 	n := len(e.frames)
 	if local || at == n-1 {
 		return generic.CleanName(generic.CutString(e.frames[n-1].name.Local, generic.MaxNameBytes), &e.scratch)
 	}
 	var b strings.Builder
-	for i := at + 1; i < n; i++ {
+	from := at + 1
+	if e.frames[at].pt.rest == nil {
+		from = at
+	}
+	for i := from; i < n; i++ {
 		s := generic.CutString(e.frames[i].name.Local, generic.MaxNameBytes)
 		if b.Len()+len(s)+1 > generic.MaxPathBytes {
 			e.out.PathsCut++

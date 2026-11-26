@@ -39,7 +39,7 @@ func TestProfilePairs(t *testing.T) {
 	}
 	bs := blocks(doc)
 	want := [][][]string{
-		{{"name", "value"}, {"Name", "Acme"}, {"Tax/ID", "FR1"}, {"Tax/ID/@scheme", "VA"}, {"Addr/Country", "FR"}},
+		{{"name", "value"}, {"Party/Name", "Acme"}, {"Party/Tax/ID", "FR1"}, {"Party/Tax/ID/@scheme", "VA"}, {"Party/Addr/Country", "FR"}},
 		{{"name", "value"}, {"Ref", "R-9"}, {"Ref/@k", "1"}},
 		{{"Title", "T"}, {"Volume", "3"}},
 		{{"id", "amount"}, {"1", "4.50 EUR"}, {"2", ""}},

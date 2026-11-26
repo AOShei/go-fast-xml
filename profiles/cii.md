@@ -20,8 +20,8 @@ a namespace alias; it is read generically (16 of 223 dev files).
 | `IssueDateTime/DateTimeString` | `Metadata.Created` when `format="102"` (`YYYYMMDD`), else `Extra["inv.issue_date"]` as written; `Extra["inv.issue_date_format"]` |
 | guideline, business process, test indicator, `InvoiceCurrencyCode`, `TaxCurrencyCode` | `Extra["inv.guideline_id"]`, `inv.business_process_id`, `inv.test_indicator`, `inv.currency`, `inv.tax_currency` |
 | `IncludedNote/Content` | a paragraph, `inv.field=IncludedNote`, with `inv.subject_code`/`inv.content_code` |
-| parties (`SellerTradeParty`, `BuyerTradeParty`, `PayeeTradeParty`, `SellerTaxRepresentativeTradeParty`, `ShipToTradeParty`, `InvoiceeTradeParty` and the other `*TradeParty`) | a table of names and values (`pairs`), no heading, carrying `inv.party` (`seller`, `buyer`, `payee`, `seller_tax_representative`, `ship_to`, ...) on the table block. A row per value: its path of local names below the party (`Name`, `PostalTradeAddress/CityName`, `SpecifiedTaxRegistration/ID`, `GlobalID`), its text; each attribute a row of its own after its element's (`SpecifiedTaxRegistration/ID/@schemeID`) |
-| references (`BuyerOrderReferencedDocument`, `AdditionalReferencedDocument`, ...), delivery event, billing period, payment means, payment terms, logistics charges, currency exchange, accounting account, project | a table of names and values each, carrying `inv.group` (the element's name): `TypeCode`, `PayeePartyCreditorFinancialAccount/IBANID`, `DueDateDateTime/DateTimeString` with `.../@format`, ... |
+| parties (`SellerTradeParty`, `BuyerTradeParty`, `PayeeTradeParty`, `SellerTaxRepresentativeTradeParty`, `ShipToTradeParty`, `InvoiceeTradeParty` and the other `*TradeParty`) | a table of names and values (`pairs`), no heading, carrying `inv.party` (`seller`, `buyer`, `payee`, `seller_tax_representative`, `ship_to`, ...) on the table block. A row per value: its path of local names from the party's element on (`SellerTradeParty/Name`, `SellerTradeParty/PostalTradeAddress/CityName`, `BuyerTradeParty/GlobalID`), its text; each attribute a row of its own after its element's (`SellerTradeParty/SpecifiedTaxRegistration/ID/@schemeID`). The party's own element name is in every row, so rendered text tells the seller's table from the buyer's |
+| references (`BuyerOrderReferencedDocument`, `AdditionalReferencedDocument`, ...), delivery event, billing period, payment means, payment terms, logistics charges, currency exchange, accounting account, project | a table of names and values each, carrying `inv.group` (the element's name): `SpecifiedTradeSettlementPaymentMeans/TypeCode`, `SpecifiedTradeSettlementPaymentMeans/PayeePartyCreditorFinancialAccount/IBANID`, `SpecifiedTradePaymentTerms/DueDateDateTime/DateTimeString` with `.../@format`, ... |
 | a value outside these (`BuyerReference`, `PaymentReference`, `CreditorReferenceID`, ...) | a table of its own of one row (and its attributes): its local name, its text |
 | lines (`IncludedSupplyChainTradeLineItem`) | one table, a row per line with `RowLocs`; then the line values table (below) |
 | `ApplicableTradeTax` (header) | a one-row table each: tax type, VAT category, rate, basis, tax amount, exemption reason and code; then, if it holds more (`DueDateTypeCode`, `TaxPointDate`, ...), a table of names and values |
@@ -31,8 +31,9 @@ a namespace alias; it is read generically (16 of 223 dev files).
 
 **Names.** A table of names and values (profile keys `pairs` and
 `rest_table`, `PROFILE_FORMAT.md`) writes each value with the file's name
-for it: the path of local names below the party, group or line, as
-written, never translated; `/@` and the attribute's name for an attribute.
+for it, as written, never translated: the path of local names starting
+with the party's or group's own element (`pairs`), or below the line's
+element (`rest_table`, where the line's id is the first cell); `/@` and the attribute's name for an attribute.
 Its header row (`name`, `value`, or `line id`, `name`, `value`) is the
 profile's (`header_source=profile`). Each row's `RowLocs` is the value's
 element. Rules for the elements inside are not applied (an attachment's

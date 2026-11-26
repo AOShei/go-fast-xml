@@ -15,8 +15,8 @@ later profile (eForms, item 7 of the note) can reuse them.
 | `CustomizationID`, `ProfileID`, `UBLVersionID`, `TaxCurrencyCode`, `IssueTime`, `UUID` | `Extra["inv.customization_id"]`, `inv.profile_id`, `inv.ubl_version`, `inv.tax_currency`, `inv.issue_time`, `inv.uuid` |
 | `cbc:Note` | a paragraph with `inv.field=Note` (`inv.languageID`) |
 | `BuyerReference`, `AccountingCost`, `DueDate`, `TaxPointDate` and the other single values | a table of names and values of its own (`pairs`): its local name, its text; its attributes as rows of their own |
-| parties (`AccountingSupplierParty`, `AccountingCustomerParty`, `PayeeParty`, `TaxRepresentativeParty`, `Delivery`, ...) | a table of names and values (`pairs`), no heading, carrying `inv.party` (`seller`, `buyer`, `payee`, `tax_representative`, `delivery`) on the table block. A row per value: its path of local names below the party element (`Party/EndpointID`, `Party/PartyName/Name`, `Party/PostalAddress/Country/IdentificationCode`, `Party/PartyTaxScheme/CompanyID`), its text; each attribute a row after its element's (`Party/EndpointID/@schemeID`) |
-| `PaymentMeans`, `PaymentTerms`, document references, `InvoicePeriod` | a table of names and values each, carrying `inv.group`: `PaymentMeansCode`, `PaymentMeansCode/@name`, `PayeeFinancialAccount/ID` (the IBAN), `PayeeFinancialAccount/FinancialInstitutionBranch/ID` (the BIC) |
+| parties (`AccountingSupplierParty`, `AccountingCustomerParty`, `PayeeParty`, `TaxRepresentativeParty`, `Delivery`, ...) | a table of names and values (`pairs`), no heading, carrying `inv.party` (`seller`, `buyer`, `payee`, `tax_representative`, `delivery`) on the table block. A row per value: its path of local names from the party's element on (`AccountingSupplierParty/Party/EndpointID`, `AccountingSupplierParty/Party/PartyName/Name`, `AccountingCustomerParty/Party/PostalAddress/Country/IdentificationCode`), its text; each attribute a row after its element's (`AccountingSupplierParty/Party/EndpointID/@schemeID`) |
+| `PaymentMeans`, `PaymentTerms`, document references, `InvoicePeriod` | a table of names and values each, carrying `inv.group`: `PaymentMeans/PaymentMeansCode`, `PaymentMeans/PaymentMeansCode/@name`, `PaymentMeans/PayeeFinancialAccount/ID` (the IBAN), `PaymentMeans/PayeeFinancialAccount/FinancialInstitutionBranch/ID` (the BIC) |
 | lines (`cac:InvoiceLine`, `cac:CreditNoteLine`) | one table, a row per line with `RowLocs`; then the line values table (below) |
 | `cac:TaxTotal` | a table, a row per `TaxSubtotal` (`RowLocs`), then a table of VAT category (the subtotal's column, as written), name and value for what a subtotal holds beyond its columns; the total `TaxAmount` is a table of names and values of its own (`TaxAmount`, `TaxAmount/@currencyID`). A `TaxTotal` with no subtotal (the tax currency's) makes only that table |
 | `cac:AllowanceCharge` (document level) | a one-row table each; then a table of names and values for the rest (`TaxCategory/TaxScheme/ID`, ...) |
@@ -24,10 +24,11 @@ later profile (eForms, item 7 of the note) can reuse them.
 | `cac:Attachment/EmbeddedDocumentBinaryObject` | an attachment: decoded from base64 and handed to `Options.ExtractChild` (`"encoding": "base64"`), named by `@filename`, media type `@mimeCode` as written (`application/octet-stream` when absent). The base64 is not in the body; a child not extracted is still listed in `Document.Children`, with `xml.parent_offset`/`length`/`element`, and the table of its `AdditionalDocumentReference` carries `Attrs["children"]`. Text that is not base64 stays as a paragraph with `media_type` and `input.stream_damaged`, before that table. `cac:ExternalReference/cbc:URI` is a row as written, never fetched |
 
 **Names.** As in `cii` (see `profiles/cii.md`): each value of a table of
-names and values is written with the file's path of local names below the
-party, group or line, never translated; the header row is the profile's.
-UBL wraps a party in `cac:Party`, so party names start with `Party/`, as
-the file writes them.
+names and values is written with the file's path of local names, starting with the
+party's or group's own element (below the line's element in a line values
+table), never translated; the header row is the profile's. UBL wraps a
+party in `cac:Party`, so a party's names read
+`AccountingSupplierParty/Party/...`, as the file writes them.
 
 **The lines table.** The root element is the table (UBL has no element
 around the lines); everything else in the document is read as blocks made

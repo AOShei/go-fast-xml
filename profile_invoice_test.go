@@ -146,16 +146,16 @@ func TestInvoiceCII(t *testing.T) {
 		attrs map[string]string
 		rows  [][]string
 	}{
-		{map[string]string{"inv.party": "seller"}, [][]string{nv, {"Name", "Exemple SARL"},
-			{"SpecifiedLegalOrganization/ID", "123456789"}, {"SpecifiedLegalOrganization/ID/@schemeID", "0002"},
-			{"PostalTradeAddress/PostcodeCode", "75001"}, {"PostalTradeAddress/CityName", "Paris"}, {"PostalTradeAddress/CountryID", "FR"},
-			{"SpecifiedTaxRegistration/ID", "FR32123456789"}, {"SpecifiedTaxRegistration/ID/@schemeID", "VA"}}},
-		{map[string]string{"inv.party": "buyer"}, [][]string{nv, {"Name", "Client SA"}}},
-		{map[string]string{"inv.group": "SpecifiedTradeSettlementPaymentMeans"}, [][]string{nv, {"TypeCode", "58"},
-			{"PayeePartyCreditorFinancialAccount/IBANID", "FR7630006000011234567890189"}}},
+		{map[string]string{"inv.party": "seller"}, [][]string{nv, {"SellerTradeParty/Name", "Exemple SARL"},
+			{"SellerTradeParty/SpecifiedLegalOrganization/ID", "123456789"}, {"SellerTradeParty/SpecifiedLegalOrganization/ID/@schemeID", "0002"},
+			{"SellerTradeParty/PostalTradeAddress/PostcodeCode", "75001"}, {"SellerTradeParty/PostalTradeAddress/CityName", "Paris"}, {"SellerTradeParty/PostalTradeAddress/CountryID", "FR"},
+			{"SellerTradeParty/SpecifiedTaxRegistration/ID", "FR32123456789"}, {"SellerTradeParty/SpecifiedTaxRegistration/ID/@schemeID", "VA"}}},
+		{map[string]string{"inv.party": "buyer"}, [][]string{nv, {"BuyerTradeParty/Name", "Client SA"}}},
+		{map[string]string{"inv.group": "SpecifiedTradeSettlementPaymentMeans"}, [][]string{nv, {"SpecifiedTradeSettlementPaymentMeans/TypeCode", "58"},
+			{"SpecifiedTradeSettlementPaymentMeans/PayeePartyCreditorFinancialAccount/IBANID", "FR7630006000011234567890189"}}},
 		{nil, [][]string{nv, {"CategoryTradeTax/TypeCode", "VAT"}}},
-		{map[string]string{"inv.group": "SpecifiedTradePaymentTerms"}, [][]string{nv, {"Description", "30 jours net"},
-			{"DueDateDateTime/DateTimeString", "20260214"}, {"DueDateDateTime/DateTimeString/@format", "102"}}},
+		{map[string]string{"inv.group": "SpecifiedTradePaymentTerms"}, [][]string{nv, {"SpecifiedTradePaymentTerms/Description", "30 jours net"},
+			{"SpecifiedTradePaymentTerms/DueDateDateTime/DateTimeString", "20260214"}, {"SpecifiedTradePaymentTerms/DueDateDateTime/DateTimeString/@format", "102"}}},
 	} {
 		b := invoiceTable(t, doc, "name", i)
 		invoiceRowLocs(t, data, b, "<")
@@ -220,12 +220,12 @@ func TestInvoiceUBL(t *testing.T) {
 		rows  [][]string
 	}{
 		{nil, [][]string{nv, {"DueDate", "2026-02-14"}}},
-		{map[string]string{"inv.party": "seller"}, [][]string{nv, {"Party/EndpointID", "7300010000001"}, {"Party/EndpointID/@schemeID", "0088"},
-			{"Party/PartyName/Name", "Seller Ltd"}, {"Party/PostalAddress/CityName", "London"}, {"Party/PostalAddress/Country/IdentificationCode", "GB"},
-			{"Party/PartyTaxScheme/CompanyID", "GB123456789"}, {"Party/PartyTaxScheme/TaxScheme/ID", "VAT"}}},
-		{map[string]string{"inv.party": "buyer"}, [][]string{nv, {"Party/PartyName/Name", "Buyer plc"}}},
-		{map[string]string{"inv.group": "PaymentMeans"}, [][]string{nv, {"PaymentMeansCode", "30"}, {"PaymentMeansCode/@name", "Credit transfer"},
-			{"PayeeFinancialAccount/ID", "GB29NWBK60161331926819"}}},
+		{map[string]string{"inv.party": "seller"}, [][]string{nv, {"AccountingSupplierParty/Party/EndpointID", "7300010000001"}, {"AccountingSupplierParty/Party/EndpointID/@schemeID", "0088"},
+			{"AccountingSupplierParty/Party/PartyName/Name", "Seller Ltd"}, {"AccountingSupplierParty/Party/PostalAddress/CityName", "London"}, {"AccountingSupplierParty/Party/PostalAddress/Country/IdentificationCode", "GB"},
+			{"AccountingSupplierParty/Party/PartyTaxScheme/CompanyID", "GB123456789"}, {"AccountingSupplierParty/Party/PartyTaxScheme/TaxScheme/ID", "VAT"}}},
+		{map[string]string{"inv.party": "buyer"}, [][]string{nv, {"AccountingCustomerParty/Party/PartyName/Name", "Buyer plc"}}},
+		{map[string]string{"inv.group": "PaymentMeans"}, [][]string{nv, {"PaymentMeans/PaymentMeansCode", "30"}, {"PaymentMeans/PaymentMeansCode/@name", "Credit transfer"},
+			{"PaymentMeans/PayeeFinancialAccount/ID", "GB29NWBK60161331926819"}}},
 		{nil, [][]string{nv, {"TaxCategory/TaxScheme/ID", "VAT"}}},
 		{nil, [][]string{nv, {"TaxAmount", "19.00"}, {"TaxAmount/@currencyID", "EUR"}}},
 		{nil, [][]string{nv, {"TaxAmount", "16.40"}, {"TaxAmount/@currencyID", "GBP"}}},

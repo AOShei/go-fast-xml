@@ -96,7 +96,7 @@ Selected by the root `ClinicalDocument` in `urn:hl7-org:v3` (a `ClinicalDocument
 
 #### Cross Industry Invoice (`cii`)
 
-Selected by the root `CrossIndustryInvoice` in `urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100` (Factur-X, ZUGFeRD 2, XRechnung CII, EN 16931). Number, type, currency, guideline in `Extra` `inv.*`; the issue date in `Metadata.Created` (format 102). Parties are sections with no heading whose paragraphs carry `inv.party` and `inv.field`; the lines are one table (a row per `IncludedSupplyChainTradeLineItem`, `RowLocs`, a profile header row, an `other` column for the rest of each line); the VAT breakdown, allowances and charges and totals are tables. Amounts keep `currencyID`, codes their `schemeID`/`listID`. Attachments (`AttachmentBinaryObject`) are decoded and handed to `Options.ExtractChild` under their `filename` and `mimeCode`. ZUGFeRD 1.0 (`CrossIndustryDocument`) is read generically. Keys: `inv.*`. [profiles/cii.md](profiles/cii.md)
+Selected by the root `CrossIndustryInvoice` in `urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100` (Factur-X, ZUGFeRD 2, XRechnung CII, EN 16931). Number, type, currency, guideline in `Extra` `inv.*`; the issue date in `Metadata.Created` (format 102). Every value is written with the name the file gives it: parties, references and payment groups are tables of names and values (the file's element paths, `SellerTradeParty/PostalTradeAddress/CountryID`; attributes as `/@` rows) carrying `inv.party` or `inv.group`; the lines are one table (a row per `IncludedSupplyChainTradeLineItem`, `RowLocs`, a profile header row), and what a line holds beyond its columns is a table of line id, name and value after it; the VAT breakdown, allowances and charges and totals are tables. Amounts keep `currencyID`, codes their `schemeID`/`listID`. Attachments (`AttachmentBinaryObject`) are decoded and handed to `Options.ExtractChild` under their `filename` and `mimeCode`. ZUGFeRD 1.0 (`CrossIndustryDocument`) is read generically. Keys: `inv.*`. [profiles/cii.md](profiles/cii.md)
 
 #### CLML (`clml`)
 
@@ -181,7 +181,7 @@ Keys: `sp.*`. Tested: Publication schema 3.5 (the dev and held-out sets above); 
 
 #### UBL invoices (`ubl`)
 
-Selected by the roots `Invoice` (`urn:oasis:names:specification:ubl:schema:xsd:Invoice-2`) and `CreditNote` (`...:CreditNote-2`) only (Peppol BIS Billing 3.0, EN 16931); other UBL documents are read generically. The same mapping as `cii`: `Extra` `inv.*`, parties as sections with `inv.party`, one lines table (`InvoiceLine`, `CreditNoteLine`), tax subtotals, allowances and charges and the legal monetary total as tables. `EmbeddedDocumentBinaryObject` attachments are handed over likewise. Keys: `inv.*`. [profiles/ubl.md](profiles/ubl.md)
+Selected by the roots `Invoice` (`urn:oasis:names:specification:ubl:schema:xsd:Invoice-2`) and `CreditNote` (`...:CreditNote-2`) only (Peppol BIS Billing 3.0, EN 16931); other UBL documents are read generically. The same mapping as `cii`: `Extra` `inv.*`, parties as tables of names and values with `inv.party`, one lines table (`InvoiceLine`, `CreditNoteLine`), tax subtotals, allowances and charges and the legal monetary total as tables. `EmbeddedDocumentBinaryObject` attachments are handed over likewise. Keys: `inv.*`. [profiles/ubl.md](profiles/ubl.md)
 
 ## Drafting a profile from an XSD
 
