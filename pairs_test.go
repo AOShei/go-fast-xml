@@ -190,8 +190,12 @@ func TestProfilePairsDate(t *testing.T) {
 			"Head/Issued/@norm=20020225T143000-0500 Head/Issued/@norm=20030101T000000Z Head/Changed=2002-02-26 Head/Name=N"},
 		{`<Doc><Head><Issued norm="20020225T143000"/><Changed>last week</Changed></Head></Doc>`,
 			"2002-02-25T14:30:00Z", "", "Head/Issued/@norm=20020225T143000 Head/Changed=last week"},
-		{`<Doc><Head><Issued norm="2002-02-25 14:30"/><Issued>20020225T143000Z</Issued></Head></Doc>`,
-			"", "", "Head/Issued/@norm=2002-02-25 14:30 Head/Issued=20020225T143000Z"},
+		{`<Doc><Head><Issued norm="25 February 2002"/><Issued>20020225T143000Z</Issued></Head></Doc>`,
+			"", "", "Head/Issued/@norm=25 February 2002 Head/Issued=20020225T143000Z"},
+		{`<Doc><Head><Issued norm="2002-02-25 14:30"/><Changed>2016-04-13 04:52:21+02:00</Changed></Head></Doc>`,
+			"2002-02-25T14:30:00Z", "2016-04-13T04:52:21+02:00", "Head/Issued/@norm=2002-02-25 14:30 Head/Changed=2016-04-13 04:52:21+02:00"},
+		{`<Doc><Head><Issued norm="2002-02-25 14:30:05"/><Changed>2016-04-13 04:52Z</Changed></Head></Doc>`,
+			"2002-02-25T14:30:05Z", "2016-04-13T04:52:00Z", "Head/Issued/@norm=2002-02-25 14:30:05 Head/Changed=2016-04-13 04:52Z"},
 	} {
 		doc := extractWith(t, prof, c.src, nil)
 		if err := doc.Validate(); err != nil {
