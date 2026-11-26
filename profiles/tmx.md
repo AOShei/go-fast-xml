@@ -52,7 +52,9 @@ the row has no field to hold them (proposal: a row `attrs`).
 - held-out: 17 files, 0 errors, 0 `Validate` failures; table 17,
   paragraph 2; `limit.exceeded` 1 (the text budget on the largest file),
   `xml.unmapped_elements` none.
-- Largest dev file (2.6 MB, 6,646 rows): 24 ms, 9 MiB allocated.
+- Largest dev file (2.6 MB, 6,646 rows): 23 ms, 9 MiB allocated.
+- Row locations are offsets in the file in every encoding (the 5 dev
+  files not in UTF-8 had them in the decoded text before 1311e61).
 
 ## Oracles
 

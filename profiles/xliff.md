@@ -79,14 +79,20 @@ by the blocks' `xliff.original`.
 ## Measured
 
 - dev: 921 files, 528 read with xliff, 393 generic (XLIFF 2.x); 0
-  errors, 0 Validate failures, 0 panics; blocks over the set: table 708,
-  paragraph 63,060, note (attribute) 197,379, stored 374; `limit.exceeded`
-  1.
+  errors, 0 Validate failures, 0 panics; blocks over the set: heading
+  749, table 708, paragraph 63,060, note (attribute) 197,378, stored 374;
+  `limit.exceeded` 1; `xml.unmapped_elements` 163,814,
+  `xml.unmapped_attributes` 306,706 (files read with xliff).
 - held-out: 325 files, 192 read with xliff, 133 generic; 0 errors, 0
-  Validate failures; table 272, paragraph 49,023, note 172,138;
-  `limit.exceeded` 1.
-- Largest dev file (7.0 MB, 4,839 rows): 352 ms, 419 MiB allocated over
-  the read, 148 MiB heap in use after.
+  Validate failures; heading 300, table 272, paragraph 49,023, note
+  172,023, stored 135; `limit.exceeded` 1; `xml.unmapped_elements`
+  161,423, `xml.unmapped_attributes` 110,527.
+- Largest dev file (7.0 MB, 4,839 rows): 359 ms, 420 MiB allocated over
+  the read, 155 MiB heap in use after. Where (heap profile of the dev
+  set read with xliff, allocated bytes): the growth of the part's block
+  slice (`generic.Out.Append`, about 30%), the attribute notes of SDL
+  extension elements (`attrNotes`: each note's block and its `Attrs`
+  map, about 19%), and `finishSink`; no one cause with a small fix.
 
 ## Oracles
 
