@@ -716,8 +716,8 @@ func (e *Engine) count(m map[string]int, name string) {
 
 // countAttrs counts the attributes of a mapped element no rule reads.
 func (e *Engine) countAttrs(f *frame, el *xmlread.Element) {
-	if f.rule.Pairs != "" {
-		return // each attribute is a row of the table
+	if f.rule.Pairs != "" || f.rule.As == profile.AsRow && f.rule.RestTable != nil {
+		return // each attribute is a row of the table (or the row's rest table)
 	}
 	for i := range el.Attrs {
 		a := &el.Attrs[i]
@@ -954,6 +954,13 @@ func (e *Engine) value(v *profile.Value) (string, bool) {
 		return v.Literal, true
 	case v.Claims() != nil, v.AttrChild != nil:
 		return "", false
+	case v.AnchorOf != nil:
+		for i := len(e.frames) - 2; i >= 0; i-- {
+			if e.frames[i].name == *v.AnchorOf {
+				return e.frames[i].anchor, true
+			}
+		}
+		return "", true
 	case v.Of != nil:
 		for i := len(e.frames) - 2; i >= 0; i-- {
 			if e.frames[i].name == *v.Of {
@@ -1282,6 +1289,12 @@ func (e *Engine) startRule(f *frame, el *xmlread.Element) {
 			}
 			if r.RestTable != nil {
 				e.startRest(f, t)
+				// The row element's own attributes (an author's
+				// ValidYN) are the rest table's first rows.
+				f.pairAt = len(e.frames) - 1
+				f.pairName = e.pairName(f.pairAt, true)
+				e.pairAttrs(f, el)
+				e.pairAttrRows(f, el.End)
 			}
 			if r.Rest > 0 {
 				e.openSink(f, skCell, el.Start)
