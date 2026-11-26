@@ -8,10 +8,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/AOShei/go-fast-core"
 )
@@ -24,12 +27,17 @@ type transCase struct {
 	// skip: elements whose character data is not body text by design
 	// (path of names as jatsOracleCase.skip; each must be met on dev).
 	skip map[string]string
-	// with: elements whose rule writes an attribute after their text
-	// ("with"), path to the attribute.
+	// with: elements whose rule writes attributes after their text
+	// ("with"), path to the attributes, space-separated.
 	with map[string]string
-	name func(xml.Name) string
-	// keyed: tables with columns by attribute value (TMX), whose cells
-	// are in column order, not file order.
+	// skipEl: elements left out by an attribute test (an embedded
+	// document handed to the child extractor).
+	skipEl func(xml.StartElement) bool
+	name   func(xml.Name) string
+	// keyed: tables whose cells are in column order, not file order (TMX
+	// languages, XLIFF source, target, notes, other): when (a) finds
+	// another order, the text must be the same characters, and (b)
+	// places each row.
 	keyed bool
 }
 
@@ -78,10 +86,14 @@ func (c *transCase) sourceText(data []byte, used map[string]bool) (string, error
 				skip++
 			} else if k, ok := pathMatch(c.skip, stack); ok {
 				skip, used[k] = 1, true
+			} else if c.skipEl != nil && c.skipEl(tk) {
+				skip, used["skipEl"] = 1, true
 			} else if k, ok := pathMatch(c.with, stack); ok {
-				for _, at := range tk.Attr {
-					if at.Name.Local == c.with[k] {
-						a, used["@"+k] = noSpace(at.Value), true
+				for _, name := range strings.Fields(c.with[k]) {
+					for _, at := range tk.Attr {
+						if at.Name.Local == name {
+							a, used["@"+k] = a+noSpace(at.Value), true
+						}
 					}
 				}
 			}
@@ -114,13 +126,17 @@ func transDocText(doc *gofastcore.Document) string {
 			continue
 		}
 		for _, x := range p.Blocks {
-			if x.Table != nil && x.Attrs[AttrAttribute] == "" {
+			if x.Table != nil {
+				// Header rows that are the profile's or attribute values,
+				// and the leading columns made from attributes ("cells"),
+				// are not character data.
 				from := 0
 				if x.Attrs[AttrHeaderSource] != "" {
 					from = x.Table.HeaderRows
 				}
+				skip := len(strings.Fields(x.Attrs[AttrAttribute]))
 				for _, r := range x.Table.Rows[from:] {
-					for _, c := range r {
+					for _, c := range r[min(skip, len(r)):] {
 						b.WriteString(noSpace(c))
 					}
 				}
@@ -140,7 +156,7 @@ func transDocText(doc *gofastcore.Document) string {
 // each of its words in the span as written.
 func rowCite(src []byte, doc *gofastcore.Document) string {
 	for _, x := range blocks(doc) {
-		if x.Table == nil || x.Attrs[AttrAttribute] != "" {
+		if x.Table == nil {
 			continue
 		}
 		for i, r := range x.Table.Rows {
@@ -155,14 +171,20 @@ func rowCite(src []byte, doc *gofastcore.Document) string {
 				return fmt.Sprintf("table at %d: row %d has no span", x.Loc.Offset, i)
 			}
 			raw := string(src[l.Offset : l.Offset+l.Length])
+			if !utf8.ValidString(raw) {
+				continue // another encoding: the bytes are not the text
+			}
 			span := noSpace(stripMarkup(raw))
+			data := noSpace(charData([]byte(raw)))
+			// An empty placeholder's equiv-text is written where it stands.
+			data += "\x00" + noSpace(charData([]byte(equivRE.ReplaceAllString(raw, "$2"))))
 			for _, cell := range r {
 				for line := range strings.SplitSeq(cell, "\n") {
-					if strings.Contains(span, noSpace(gofastcore.ExpandLigatures(line))) {
+					if l := noSpace(gofastcore.ExpandLigatures(line)); strings.Contains(span, l) || strings.Contains(data, l) {
 						continue
 					}
 					for _, w := range strings.Fields(line) {
-						if !strings.Contains(span, noSpace(w)) && !strings.Contains(raw, w) && !strings.Contains(unescapeMarkup(raw), w) {
+						if !strings.Contains(span, noSpace(w)) && !strings.Contains(raw, w) && !strings.Contains(xmlUnescape.Replace(raw), w) {
 							return fmt.Sprintf("table at %d: row %d: %q not in its span %q", x.Loc.Offset, i, line, around(raw, 0))
 						}
 					}
@@ -172,6 +194,77 @@ func rowCite(src []byte, doc *gofastcore.Document) string {
 	}
 	return ""
 }
+
+// corpus reads every file of dev and held-out and logs aggregate counts
+// (names only on dev): files by profile (a set may hold files of another
+// version, read generically), errors, Validate failures, panics, blocks,
+// warnings, unmapped names.
+func (c *transCase) corpus(t *testing.T) {
+	for _, set := range []string{"dev", "heldout"} {
+		dir := jatsCorpusDir(set, c.format)
+		if dir == "" {
+			t.Logf("%s: no %s corpus", set, c.format)
+			continue
+		}
+		files := jatsCorpusFiles(dir)
+		tally := newTally()
+		profiles := map[string]int{}
+		unmapped := map[string]map[string]int{WarnUnmappedElements: {}, WarnUnmappedAttributes: {}}
+		total := map[string]int{}
+		start := time.Now()
+		for _, path := range files {
+			res := corpusOne(path)
+			tally.add(c.format, res)
+			label := path
+			if set == "heldout" {
+				label = "a held-out file"
+			}
+			switch {
+			case res.panic != "":
+				t.Errorf("%s: panic: %s", label, firstLine(res.panic, set))
+			case res.timeout:
+				t.Errorf("%s: no result within the time limit", label)
+			case res.err != nil:
+				t.Errorf("%s: error: %s", label, firstLine(res.err.Error(), set))
+			case res.invalid != nil:
+				t.Errorf("%s: Validate: %s", label, firstLine(res.invalid.Error(), set))
+			}
+			if res.doc == nil {
+				continue
+			}
+			p := res.doc.Metadata.Extra[ExtraProfile]
+			profiles[p]++
+			if p != c.profile {
+				continue
+			}
+			for _, w := range res.doc.AllWarnings() {
+				m, ok := unmapped[w.Code]
+				if !ok {
+					continue
+				}
+				for _, sm := range countRE.FindAllStringSubmatch(w.Message, -1) {
+					n, _ := strconv.Atoi(sm[2])
+					total[w.Code] += n
+					if set == "dev" {
+						m[strings.TrimSpace(sm[1])] += n
+					}
+				}
+			}
+		}
+		t.Logf("%s: %d files in %v, by profile %s\n%s", set, len(files), time.Since(start).Round(time.Millisecond), sorted(profiles), tally)
+		for _, code := range []string{WarnUnmappedElements, WarnUnmappedAttributes} {
+			line := fmt.Sprintf("%s: %s (files read with %s): %d in all", set, code, c.profile, total[code])
+			if set == "dev" {
+				line += ": " + byCount(unmapped[code])
+			}
+			t.Log(line)
+		}
+	}
+}
+
+var equivRE = regexp.MustCompile(`<((?:[\w-]+:)?(?:x|bx|ex))\b[^>]*?\bequiv-text="([^"]*)"[^>]*/>`)
+
+var xmlUnescape = strings.NewReplacer("&lt;", "<", "&gt;", ">", "&amp;", "&", "&quot;", `"`, "&apos;", "'")
 
 // oracles runs both oracles over every dev file of the set.
 func (c *transCase) oracles(t *testing.T) {
@@ -221,9 +314,9 @@ func (c *transCase) oracles(t *testing.T) {
 			t.Errorf("%s: (a) text differs at byte %d (encoding/xml: %v):\n doc:  %q\n file: %q", name, i, serr, around(got, i), around(src, i))
 		}
 		bad := ""
-		if len(data) > 3 && bytes.IndexByte(data[:4], 0) >= 0 {
-			// UTF-16: offsets are bytes of the file, whose text the
-			// oracle cannot compare as written.
+		if !utf8.Valid(data) {
+			// UTF-16, windows-1252: offsets are bytes of the file, whose
+			// text the oracle cannot compare as written.
 			wide++
 		} else if bad = jatsCiteCheck(data, doc); bad == "" {
 			bad = rowCite(data, doc)
@@ -233,7 +326,7 @@ func (c *transCase) oracles(t *testing.T) {
 			t.Errorf("%s: (b) %s", name, around(bad, 0))
 		}
 	}
-	t.Logf("%d files read with %s: %d compared up to where encoding/xml stops, %d with the same characters in another order, %d UTF-16 not cited", files, c.profile, stopped, reordered, wide)
+	t.Logf("%d files read with %s: %d compared up to where encoding/xml stops, %d with the same characters in another order, %d not UTF-8 not cited", files, c.profile, stopped, reordered, wide)
 	for k := range c.skip {
 		if !used[k] {
 			t.Errorf("exception %q is met nowhere in the dev set", k)
