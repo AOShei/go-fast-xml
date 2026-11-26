@@ -12,7 +12,13 @@ func TestXLIFFFixture(t *testing.T) {
 		t.Fatalf("profile %q", p)
 	}
 	got := tableBrief(doc) + "version=" + doc.Metadata.Extra["xliff.version"] + "\n"
-	want := `paragraph:Hand
+	want := `heading1:weather.properties
+  attribute=original
+  xliff.datatype=javapropertyresourcebundle
+  xliff.original=weather.properties
+  xliff.source_language=en
+  xliff.target_language=fr-FR
+paragraph:Hand
   attribute=tool-name
   xliff.datatype=javapropertyresourcebundle
   xliff.field=tool
@@ -28,16 +34,17 @@ paragraph:Written for the tests.
   xliff.source_language=en
   xliff.target_language=fr-FR
 table:
-  attribute=id resname restype approved translate
+  attribute=id resname restype approved translate target@state
   header_source=profile
   xliff.datatype=javapropertyresourcebundle
   xliff.original=weather.properties
   xliff.source_language=en
   xliff.target_language=fr-FR
 table @336+566 header=1
-  ["id" "resname" "restype" "approved" "translate" "source" "target" "notes" "other"] @0+0#
-  ["1" "hello" "" "yes" "" "Hello world{0}!" "Bonjour le monde{0} !" "Keep the brace. dev" "Hello\nSalut"] @379+373#1
-  ["2" "" "" "" "no" "It is <b>cold</b>." "" "" ""] @762+132#2
+  ["id" "resname" "restype" "approved" "translate" "state" "source" "target" "notes" "other"] @0+0#
+  ["g1" "greetings" "" "" "" "" "" "" "" ""] @343+35#g1
+  ["1" "hello" "" "yes" "" "translated" "Hello world{0}!" "Bonjour le monde{0} !" "Keep the brace. dev" "Hello\nSalut\n80% tm"] @379+373#1
+  ["2" "" "" "" "no" "" "It is <b>cold</b>." "" "" ""] @762+132#2
 version=1.2
 `
 	if got != want {
@@ -75,7 +82,7 @@ func TestXLIFFSelection(t *testing.T) {
 
 var xliffCase = &transCase{profile: "xliff", format: "xml-xliff", keyed: true,
 	skip: map[string]string{},
-	with: map[string]string{"trans-unit/context-group/context": "context-type", "trans-unit/note": "from", "x": "equiv-text", "bx": "equiv-text", "ex": "equiv-text", "trans-unit/count-group/count": "count-type unit"},
+	with: map[string]string{"alt-trans": "match-quality origin tool", "trans-unit/context-group/context": "context-type", "trans-unit/note": "from", "x": "equiv-text", "bx": "equiv-text", "ex": "equiv-text", "trans-unit/count-group/count": "count-type unit"},
 	// internal-file form="base64" is an embedded document: its base64 is
 	// handed to the child extractor, not written in the body.
 	skipEl: func(el xml.StartElement) bool {

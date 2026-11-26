@@ -134,7 +134,13 @@ func transDocText(doc *gofastcore.Document) string {
 				if x.Attrs[AttrHeaderSource] != "" {
 					from = x.Table.HeaderRows
 				}
-				skip := len(strings.Fields(x.Attrs[AttrAttribute]))
+				// A child's attribute (target@state, bin-target@state)
+				// is one column whichever child gives it.
+				cols := map[string]bool{}
+				for _, n := range strings.Fields(x.Attrs[AttrAttribute]) {
+					cols[n[strings.LastIndex(n, "@")+1:]] = true
+				}
+				skip := len(cols)
 				for _, r := range x.Table.Rows[from:] {
 					for _, c := range r[min(skip, len(r)):] {
 						b.WriteString(noSpace(c))
