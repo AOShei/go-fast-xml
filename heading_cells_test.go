@@ -118,3 +118,38 @@ func TestProfileCellsFromChildAttribute(t *testing.T) {
 		}
 	}
 }
+
+// TestProfileSectionHeadingAnchor: with "heading": "anchor" the child a
+// section's anchor is read from is its heading too, where the child
+// stands, so that a record's blocks before its title are under a heading
+// of the record. Without an anchor read from a child the key is refused.
+func TestProfileSectionHeadingAnchor(t *testing.T) {
+	prof := head("sechanchor", `{"root": "r"}`) + `"rules": [
+		{"match": "/r", "as": "transparent"},
+		{"match": "rec", "as": "section", "anchor": {"child": "id"}, "heading": "anchor"},
+		{"match": "t", "as": "heading", "level": 2},
+		{"match": "p", "as": "block", "kind": "paragraph"}]}`
+	src := `<r><rec><id>A1</id><p>One</p><t>Title</t><p>Two</p></rec><rec><p>Three</p></rec></r>`
+	doc := extractWith(t, prof, src, nil)
+	if err := doc.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, b := range blocks(doc) {
+		got = append(got, b.Kind.String()+":"+b.Text+" #"+b.Loc.Anchor+" ^"+b.Attrs[AttrAnchorParent]+" "+src[b.Loc.Offset:b.Loc.Offset+b.Loc.Length])
+	}
+	want := []string{
+		`heading:A1 #A1 ^ <id>A1</id>`,
+		`paragraph:One # ^A1 <p>One</p>`,
+		`heading:Title # ^A1 <t>Title</t>`,
+		`paragraph:Two # ^A1 <p>Two</p>`,
+		`paragraph:Three # ^ <p>Three</p>`,
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("got:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+	bad := head("sechanchor2", `{"root": "r"}`) + `"rules": [{"match": "rec", "as": "section", "anchor": {"attr": "id"}, "heading": "anchor"}]}`
+	if _, err := LoadProfile(strings.NewReader(bad)); err == nil {
+		t.Error("\"heading\": \"anchor\" without an anchor read from a child was accepted")
+	}
+}

@@ -1,0 +1,47 @@
+heading1 #700001 pubmed.pmid_version=1: 700001
+table anchor_parent=700001 header_source=profile
+  name | value
+  ArticleId | NBK1  <<ArticleId IdType="booka
+  ArticleId/@IdType | bookaccession  <<ArticleId IdType="booka
+table anchor_parent=700001 header_source=profile
+  name | value
+  Publisher/PublisherName | Example Press  <<PublisherName>Example P
+  Publisher/PublisherLocation | Paris  <<PublisherLocation>Paris
+heading2 anchor_parent=700001 pubmed.book=exbook: Handbook of Examples
+table anchor_parent=700001 header_source=profile
+  name | value
+  PubDate/Year | 2020  <<Year>2020</Year>
+table anchor_parent=700001 header_source=profile pubmed.list_type=editors
+  last name | fore name | initials | suffix | collective name | identifier | affiliation
+  Roe | Rex | R |  |  |  |   <<Author ValidYN="Y"><Las
+table anchor_parent=700001 header_source=profile
+  last name | name | value
+  Roe | Author/@ValidYN | Y  <<Author ValidYN="Y">
+table anchor_parent=700001 header_source=profile
+  name | value
+  Medium | Internet  <<Medium>Internet</Medium
+table anchor_parent=700001 header_source=profile
+  name | value
+  LocationLabel | 3  <<LocationLabel Type="cha
+  LocationLabel/@Type | chapter  <<LocationLabel Type="cha
+heading3 anchor_parent=700001 pubmed.book=exbook pubmed.part=ch3: Chapter three
+table anchor_parent=700001 header_source=profile
+  name | value
+  Language | eng  <<Language>eng</Language>
+paragraph(SUMMARY) anchor_parent=700001 pubmed.in=Abstract: A chapter.
+list_item1 anchor_parent=700001 pubmed.book=exbook pubmed.location_label_type=section pubmed.part=ch3 pubmed.sec=s1: 3.1 Intro
+list_item2 anchor_parent=700001 pubmed.book=exbook pubmed.part=ch3 pubmed.sec=s1a: Deeper
+list_item1 anchor_parent=700001 pubmed.list_type=Glossary: An item.
+table anchor_parent=700001 header_source=profile
+  name | value
+  PublicationStatus | ppublish  <<PublicationStatus>ppubl
+table anchor_parent=700001 header_source=profile
+  name | value
+  ArticleId | 700001  <<ArticleId IdType="pubme
+  ArticleId/@IdType | pubmed  <<ArticleId IdType="pubme
+table header_source=profile pubmed.field=DeleteCitation
+  name | value
+  PMID | 600001  <<PMID Version="1">600001
+  PMID/@Version | 1  <<PMID Version="1">600001
+  PMID | 600002  <<PMID Version="2">600002
+  PMID/@Version | 2  <<PMID Version="2">600002

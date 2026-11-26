@@ -127,6 +127,10 @@ type Value struct {
 	// Codepoint: {"attr": ..., "codepoint": "hex"}, the character whose
 	// code point the attribute holds in hexadecimal (Formex QUOT.START).
 	Codepoint bool
+	// AnchorOf: {"anchor_of": ...}, in "anchor" only: the anchor of the
+	// nearest enclosing element of that name, as its rule's "anchor" gave
+	// it (PubMed: a record's heading takes the record's PMID).
+	AnchorOf *QName
 }
 
 // Claims reports whether the value is read from a child element.
@@ -211,6 +215,10 @@ type Rule struct {
 	// Heading: a section's heading from its own attributes, the first
 	// present and not empty ("heading", section: XLIFF file@original).
 	Heading []*Value
+	// HeadingAnchor: the child the section's anchor is read from is also
+	// its heading, where the child stands ("heading": "anchor": a PubMed
+	// record's PMID).
+	HeadingAnchor bool
 	// SectionTable: the section is also a table whose header row is
 	// HeaderText ("table_header", section: an XLIFF 2 file, whose rows
 	// have no table element of their own); its table block comes where
@@ -1010,7 +1018,13 @@ func compileRule(raw json.RawMessage, i int, f *fileJSON, builtin bool) (*Rule, 
 		}
 	}
 	if v, ok := m["heading"]; ok {
-		if r.Heading, err = c.sectionHeading(where, v); err != nil {
+		if string(v) == `"anchor"` {
+			// The section's anchor, read from a child, is its heading.
+			if r.Anchor == nil || r.Anchor.Child == nil {
+				return nil, fmt.Errorf("%s: \"heading\": \"anchor\" needs an \"anchor\" read from a child", where)
+			}
+			r.HeadingAnchor = true
+		} else if r.Heading, err = c.sectionHeading(where, v); err != nil {
 			return nil, err
 		}
 	}
@@ -1239,9 +1253,20 @@ func (c *compiler) value(key string, v json.RawMessage) (*Value, error) {
 		Child     string `json:"child"`
 		Structure string `json:"structure"`
 		Codepoint string `json:"codepoint"`
+		AnchorOf  string `json:"anchor_of"`
 	}
 	if err := strict(v, &o); err != nil {
 		return nil, fmt.Errorf("%s: %q is not a value source: %v", c.where, key, err)
+	}
+	if o.AnchorOf != "" {
+		if key != "anchor" || o.Attr != "" || o.Of != "" || o.Child != "" || o.Structure != "" || o.Codepoint != "" {
+			return nil, fmt.Errorf("%s: %q: \"anchor_of\" stands alone, in \"anchor\" only", c.where, key)
+		}
+		q, err := ResolveName(o.AnchorOf, c.f.Namespaces, c.f.DefaultNamespace)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %q: \"anchor_of\": %v", c.where, key, err)
+		}
+		return &Value{AnchorOf: &q}, nil
 	}
 	if o.Codepoint != "" {
 		// The character a code point names: of the element's own

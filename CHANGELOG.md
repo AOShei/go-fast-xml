@@ -71,6 +71,14 @@
   child's or an ancestor's attribute; a row with `cells` and `rest` stays
   open for its content; a row of attributes with none present makes no
   row.
+- **New built-in profile `pubmed`** for PubMed / MEDLINE citation sets:
+  root `PubmedArticleSet`. A section per record with its PMID as heading
+  and anchor, the title, the abstract's labelled parts, an authors table,
+  keywords and references as lists, and every identifier, date and code
+  in tables of names and values. See `profiles/pubmed.md`.
+- Profile keys: `"heading": "anchor"` on a `section` (the child its
+  anchor is read from is its heading too); the value source `anchor_of`;
+  a row's own attributes are rows of its `rest_table`.
 
 ## v0.2.1 (2026-11-25)
 

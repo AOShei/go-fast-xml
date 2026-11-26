@@ -719,8 +719,8 @@ func (e *Engine) count(m map[string]int, name string) {
 
 // countAttrs counts the attributes of a mapped element no rule reads.
 func (e *Engine) countAttrs(f *frame, el *xmlread.Element) {
-	if f.rule.Pairs != "" {
-		return // each attribute is a row of the table
+	if f.rule.Pairs != "" || f.rule.As == profile.AsRow && f.rule.RestTable != nil {
+		return // each attribute is a row of the table (or the row's rest table)
 	}
 	for i := range el.Attrs {
 		a := &el.Attrs[i]
@@ -957,6 +957,13 @@ func (e *Engine) value(v *profile.Value) (string, bool) {
 		return v.Literal, true
 	case v.Claims() != nil, v.AttrChild != nil:
 		return "", false
+	case v.AnchorOf != nil:
+		for i := len(e.frames) - 2; i >= 0; i-- {
+			if e.frames[i].name == *v.AnchorOf {
+				return e.frames[i].anchor, true
+			}
+		}
+		return "", true
 	case v.Of != nil:
 		for i := len(e.frames) - 2; i >= 0; i-- {
 			if e.frames[i].name == *v.Of {
@@ -1313,6 +1320,12 @@ func (e *Engine) startRule(f *frame, el *xmlread.Element) {
 			}
 			if r.RestTable != nil {
 				e.startRest(f, t)
+				// The row element's own attributes (an author's
+				// ValidYN) are the rest table's first rows.
+				f.pairAt = len(e.frames) - 1
+				f.pairName = e.pairName(f.pairAt, true)
+				e.pairAttrs(f, el)
+				e.pairAttrRows(f, el.End)
 			}
 			if r.Rest > 0 {
 				e.openSink(f, skCell, el.Start)
@@ -2314,6 +2327,13 @@ func (e *Engine) endCapture(f *frame, end int64) blockRef {
 			o.waiting = append(o.waiting, waitVal{text: v, rule: f.capRule, start: f.start, end: end})
 		}
 		e.fill(o, f.capture, v)
+		if o.rule != nil && o.rule.HeadingAnchor && f.capture.use == useAnchor && v != "" {
+			// The child the section's anchor is read from is its
+			// heading too (a PubMed record's PMID), where it stands.
+			e.flushStray()
+			e.add(gofastcore.Block{Kind: gofastcore.KindHeading, Text: v, Level: uint8(min(max(e.p.HeadingBase+o.sections-1, 1), 255)),
+				Loc: gofastcore.Location{Offset: f.start, Length: max(end-f.start, 0), Anchor: v}}, o, true)
+		}
 		// Other uses the owner has for the same child (dila-juri's root
 		// reads META/META_COMMUN/ID as its anchor and as Extra) get the
 		// same value: a child is read once.

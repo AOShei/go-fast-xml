@@ -1,0 +1,95 @@
+heading1 #900001 pubmed.owner=NLM pubmed.pmid_version=1 pubmed.status=MEDLINE: 900001
+table anchor_parent=900001 header_source=profile
+  name | value
+  DateRevised/Year | 2024  <<Year>2024</Year>
+  DateRevised/Month | 05  <<Month>05</Month>
+  DateRevised/Day | 18  <<Day>18</Day>
+table anchor_parent=900001 header_source=profile pubmed.pub_model=Print
+  name | value
+  Journal/ISSN | 1234-5678  <<ISSN IssnType="Electron
+  Journal/ISSN/@IssnType | Electronic  <<ISSN IssnType="Electron
+  Journal/JournalIssue/@CitedMedium | Internet  <<JournalIssue CitedMediu
+  Journal/JournalIssue/Volume | 12  <<Volume>12</Volume>
+  Journal/JournalIssue/PubDate/Year | 2020  <<Year>2020</Year>
+  Journal/JournalIssue/PubDate/Month | Dec  <<Month>Dec</Month>
+  Journal/Title | Journal of Examples  <<Title>Journal of Exampl
+heading2 anchor_parent=900001: Effect of H2O on E. coli.
+table anchor_parent=900001 header_source=profile
+  name | value
+  Pagination/MedlinePgn | 10-12  <<MedlinePgn>10-12</Medli
+table anchor_parent=900001 header_source=profile
+  name | value
+  ELocationID | 10.9999/ex.1  <<ELocationID EIdType="do
+  ELocationID/@EIdType | doi  <<ELocationID EIdType="do
+  ELocationID/@ValidYN | Y  <<ELocationID EIdType="do
+paragraph(BACKGROUND) anchor_parent=900001 pubmed.in=Abstract pubmed.nlm_category=BACKGROUND: Water matters.
+paragraph anchor_parent=900001 pubmed.in=Abstract: Unlabelled text.
+paragraph anchor_parent=900001 pubmed.field=CopyrightInformation pubmed.in=Abstract: Copyright Example.
+table anchor_parent=900001 header_source=profile pubmed.complete=Y
+  last name | fore name | initials | suffix | collective name | identifier | affiliation
+  Doe | Jane | J |  |  | 0000-0001 ORCID | Lab A.
+Lab B.  <<Author ValidYN="Y"><Las
+   |  |  |  | Study Group |  |   <<Author ValidYN="Y"><Col
+table anchor_parent=900001 header_source=profile
+  last name | name | value
+  Doe | Author/@ValidYN | Y  <<Author ValidYN="Y">
+   | Author/@ValidYN | Y  <<Author ValidYN="Y">
+table anchor_parent=900001 header_source=profile
+  name | value
+  Language | eng  <<Language>eng</Language>
+table anchor_parent=900001 header_source=profile
+  name | value
+  PublicationType | Journal Article  <<PublicationType UI="D01
+  PublicationType/@UI | D016428  <<PublicationType UI="D01
+paragraph anchor_parent=900001 pubmed.field=VernacularTitle: Effet de l'eau.
+table anchor_parent=900001 header_source=profile
+  name | value
+  MeshHeadingList/MeshHeading/DescriptorName | Humans  <<DescriptorName UI="D006
+  MeshHeadingList/MeshHeading/DescriptorName/@UI | D006801  <<DescriptorName UI="D006
+  MeshHeadingList/MeshHeading/DescriptorName/@MajorTopicYN | N  <<DescriptorName UI="D006
+  MeshHeadingList/MeshHeading/QualifierName | metabolism  <<QualifierName UI="Q0003
+  MeshHeadingList/MeshHeading/QualifierName/@UI | Q000378  <<QualifierName UI="Q0003
+  MeshHeadingList/MeshHeading/QualifierName/@MajorTopicYN | Y  <<QualifierName UI="Q0003
+list_item1 anchor_parent=900001 pubmed.in=KeywordList pubmed.major_topic=N pubmed.owner=NOTNLM: water
+table anchor_parent=900001 header_source=profile
+  name | value
+  History/PubMedPubDate/@PubStatus | pubmed  <<PubMedPubDate PubStatus
+  History/PubMedPubDate/Year | 2020  <<Year>2020</Year>
+  History/PubMedPubDate/Month | 12  <<Month>12</Month>
+  History/PubMedPubDate/Day | 1  <<Day>1</Day>
+table anchor_parent=900001 header_source=profile
+  name | value
+  PublicationStatus | ppublish  <<PublicationStatus>ppubl
+table anchor_parent=900001 header_source=profile
+  name | value
+  ArticleId | 900001  <<ArticleId IdType="pubme
+  ArticleId/@IdType | pubmed  <<ArticleId IdType="pubme
+  ArticleId | 10.9999/ex.1  <<ArticleId IdType="doi">
+  ArticleId/@IdType | doi  <<ArticleId IdType="doi">
+list_item1 anchor_parent=900001 pubmed.in=ReferenceList: Roe R. A prior study. 2019.
+table anchor_parent=900001 header_source=profile pubmed.in=ReferenceList
+  name | value
+  ArticleId | 800001  <<ArticleId IdType="pubme
+  ArticleId/@IdType | pubmed  <<ArticleId IdType="pubme
+heading1 #900002 pubmed.owner=NLM pubmed.pmid_version=1 pubmed.status=PubMed-not-MEDLINE: 900002
+table anchor_parent=900002 header_source=profile pubmed.pub_model=Electronic
+  name | value
+  Journal/JournalIssue/@CitedMedium | Internet  <<JournalIssue CitedMediu
+  Journal/JournalIssue/PubDate/MedlineDate | 2021 Jan-Feb  <<MedlineDate>2021 Jan-Fe
+heading2 anchor_parent=900002: Second record.
+table anchor_parent=900002 header_source=profile
+  name | value
+  Language | fre  <<Language>fre</Language>
+table anchor_parent=900002 header_source=profile
+  name | value
+  PublicationType | Journal Article  <<PublicationType UI="D01
+  PublicationType/@UI | D016428  <<PublicationType UI="D01
+paragraph anchor_parent=900002 pubmed.abstract_type=Publisher pubmed.in=OtherAbstract pubmed.language=fre: Résumé.
+table anchor_parent=900002 header_source=profile
+  name | value
+  PublicationStatus | epublish  <<PublicationStatus>epubl
+table anchor_parent=900002 header_source=profile
+  name | value
+  ArticleId | 900002  <<ArticleId IdType="pubme
+  ArticleId/@IdType | pubmed  <<ArticleId IdType="pubme
+warning input.external_reference: external DTD subset (1); nothing was loaded or fetched
