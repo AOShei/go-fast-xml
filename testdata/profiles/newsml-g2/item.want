@@ -1,0 +1,41 @@
+title: Harbour reopens
+heading1 #urn:newsml:example.com:20121001:harbour attribute=guid newsml.conformance=power newsml.standard=NewsML-G2 newsml.standardversion=2.30 newsml.version=3 newsml.xml_lang=en: urn:newsml:example.com:20121001:harbour
+table anchor_parent=urn:newsml:example.com:20121001:harbour header_source=profile
+  name | value
+  catalogRef/@href | http://www.iptc.org/std/catalog/catalog.IPTC-G2-Standards_38.xml  <<catalogRef href="http:/
+table anchor_parent=urn:newsml:example.com:20121001:harbour header_source=profile
+  name | value
+  rightsInfo/copyrightHolder/@literal | Example Wire  <<copyrightHolder literal
+  rightsInfo/copyrightHolder/name | Example Wire  <<name>Example Wire</name
+  rightsInfo/copyrightNotice | Copyright 2012 Example Wire  <<copyrightNotice>Copyrig
+table anchor_parent=urn:newsml:example.com:20121001:harbour header_source=profile
+  name | value
+  itemClass/@qcode | ninat:text  <<itemClass qcode="ninat:
+table anchor_parent=urn:newsml:example.com:20121001:harbour header_source=profile
+  name | value
+  provider/@qcode | nprov:EX  <<provider qcode="nprov:E
+table anchor_parent=urn:newsml:example.com:20121001:harbour header_source=profile
+  name | value
+  versionCreated | 2012-10-01T12:00:00Z  <<versionCreated>2012-10-
+table anchor_parent=urn:newsml:example.com:20121001:harbour header_source=profile
+  name | value
+  pubStatus/@qcode | stat:usable  <<pubStatus qcode="stat:u
+paragraph anchor_parent=urn:newsml:example.com:20121001:harbour newsml.field=edNote: Embargoed until noon.
+table anchor_parent=urn:newsml:example.com:20121001:harbour header_source=profile
+  name | value
+  urgency | 4  <<urgency>4</urgency>
+table anchor_parent=urn:newsml:example.com:20121001:harbour header_source=profile
+  name | value
+  subject/@type | cpnat:abstract  <<subject type="cpnat:abs
+  subject/@qcode | medtop:04000000  <<subject type="cpnat:abs
+  subject/name | economy, business and finance  <<name xml:lang="en">econ
+  subject/name/@lang | en  <<name xml:lang="en">econ
+heading2 anchor_parent=urn:newsml:example.com:20121001:harbour: Harbour reopens
+paragraph anchor_parent=urn:newsml:example.com:20121001:harbour newsml.field=description newsml.role=drol:summary: The harbour opened at dawn.
+paragraph anchor_parent=urn:newsml:example.com:20121001:harbour newsml.contenttype=application/nitf+xml: The harbour board reopened the port.
+table anchor_parent=urn:newsml:example.com:20121001:harbour header_source=profile
+  name | value
+  remoteContent/@href | http://example.com/harbour.mp3  <<remoteContent href="htt
+  remoteContent/@contenttype | audio/mpeg  <<remoteContent href="htt
+  remoteContent/@size | 1024  <<remoteContent href="htt
+  remoteContent/@rendition | rnd:highRes  <<remoteContent href="htt

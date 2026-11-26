@@ -21,7 +21,7 @@ var nitfCase = &jatsOracleCase{profile: "nitf", format: "xml-nitf", prep: pubmed
 
 func TestNitfCorpus(t *testing.T) { nitfCase.run(t) }
 
-func TestNitfOracles(t *testing.T) { newsOracles(t, nitfCase) }
+func TestNitfOracles(t *testing.T) { newsOracles(t, nitfCase, 0) }
 
 // latin1RE finds an XML declaration naming ISO-8859-1.
 var latin1RE = regexp.MustCompile(`^(?:\xef\xbb\xbf)?<\?xml[^>]*encoding=["'](?i:iso-8859-1|latin1)["']`)
@@ -64,11 +64,13 @@ func newsCite(c *jatsOracleCase, src []byte, doc *gofastcore.Document) string {
 }
 
 // newsOracles is jatsOracleCase.oracles with newsCite for oracle (b).
-func newsOracles(t *testing.T, c *jatsOracleCase) {
+// wantReordered is the number of dev files met by its one exception.
+func newsOracles(t *testing.T, c *jatsOracleCase, wantReordered int) {
 	dir := jatsCorpusDir("dev", c.format)
 	if dir == "" {
 		t.Skip("no dev corpus")
 	}
+	var reordered []string
 	used := map[string]bool{}
 	fails := 0
 	for _, path := range jatsCorpusFiles(dir) {
@@ -80,7 +82,9 @@ func newsOracles(t *testing.T, c *jatsOracleCase) {
 		if err != nil {
 			t.Fatalf("%s: %v", path, err)
 		}
-		src, err := c.sourceText(data, used)
+		// encoding/xml knows "utf8" (a label of the WHATWG Encoding
+		// standard, which the extractor accepts) only as "UTF-8".
+		src, err := c.sourceText(utf8LabelRE.ReplaceAll(data, []byte(`${1}UTF-8`)), used)
 		if err != nil {
 			t.Fatalf("%s: encoding/xml: %v", path, err)
 		}
@@ -92,6 +96,14 @@ func newsOracles(t *testing.T, c *jatsOracleCase) {
 			got, src = jatsNumberRE.ReplaceAllString(got, ""), jatsNumberRE.ReplaceAllString(src, "")
 		}
 		if got != src && jatsEntityRE.MatchString(src) && jatsInOrder(got, jatsEntityRE.Split(src, -1)) {
+			got = src
+		}
+		if got != src && sameRunes(got, src) {
+			// The one tested exception: a value of a name and value table
+			// that starts with inline markup (NewsML-G2 copyrightNotice
+			// holding an a) is read as values of the inline elements, in
+			// another order (the engine's known limit, profiles/pubmed.md).
+			reordered = append(reordered, filepath.Base(path))
 			got = src
 		}
 		if got != src && fails < 10 {
@@ -112,6 +124,31 @@ func newsOracles(t *testing.T, c *jatsOracleCase) {
 			t.Errorf("exception %q is met nowhere in the dev set", k)
 		}
 	}
+	if len(reordered) != wantReordered {
+		t.Errorf("(a) same text in another order in %d files, want %d: %v", len(reordered), wantReordered, reordered)
+	}
+}
+
+var utf8LabelRE = regexp.MustCompile(`^(<\?xml[^>]*encoding=["'])(?i:utf8)`)
+
+// sameRunes reports whether a and b hold the same characters, in any
+// order.
+func sameRunes(a, b string) bool {
+	ra, rb := []rune(a), []rune(b)
+	if len(ra) != len(rb) {
+		return false
+	}
+	n := map[rune]int{}
+	for i := range ra {
+		n[ra[i]]++
+		n[rb[i]]--
+	}
+	for _, v := range n {
+		if v != 0 {
+			return false
+		}
+	}
+	return true
 }
 
 var nitfUpdate = flag.Bool("nitf.update", false, "rewrite testdata/profiles/nitf/*.want")
