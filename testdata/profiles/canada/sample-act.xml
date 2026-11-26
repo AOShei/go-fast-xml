@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Statute lims:pit-date="2026-01-05" lims:lastAmendedDate="2026-01-05" lims:current-date="2026-02-01" lims:inforce-start-date="2026-01-02" lims:fid="100" lims:id="100" bill-origin="commons" bill-type="govt-public" in-force="yes" xml:lang="en" xmlns:lims="http://justice.gc.ca/lims">
+<Identification lims:fid="101" lims:id="101">
+<LongTitle lims:fid="102" lims:id="102">An Act respecting samples</LongTitle>
+<ShortTitle status="official">Sample Act</ShortTitle>
+<BillHistory><Stages stage="assented-to"><Date><YYYY>2026</YYYY><MM>1</MM><DD>2</DD></Date></Stages></BillHistory>
+<Chapter><ConsolidatedNumber official="no">S-0.1</ConsolidatedNumber><AnnualStatuteId><AnnualStatuteNumber>7</AnnualStatuteNumber><YYYY>2026</YYYY></AnnualStatuteId></Chapter>
+</Identification>
+<Introduction lims:fid="103" lims:id="103"><Enacts lims:fid="104" lims:id="104"><Provision lims:fid="105" lims:id="105"><Text>His Majesty enacts as follows:</Text></Provision></Enacts></Introduction>
+<Body lims:fid="106" lims:id="106">
+<Heading lims:fid="107" lims:id="107" level="1"><Label>PART 1</Label><TitleText>General</TitleText></Heading>
+<Section lims:inforce-start-date="2026-01-02" lims:lastAmendedDate="2026-01-05" lims:fid="108" lims:id="108" type="normal">
+<MarginalNote lims:fid="109" lims:id="109">Definitions</MarginalNote>
+<Label>1</Label>
+<Text>The following definitions apply in this Act.</Text>
+<Definition lims:fid="110" lims:id="110"><Text><DefinedTermEn>sample</DefinedTermEn> means a thing listed in the <XRefExternal reference-type="act" link="S-0.2">Other Act</XRefExternal>. (<DefinedTermFr>échantillon</DefinedTermFr>)</Text></Definition>
+<HistoricalNote><HistoricalNoteSubItem lims:fid="111" lims:id="111">2026, c. 7, s. 1</HistoricalNoteSubItem><HistoricalNoteSubItem lims:fid="112" lims:id="112">2026, c. 9, s. 4</HistoricalNoteSubItem></HistoricalNote>
+</Section>
+<Section lims:fid="120" lims:id="120">
+<MarginalNote lims:fid="121" lims:id="121">Rates<HistoricalNote>2026, c. 9, s. 5</HistoricalNote></MarginalNote>
+<Label>2</Label>
+<Subsection lims:fid="122" lims:id="122" in-force="no">
+<Label>(1)</Label>
+<Text>The rate is set out in the table to this section<FootnoteRef idref="fn1">*</FootnoteRef>.</Text>
+<Paragraph lims:fid="123" lims:id="123"><Label>(a)</Label><Text>for apples, <Emphasis style="italic">per</Emphasis> kilogram; and</Text></Paragraph>
+<TableGroup lims:fid="124" lims:id="124"><table lims:fid="125" lims:id="125"><tgroup cols="2"><colspec colname="c1"/><colspec colname="c2"/><thead><row><entry>Fruit</entry><entry>Rate</entry></row></thead><tbody><row><entry>apple</entry><entry>1<LeaderRightJustified leader="dot"/>$</entry></row></tbody></tgroup></table></TableGroup>
+<Footnote id="fn1" placement="page" status="official"><Label>*</Label><Text>Rates in dollars.</Text></Footnote>
+</Subsection>
+<Subsection lims:fid="126" lims:id="126"><Label>(2)</Label><Text><Repealed>[Repealed, 2026, c. 9, s. 6]</Repealed></Text></Subsection>
+</Section>
+<Section lims:fid="130" lims:id="130"><Label>3</Label><Text>The formula is</Text>
+<FormulaGroup lims:fid="131" lims:id="131"><Formula lims:fid="132" lims:id="132"><FormulaText>A × B</FormulaText></Formula><FormulaConnector>where</FormulaConnector><FormulaDefinition lims:fid="133" lims:id="133"><FormulaTerm>A</FormulaTerm><Text>is the weight; and</Text></FormulaDefinition></FormulaGroup>
+<AmendedText><SectionPiece><Paragraph><Label>(b)</Label><Text>for pears, <Language xml:lang="fr">par</Language> unit.</Text></Paragraph></SectionPiece></AmendedText>
+</Section>
+<Repealed lims:fid="140" lims:id="140">[Repealed, 2026, c. 9, s. 7]</Repealed>
+</Body>
+<Schedule lims:fid="150" lims:id="150" id="sched1">
+<ScheduleFormHeading lims:fid="151" lims:id="151"><Label>SCHEDULE</Label><OriginatingRef>(Section 2)</OriginatingRef><TitleText>Fruit</TitleText></ScheduleFormHeading>
+<List><Item lims:fid="152" lims:id="152"><Label>1</Label><Text>Apples</Text></Item></List>
+<BilingualGroup><BilingualItemEn>Apple Board</BilingualItemEn><BilingualItemFr>Office des pommes</BilingualItemFr></BilingualGroup>
+<ImageGroup><Image source="fruit.gif"/></ImageGroup>
+</Schedule>
+<RecentAmendments><Amendment><AmendmentCitation link="2026_9">2026, c. 9</AmendmentCitation><AmendmentDate>2026-01-05</AmendmentDate></Amendment></RecentAmendments>
+</Statute>
