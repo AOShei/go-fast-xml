@@ -241,6 +241,11 @@ type frame struct {
 
 	val    string
 	hasVal bool
+	// with: the values of the rule's "with" attributes, written after the
+	// element's text when it ends. rest: a row's sink for its "rest"
+	// column.
+	with   []string
+	rest   bool
 	part   *gofastcore.Part
 	imgAlt bool
 
@@ -542,6 +547,7 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 		} else if rule := e.lookup(); rule == nil {
 			e.count(e.unmapped, el.Name)
 		} else if rule.As == profile.AsInline && s != nil {
+			e.withValues(f, rule)
 			if rule.Space {
 				s.b.Space()
 				f.spaced = s
@@ -580,6 +586,7 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 		return
 	}
 	e.countAttrs(f, el)
+	e.withValues(f, rule)
 	if rule.As == profile.AsSkip {
 		f.role = roleSkip
 		e.count(e.skipped, el.Name)
@@ -634,6 +641,14 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 		f.resume, e.cur, f.outOfLine = e.cur, nil, true
 		e.startRule(f, el)
 		return
+	}
+	if rule.As == profile.AsCell && rule.Column > 0 && e.cur != nil {
+		if row := e.rowFrame(); row != nil && row.sink == e.cur {
+			// A column cell inside its row's "rest" column has a cell of
+			// its own.
+			e.startRule(f, el)
+			return
+		}
 	}
 	if e.cur != nil {
 		if e.nested(f, el) {
@@ -1213,6 +1228,15 @@ func (e *Engine) startRule(f *frame, el *xmlread.Element) {
 		if len(r.HeaderText) > 0 {
 			e.headerRow(f.table, r.HeaderText)
 		}
+		if r.OneRow {
+			// The element is also the table's one row.
+			f.owner = f.table
+			f.table.startRow(false)
+			if r.Rest > 0 {
+				e.openSink(f, skCell, el.Start)
+				f.rest = true
+			}
+		}
 	case profile.AsRow:
 		if t := e.tableOf(); t != nil {
 			f.owner = t
@@ -1220,8 +1244,20 @@ func (e *Engine) startRule(f *frame, el *xmlread.Element) {
 			if len(r.Cells) > 0 {
 				e.attrRow(t, r.Cells)
 			}
+			if r.Rest > 0 {
+				e.openSink(f, skCell, el.Start)
+				f.rest = true
+			}
 		}
 	case profile.AsCell:
+		if r.Column > 0 {
+			if row := e.rowFrame(); row != nil {
+				f.owner = row.owner
+				f.cell = true
+				e.openSink(f, skCell, el.Start)
+			}
+			break
+		}
 		if t := e.tableOf(); t != nil {
 			f.owner = t
 			cs, rs := 1, 1
@@ -1970,6 +2006,9 @@ func (e *Engine) EndElement(r *xmlread.Reader, el *xmlread.Element, start, end i
 		return
 	}
 	f := &e.frames[n-1]
+	if len(f.with) > 0 {
+		e.writeWith(r, f, start)
+	}
 	var ref blockRef
 	switch {
 	case f.role == roleSkip:
@@ -2027,6 +2066,51 @@ func (e *Engine) EndElement(r *xmlread.Reader, el *xmlread.Element, start, end i
 		p.lastChild, p.lastRef = el.Local, ref
 	}
 	e.frames = e.frames[:n-1]
+}
+
+// withValues reads the values of the rule's "with" attributes of the
+// element being started; they are written when it ends.
+func (e *Engine) withValues(f *frame, rule *profile.Rule) {
+	for _, w := range rule.With {
+		if v, _ := e.value(w); v != "" {
+			f.with = append(f.with, v)
+		}
+	}
+}
+
+// writeWith writes the "with" values after the element's text, in the
+// sink its text went to, each set off by a space (BilledQuantity@unitCode:
+// "2 C62"). They are text of the file, read from attributes.
+func (e *Engine) writeWith(r *xmlread.Reader, f *frame, at int64) {
+	var s *sink
+	switch {
+	case f.role == roleSkip || f.role == roleDoc:
+		return
+	case f.sink != nil:
+		s = f.sink
+	case f.role == roleInline:
+		s = e.active()
+	}
+	if s == nil || s.structure {
+		return
+	}
+	for _, v := range f.with {
+		s.b.Space()
+		e.textTo(r, s, v, at)
+	}
+	if f.role == roleInline {
+		s.b.Space()
+	}
+}
+
+// textTo writes v into s, as Text writes into the active sink.
+func (e *Engine) textTo(r *xmlread.Reader, s *sink, v string, at int64) {
+	cur, stray := e.cur, e.stray
+	if e.cur != s {
+		e.cur = s
+	}
+	e.Text(r, []byte(v), at, at)
+	e.cur, e.stray = cur, stray
 }
 
 // inlineValue writes an inline rule's "value", an attribute of its own
@@ -2338,7 +2422,9 @@ func (e *Engine) endRule(f *frame, end int64) blockRef {
 	case profile.AsCell:
 		if f.sink != nil {
 			s := e.closeSink(f)
-			if t := f.owner; t != nil {
+			if t := f.owner; t != nil && r.Column > 0 {
+				t.columnCell(r.Column-1, s.b.String(), s.href)
+			} else if t != nil {
 				t.endCell(s.b.String(), s.href)
 			}
 			for _, b := range s.after {
@@ -2347,11 +2433,19 @@ func (e *Engine) endRule(f *frame, end int64) blockRef {
 			e.putSink(s)
 		}
 	case profile.AsRow:
+		e.endRest(f)
 		if t := f.owner; t != nil {
 			t.endRow()
 			t.rowDone(f.start, end, f.anchor)
 		}
 	case profile.AsTable:
+		if r.OneRow {
+			e.endRest(f)
+			if t := f.owner; t != nil {
+				t.endRow()
+				t.rowDone(f.start, end, "")
+			}
+		}
 		e.flushStray()
 		if t := f.table; t != nil {
 			if b, ok := t.block(e, f.start, end); ok {
@@ -2383,6 +2477,22 @@ func (e *Engine) endRule(f *frame, end int64) blockRef {
 		e.putSink(s)
 	}
 	return f.ref
+}
+
+// endRest writes a row's "rest" column, the row's content no column cell
+// took.
+func (e *Engine) endRest(f *frame) {
+	if !f.rest || f.sink == nil {
+		return
+	}
+	s := e.closeSink(f)
+	if t := f.owner; t != nil {
+		t.columnCell(f.rule.Rest-1, s.b.String(), s.href)
+	}
+	for _, b := range s.after {
+		e.add(b, f, false)
+	}
+	e.putSink(s)
 }
 
 // keepAfter gives the notes that followed a value's text (the attributes
@@ -2570,6 +2680,13 @@ func (e *Engine) metadata(f *frame, v string, end int64) {
 func parseDate(s string) (time.Time, bool) {
 	for _, layout := range []string{time.RFC3339Nano, "2006-01-02T15:04:05", "2006-01-02"} {
 		if t, err := time.Parse(layout, s); err == nil {
+			return t, true
+		}
+	}
+	// ISO 8601 basic calendar date, YYYYMMDD (UN/CEFACT format 102, as CII
+	// writes it): eight digits and nothing else.
+	if len(s) == 8 && strings.Trim(s, "0123456789") == "" {
+		if t, err := time.Parse("20060102", s); err == nil {
 			return t, true
 		}
 	}

@@ -218,6 +218,51 @@ func (t *table) endCell(text, href string) {
 	t.widen(t.col)
 }
 
+// rowFrame returns the frame of the innermost open row of the rows model
+// the element on top of the stack stands in (at any depth), or nil when a
+// cell or a table comes first.
+func (e *Engine) rowFrame() *frame {
+	for i := len(e.frames) - 2; i >= 0; i-- {
+		f := &e.frames[i]
+		if f.rule != nil && (f.rule.As == profile.AsRow || f.rule.OneRow) && f.owner != nil {
+			return f
+		}
+		if f.table != nil || f.cell {
+			return nil
+		}
+	}
+	return nil
+}
+
+// columnCell writes a column cell's text (a cell rule's "column", a row's
+// "rest") at column c of the row being read; a second text for one column
+// of a row follows the first after a line break. An empty text adds
+// nothing.
+func (t *table) columnCell(c int, text, href string) {
+	if !t.inRow || c < 0 || c >= MaxTableColumns {
+		return
+	}
+	for len(t.row) <= c {
+		t.row = append(t.row, "")
+	}
+	t.rowCells++
+	t.rowAllHeadCells = false
+	if text == "" {
+		t.widen(len(t.row))
+		return
+	}
+	if t.row[c] != "" {
+		t.row[c] += "\n"
+		t.cost++
+	}
+	t.row[c] += text
+	t.cost += int64(len(text))
+	if href != "" {
+		t.cells = append(t.cells, gofastcore.CellDetail{Row: len(t.rows), Col: c, Href: href})
+	}
+	t.widen(len(t.row))
+}
+
 func (t *table) endRow() {
 	if !t.inRow {
 		return
@@ -265,6 +310,11 @@ func (t *table) rowDone(start, end int64, anchor string) {
 func (t *table) block(e *Engine, start, end int64) (gofastcore.Block, bool) {
 	t.endRow()
 	if t.over || e.out.Stopped || len(t.rows) == 0 || t.ncols == 0 {
+		return gofastcore.Block{}, false
+	}
+	if t.fromProfile && len(t.rows) == 1 {
+		// Only the profile's header row: no row of the file (a UBL
+		// TaxTotal with no TaxSubtotal) makes no table.
 		return gofastcore.Block{}, false
 	}
 	for i, r := range t.rows {

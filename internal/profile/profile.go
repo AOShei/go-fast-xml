@@ -82,13 +82,13 @@ var (
 	allowed = map[As][]string{
 		AsSection:     common,
 		AsHeading:     append(slices.Clone(common), "level", "marker", "duplicate_of", "key"),
-		AsBlock:       append(slices.Clone(common), "kind", "language", "notation", "marker", "value", "duplicate_of", "key", "out_of_line", "split"),
+		AsBlock:       append(slices.Clone(common), "kind", "language", "notation", "marker", "value", "duplicate_of", "key", "out_of_line", "split", "with"),
 		AsList:        append(slices.Clone(common), "ordered", "split"),
 		AsItem:        append(slices.Clone(common), "marker", "value"),
-		AsTable:       append(slices.Clone(common), "model", "header"),
-		AsRow:         append(slices.Clone(common), "header", "cells"),
-		AsCell:        append(slices.Clone(common), "header", "colspan", "rowspan"),
-		AsInline:      {"match", "as", "style", "link", "title", "attrs", "extra", "space", "value"},
+		AsTable:       append(slices.Clone(common), "model", "header", "one_row", "rest"),
+		AsRow:         append(slices.Clone(common), "header", "cells", "rest"),
+		AsCell:        append(slices.Clone(common), "header", "colspan", "rowspan", "column", "with"),
+		AsInline:      {"match", "as", "style", "link", "title", "attrs", "extra", "space", "value", "with"},
 		AsLabel:       {"match", "as"},
 		AsImage:       append(slices.Clone(common), "id", "alt"),
 		AsNote:        append(slices.Clone(common), "type", "value", "out_of_line", "split"),
@@ -206,6 +206,17 @@ type Rule struct {
 	// table).
 	Cells      []*Value
 	HeaderText []string
+	// Column: a cell placed in this column (1-based) of the row it stands
+	// in, at any depth inside the row element ("column", cell). Rest: the
+	// column that takes the row's content no column cell takes ("rest",
+	// row). With: attributes of the element's own written after its text,
+	// each set off by a space ("with": unitCode, currencyID, schemeID).
+	// OneRow: the table's element is also its one row, filled by column
+	// cells ("one_row", table: CII's monetary summation).
+	Column int
+	Rest   int
+	With   []*Value
+	OneRow bool
 
 	// A "document" rule: the media type handed over, a constant
 	// (MediaType) or chosen by an attribute (MediaAttr, MediaMap: a value
@@ -567,6 +578,7 @@ func (r *Rule) values() []*Value {
 			vs = append(vs, kv.Value)
 		}
 	}
+	vs = append(vs, r.With...)
 	return append(vs, r.Cells...)
 }
 
@@ -830,6 +842,46 @@ func compileRule(raw json.RawMessage, i int, f *fileJSON, builtin bool) (*Rule, 
 				return nil, fmt.Errorf("%s: %q: %v", where, x.key, err)
 			}
 			*x.dst = &q
+		}
+	}
+	for _, x := range []struct {
+		key string
+		dst *int
+	}{{"column", &r.Column}, {"rest", &r.Rest}} {
+		if v, ok := m[x.key]; ok {
+			if err := json.Unmarshal(v, x.dst); err != nil || *x.dst < 1 || *x.dst > MaxCells {
+				return nil, fmt.Errorf("%s: %q is a column number, 1 to %d", where, x.key, MaxCells)
+			}
+		}
+	}
+	if r.Column > 0 && (r.Colspan != nil || r.Rowspan != nil) {
+		return nil, fmt.Errorf("%s: a cell with \"column\" has no span", where)
+	}
+	if v, ok := m["one_row"]; ok {
+		if err := json.Unmarshal(v, &r.OneRow); err != nil {
+			return nil, fmt.Errorf("%s: \"one_row\" must be true or false", where)
+		}
+		if r.OneRow && r.Model == "cals" {
+			return nil, fmt.Errorf("%s: \"one_row\" is for the rows model", where)
+		}
+	}
+	if r.As == AsTable && r.Rest > 0 && !r.OneRow {
+		return nil, fmt.Errorf("%s: a table's \"rest\" goes with \"one_row\"", where)
+	}
+	if v, ok := m["with"]; ok {
+		var raws []json.RawMessage
+		if err := json.Unmarshal(v, &raws); err != nil || len(raws) == 0 || len(raws) > 8 {
+			return nil, fmt.Errorf("%s: \"with\" is a list of 1 to 8 value sources", where)
+		}
+		for _, raw := range raws {
+			wv, err := c.value("with", raw)
+			if err != nil {
+				return nil, err
+			}
+			if wv.IsLiteral || wv.Attr.Local == "" || wv.Of != nil || wv.Claims() != nil || wv.AttrChild != nil || wv.Codepoint {
+				return nil, fmt.Errorf("%s: an entry of \"with\" is an attribute of the element's own, {\"attr\": \"name\"}", where)
+			}
+			r.With = append(r.With, wv)
 		}
 	}
 	if v, ok := m["display"]; ok {
