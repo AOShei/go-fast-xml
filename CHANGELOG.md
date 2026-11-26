@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.4.1 (2026-11-26)
 
 - **A date and time written with a space in place of the `T`** fills
   `Metadata.Created` and `Modified` wherever a profile reads a date:
