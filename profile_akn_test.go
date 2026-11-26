@@ -136,6 +136,9 @@ type aknOracleSpec struct {
 	// (Formex QUOT.START@CODE), wherever they stand. Each must be met on
 	// dev; codepointTagRE must name the same elements.
 	attrChar map[string]string
+	// only, when set, names the dev files the oracles read (one corpus
+	// set holding files of several profiles, xml-dila).
+	only func(path string) bool
 }
 
 // codepointTagRE is a tag of an attrChar element, for the cite check,
@@ -427,6 +430,9 @@ func aknOracles(t *testing.T, format string, spec *aknOracleSpec) {
 	used := map[string]bool{}
 	fails := 0
 	for _, path := range spFiles(dir) {
+		if spec.only != nil && !spec.only(path) {
+			continue
+		}
 		data, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)
