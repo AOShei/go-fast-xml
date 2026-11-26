@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<newsItem xmlns="http://iptc.org/std/nar/2006-10-01/" guid="urn:newsml:example.com:20121001:harbour" version="3" standard="NewsML-G2" standardversion="2.30" conformance="power" xml:lang="en">
+<catalogRef href="http://www.iptc.org/std/catalog/catalog.IPTC-G2-Standards_38.xml"/>
+<rightsInfo><copyrightHolder literal="Example Wire"><name>Example Wire</name></copyrightHolder><copyrightNotice>Copyright 2012 Example Wire</copyrightNotice></rightsInfo>
+<itemMeta>
+<itemClass qcode="ninat:text"/>
+<provider qcode="nprov:EX"/>
+<versionCreated>2012-10-01T12:00:00Z</versionCreated>
+<pubStatus qcode="stat:usable"/>
+<edNote>Embargoed until noon.</edNote>
+</itemMeta>
+<contentMeta>
+<urgency>4</urgency>
+<subject type="cpnat:abstract" qcode="medtop:04000000"><name xml:lang="en">economy, business and finance</name></subject>
+<headline>Harbour reopens</headline>
+<description role="drol:summary">The harbour opened at dawn.</description>
+</contentMeta>
+<contentSet>
+<inlineXML contenttype="application/nitf+xml">
+<nitf xmlns="http://iptc.org/std/NITF/2006-10-18/"><body><body.content><p>The <org>harbour board</org> reopened the port.</p></body.content></body></nitf>
+</inlineXML>
+<remoteContent href="http://example.com/harbour.mp3" contenttype="audio/mpeg" size="1024" rendition="rnd:highRes"/>
+</contentSet>
+</newsItem>
