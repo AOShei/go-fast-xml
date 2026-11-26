@@ -147,3 +147,55 @@ func TestEformsSelection(t *testing.T) {
 		`<BusinessRegistrationInformationNotice xmlns="http://data.europa.eu/p27/eforms-business-registration-information-notice/1"/>`: "",
 	})
 }
+
+// tedPrep is pubmedPrep, after the language column of the two tables of
+// translated titles and names, read from the LG attribute, is removed.
+func tedPrep(doc *gofastcore.Document) {
+	for pi := range doc.Parts {
+		for i := range doc.Parts[pi].Blocks {
+			x := &doc.Parts[pi].Blocks[i]
+			if x.Kind != gofastcore.KindTable || len(x.Table.Rows) == 0 || x.Table.Rows[0][0] != "language" {
+				continue
+			}
+			tb := *x.Table
+			tb.Rows = nil
+			for _, row := range x.Table.Rows[1:] {
+				tb.Rows = append(tb.Rows, row[1:])
+			}
+			x.Table = &tb
+			x.Attrs = map[string]string{}
+		}
+	}
+	pubmedPrep(doc)
+}
+
+// tedCase: the country of an address written as a sentence is the VALUE
+// attribute of an empty element, written where it stands.
+var tedCase = &jatsOracleCase{profile: "ted", format: "xml-ted", prep: tedPrep, rawCells: true,
+	attrText: map[string]string{"ADDRESS_NOT_STRUCT/COUNTRY": "VALUE"}}
+
+func TestTedCensus(t *testing.T)  { jatsCensus(t, "xml-ted") }
+func TestTedCorpus(t *testing.T)  { tedCase.run(t) }
+func TestTedOracles(t *testing.T) { tedCase.oracles(t) }
+
+func TestTedFixtureForm(t *testing.T) {
+	doc := procFixture(t, tedCase, "f03")
+	if doc.Metadata.Title != "Fourniture de pain pour la cantine" {
+		t.Errorf("title %q", doc.Metadata.Title)
+	}
+}
+
+func TestTedFixtureText(t *testing.T) { procFixture(t, tedCase, "text") }
+
+// The profile is chosen by the root TED_EXPORT in the namespaces of the
+// schema's versions; with no namespace or another, it is not.
+func TestTedSelection(t *testing.T) {
+	procSelection(t, map[string]string{
+		`<TED_EXPORT xmlns="http://publications.europa.eu/resource/schema/ted/R2.0.9/publication"/>`:  "ted",
+		`<TED_EXPORT xmlns="http://publications.europa.eu/resource/schema/ted/R2.0.8/publication"/>`:  "ted",
+		`<TED_EXPORT xmlns="http://publications.europa.eu/TED_schema/Export"/>`:                       "ted",
+		`<TED_EXPORT xmlns="http://formex.publications.europa.eu/ted/schema/export/R2.0.9.S01.E01"/>`: "ted",
+		`<TED_EXPORT/>`:                     "",
+		`<TED_EXPORT xmlns="urn:example"/>`: "",
+	})
+}

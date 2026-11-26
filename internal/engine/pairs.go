@@ -20,6 +20,9 @@ type pairTarget struct {
 	// parent: names start with the element the table's element stands
 	// in ("pairs": "parent").
 	parent bool
+	// empty: an element with no content and no attributes is a row with
+	// an empty value ("pairs_empty").
+	empty bool
 	rest  *profile.RestTable
 	first int
 }
@@ -144,7 +147,7 @@ func (e *Engine) pairName(at int, local bool) string {
 func (e *Engine) endPair(f *frame, end int64) {
 	if f.sink != nil {
 		s := e.closeSink(f)
-		if text := s.b.String(); text != "" {
+		if text := s.b.String(); text != "" || len(f.pairAttrs) == 0 && e.frames[f.pairAt].pt.empty && f.pairAt != len(e.frames)-1 {
 			e.pairRow(f, f.pairName, text, end)
 		}
 		for _, b := range s.after {

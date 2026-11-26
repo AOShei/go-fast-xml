@@ -137,3 +137,36 @@ func TestProfilePairsParent(t *testing.T) {
 		t.Errorf("got  %s\nwant %s", strings.Join(got, " "), want)
 	}
 }
+
+// TestProfilePairsEmpty: with "pairs_empty" an element with no content
+// and no attributes, whose presence is the value (TED's PT_OPEN), is a
+// row with an empty value; without it, it gives nothing.
+func TestProfilePairsEmpty(t *testing.T) {
+	src := `<Doc><Proc><PT_OPEN/><GPA></GPA><Lang V="EN"/><Date>2022</Date><Box> </Box></Proc></Doc>`
+	for _, c := range []struct{ key, want string }{
+		{`, "pairs_empty": true`, "Proc/PT_OPEN= Proc/GPA= Proc/Lang/@V=EN Proc/Date=2022 Proc/Box="},
+		{``, "Proc/Lang/@V=EN Proc/Date=2022"},
+	} {
+		prof := head("pairsempty", `{"root": "Doc"}`) + `"rules": [
+		{"match": "/Doc", "as": "transparent"},
+		{"match": "Proc", "as": "table", "pairs": "path"` + c.key + `}]}`
+		doc := extractWith(t, prof, src, nil)
+		if err := doc.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, b := range blocks(doc) {
+			if b.Kind == gofastcore.KindTable {
+				for i, row := range b.Table.Rows {
+					got = append(got, strings.Join(row, "="))
+					if l := b.Table.RowLocs[i]; l.Length == 0 {
+						t.Errorf("row %v has no location", row)
+					}
+				}
+			}
+		}
+		if strings.Join(got, " ") != c.want {
+			t.Errorf("%q: got  %s\nwant %s", c.key, strings.Join(got, " "), c.want)
+		}
+	}
+}
