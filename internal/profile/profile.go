@@ -82,7 +82,7 @@ func (a As) String() string {
 var (
 	common  = []string{"match", "as", "anchor", "attrs", "mark", "display", "extra"}
 	allowed = map[As][]string{
-		AsSection:     append(slices.Clone(common), "heading"),
+		AsSection:     append(slices.Clone(common), "heading", "table_header"),
 		AsHeading:     append(slices.Clone(common), "level", "marker", "duplicate_of", "key"),
 		AsBlock:       append(slices.Clone(common), "kind", "language", "notation", "marker", "value", "duplicate_of", "key", "out_of_line", "split", "with"),
 		AsList:        append(slices.Clone(common), "ordered", "split"),
@@ -211,6 +211,11 @@ type Rule struct {
 	// Heading: a section's heading from its own attributes, the first
 	// present and not empty ("heading", section: XLIFF file@original).
 	Heading []*Value
+	// SectionTable: the section is also a table whose header row is
+	// HeaderText ("table_header", section: an XLIFF 2 file, whose rows
+	// have no table element of their own); its table block comes where
+	// the section ends.
+	SectionTable bool
 	// Column: a cell placed in this column (1-based) of the row it stands
 	// in, at any depth inside the row element ("column", cell). Rest: the
 	// column that takes the row's content no column cell takes ("rest",
@@ -826,8 +831,15 @@ func compileRule(raw json.RawMessage, i int, f *fileJSON, builtin bool) (*Rule, 
 	if r.Ordered, err = c.test("ordered"); err != nil {
 		return nil, err
 	}
-	if r.As == AsTable {
-		if v, ok := m["header"]; ok {
+	if r.As == AsTable || r.As == AsSection {
+		key := "header"
+		if r.As == AsSection {
+			// "table_header": the section is also a table (XLIFF 2's
+			// file, whose units have no body element around them).
+			key = "table_header"
+		}
+		if v, ok := m[key]; ok {
+			r.SectionTable = r.As == AsSection
 			if err := json.Unmarshal(v, &r.HeaderText); err != nil || len(r.HeaderText) == 0 || len(r.HeaderText) > MaxCells {
 				return nil, fmt.Errorf("%s: a table's \"header\" is a list of 1 to %d strings", where, MaxCells)
 			}
@@ -850,8 +862,8 @@ func compileRule(raw json.RawMessage, i int, f *fileJSON, builtin bool) (*Rule, 
 			if err != nil {
 				return nil, err
 			}
-			if cv.IsLiteral || cv.Of != nil || cv.Claims() != nil || cv.Codepoint {
-				return nil, fmt.Errorf("%s: a cell of \"cells\" is an attribute of the row's element, {\"attr\": \"name\"}, or of a child, {\"attr\": \"name\", \"child\": \"selector\"}", where)
+			if cv.IsLiteral || cv.Claims() != nil || cv.Codepoint || cv.Of != nil && cv.AttrChild != nil {
+				return nil, fmt.Errorf("%s: a cell of \"cells\" is an attribute of the row's element, {\"attr\": \"name\"}, of a child, {\"attr\": \"name\", \"child\": \"selector\"}, or of an ancestor, {\"attr\": \"name\", \"of\": \"name\"}", where)
 			}
 			r.Cells = append(r.Cells, cv)
 		}

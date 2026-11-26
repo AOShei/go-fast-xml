@@ -1188,6 +1188,11 @@ func (e *Engine) startRule(f *frame, el *xmlread.Element) {
 				break
 			}
 		}
+		if r.SectionTable {
+			// The section is also a table (XLIFF 2's file).
+			f.table = newTable(e, "")
+			e.headerRow(f.table, r.HeaderText)
+		}
 	case profile.AsHeading, profile.AsBlock, profile.AsNote:
 		if r.Value != nil {
 			f.val, f.hasVal = e.resolve(f, r.Value, "", useValue)
@@ -2491,6 +2496,13 @@ func (e *Engine) endRule(f *frame, end int64) blockRef {
 		if t := f.table; t != nil {
 			if b, ok := t.block(e, f.start, end); ok {
 				f.ref = e.add(b, f, true)
+			}
+		}
+	case profile.AsSection:
+		if t := f.table; t != nil {
+			e.flushStray()
+			if b, ok := t.block(e, f.start, end); ok {
+				e.add(b, f, false)
 			}
 		}
 	case profile.AsImage:

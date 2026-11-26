@@ -128,6 +128,11 @@ func (e *Engine) attrRow(f *frame, t *table, cells []*profile.Value, open bool) 
 		n := cv.Attr.Local
 		v, _ := e.value(cv)
 		t.startCell(e, 1, 1, false)
+		if cv.Of != nil {
+			// An ancestor's attribute (XLIFF 2's unit@id on each
+			// segment's row).
+			n = cv.Of.Local + "@" + n
+		}
 		if cv.AttrChild != nil {
 			// A child's attribute (XLIFF target@state): the cell is
 			// empty until the child starts, then filled in its column.
