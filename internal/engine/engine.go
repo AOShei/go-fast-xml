@@ -2810,6 +2810,16 @@ func parseDate(s string) (time.Time, bool) {
 			return t, true
 		}
 	}
+	// The extended form with a space where ISO 8601 has the T (RFC 3339
+	// allows it), with or without seconds and zone: 2022-07-11 18:33,
+	// 2016-04-13 04:52:21+00:00 (as agencies write NITF's date.issue@norm).
+	if len(s) >= 16 && s[10] == ' ' && s[4] == '-' {
+		for _, layout := range []string{"2006-01-02 15:04:05Z07:00", "2006-01-02 15:04:05", "2006-01-02 15:04Z07:00", "2006-01-02 15:04"} {
+			if t, err := time.Parse(layout, s); err == nil {
+				return t, true
+			}
+		}
+	}
 	// ISO 8601 basic date and time, YYYYMMDDThhmmss with Z, a numeric
 	// offset or no zone (NITF's date.issue@norm).
 	if len(s) >= 15 && s[8] == 'T' && strings.Trim(s[:8], "0123456789") == "" {

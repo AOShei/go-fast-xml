@@ -44,13 +44,21 @@ stays generic, as does NITF without its root (`TestNitfSelection`).
 
 `Metadata.Created` is the first `docdata/date.issue@norm` the engine
 reads as a date: ISO 8601 basic date and time (`20020225T143000-0500`,
-with `Z`, a numeric offset or no zone, which is read as UTC) or ISO 8601
-extended. The value is also a row of the head table, as written. A date
-written another way (`2022-07-11 18:33`, with a space) is only the row.
-`date.release` and `date.expire` are rows only. On the dev set 15 of the
-17 files have `Created`; the 2 others write the date with a space. NITF
-inside a NewsML-G2 item fills it the same way (1 dev file has one, with
-a space).
+with `Z`, a numeric offset or no zone, which is read as UTC), ISO 8601
+extended, or the extended form with a space in place of the `T`, with or
+without seconds and offset (`2022-07-11 18:33`,
+`2016-04-13 04:52:21+00:00`), as some agencies write it. The value is
+also a row of the head table, as written. A date written another way is
+only the row. `date.release` and `date.expire` are rows only. All 17 dev
+files and all 10 held-out files have `Created` (15 dev files write the
+basic form, 2 the form with a space).
+
+NITF inside a NewsML-G2 item fills it the same way when the `nitf`
+element is in no namespace or the NITF namespace. One dev file (an NTB
+item) has `nitf` with no namespace declaration inside `inlineXML`, so
+its elements are in the NewsML-G2 namespace: they are not NITF by name,
+are read as the table of names and values any other vocabulary there
+is, and its `date.issue` is a row only.
 
 `Loc.Anchor`: `doc-id@id-string` is an attribute of a child of `head`;
 the engine's `"heading": "anchor"` takes only a child's text and a

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **A date and time written with a space in place of the `T`** fills
+  `Metadata.Created` and `Modified` wherever a profile reads a date:
+  `2022-07-11 18:33`, `2016-04-13 04:52:21+00:00`, with or without
+  seconds and offset. Some news agencies write NITF's `date.issue@norm`
+  this way. On the corpus this changes 2 NITF files and no other; all 17
+  NITF dev files now have `Created`.
+
 ## v0.4.0 (2026-11-26)
 
 - **A directory given to `gofastxml` stands for `.xlf`, `.xliff` and `.tmx`
