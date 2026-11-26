@@ -84,7 +84,7 @@ func TestRowLocCheck(t *testing.T) {
 // TestCorpusRowLocs runs rowLocCheck over every dev file of every XML
 // corpus.
 func TestCorpusRowLocs(t *testing.T) {
-	formats := []string{"xml-akn", "xml-cda", "xml-clml", "xml-dita", "xml-docbook", "xml-formex", "xml-jats",
+	formats := []string{"xml-akn", "xml-cda", "xml-clml", "xml-dila", "xml-dita", "xml-docbook", "xml-formex", "xml-jats",
 		"xml-legifrance", "xml-patent", "xml-s1000d", "xml-servicepublic", "xml-tei"}
 	seen := false
 	start := time.Now()

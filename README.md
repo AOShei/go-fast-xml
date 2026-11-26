@@ -119,7 +119,7 @@ Selected by the root `article` with a NLM or NISO DOCTYPE public identifier or a
 
 #### Légifrance (`legifrance`)
 
-Selected by the LEGI and JORF roots in no namespace (`ARTICLE`, `TEXTE_VERSION`, `SECTION_TA`, `TEXTELR`, `JO`, `CONTENEUR`). Maps the metadata blocks (identifiers, dates, status, NOR) to `Metadata` and `Extra` `lf.*`, the title as heading 1, the article text (XHTML-like content with `br` as line breaks, and tables), and versions, links and structures as one paragraph each with their ids in `Attrs`. Keys: `lf.*`. Cite: the `ID` (`LEGIARTI...`) in `Extra`; sections of a `JO` summary by `Loc.Anchor` from `@id`. Tested: LEGI and JORF exports; not tested: `CONTENEUR`, `TEXTEKALI`, CNIL, JADE. [profiles/legifrance.md](profiles/legifrance.md)
+Selected by the LEGI and JORF roots in no namespace (`ARTICLE`, `TEXTE_VERSION`, `SECTION_TA`, `TEXTELR`, `JO`, `CONTENEUR`), KALI's (the same, and `TEXTEKALI`, `IDCC`) and CNIL's `TEXTE_CNIL`. Maps the metadata blocks (identifiers, dates, status, NOR) to `Metadata` and `Extra` `lf.*`, the title as heading 1, the article text (XHTML-like content with `br` as line breaks, and tables), and versions, links and structures as one paragraph each with their ids in `Attrs`. Keys: `lf.*`. Cite: the `ID` (`LEGIARTI...`) in `Extra`; sections of a `JO` summary by `Loc.Anchor` from `@id`. Tested: LEGI and JORF exports, KALI and CNIL (2026-11-08 dumps); not tested: `CONTENEUR`. Case law is `dila-juri`'s. [profiles/legifrance.md](profiles/legifrance.md)
 
 #### Patents (`patent`)
 

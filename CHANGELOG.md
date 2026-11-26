@@ -5,6 +5,11 @@
 - **New built-in profile `dila-juri`** for DILA's case law: roots
   `TEXTE_JURI_JUDI` (CASS, INCA, CAPP), `TEXTE_JURI_ADMIN` (JADE) and
   `TEXTE_JURI_CONSTIT` (CONSTIT). See `profiles/dila-juri.md`.
+- **`legifrance` reads KALI and CNIL**: new roots `TEXTEKALI`, `IDCC` and
+  `TEXTE_CNIL`, and rules for the KALI-only elements (`CALIPSO`,
+  `HISTORIQUE`, extension dates, signatories' parts, `CONDITION_DIFFERE`,
+  `CONTEXTE/CONTENEUR`, ...). The output of every LEGI/JORF file is
+  unchanged.
 - Engine: several value sources of one rule naming the same `child` all
   get its text; an anchor read from a grandchild reaches the blocks after
   the elements between. The output of every earlier corpus file is
