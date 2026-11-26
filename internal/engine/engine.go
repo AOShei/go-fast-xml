@@ -1247,7 +1247,7 @@ func (e *Engine) startRule(f *frame, el *xmlread.Element) {
 			f.owner = t
 			t.startRow(e.test(r.Header))
 			if len(r.Cells) > 0 {
-				e.attrRow(t, r.Cells)
+				e.attrRow(t, r.Cells, r.Rest > 0)
 			}
 			if r.Rest > 0 {
 				e.openSink(f, skCell, el.Start)

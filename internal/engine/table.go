@@ -120,8 +120,10 @@ func (t *table) keyHeader() {
 }
 
 // attrRow fills the row just started from its element's attributes
-// (a row rule's "cells"); an absent attribute gives an empty cell.
-func (e *Engine) attrRow(t *table, cells []*profile.Value) {
+// (a row rule's "cells"); an absent attribute gives an empty cell. A row
+// with "rest" stays open: its element's content fills the columns after
+// (column cells, rest).
+func (e *Engine) attrRow(t *table, cells []*profile.Value, open bool) {
 	for _, cv := range cells {
 		v, _ := e.value(cv)
 		t.startCell(e, 1, 1, false)
@@ -130,7 +132,9 @@ func (e *Engine) attrRow(t *table, cells []*profile.Value) {
 			t.attrNames = append(t.attrNames, n)
 		}
 	}
-	t.endRow()
+	if !open {
+		t.endRow()
+	}
 	e.tableCost(t)
 }
 
