@@ -20,14 +20,24 @@ a namespace alias; it is read generically (16 of 223 dev files).
 | `IssueDateTime/DateTimeString` | `Metadata.Created` when `format="102"` (`YYYYMMDD`), else `Extra["inv.issue_date"]` as written; `Extra["inv.issue_date_format"]` |
 | guideline, business process, test indicator, `InvoiceCurrencyCode`, `TaxCurrencyCode` | `Extra["inv.guideline_id"]`, `inv.business_process_id`, `inv.test_indicator`, `inv.currency`, `inv.tax_currency` |
 | `IncludedNote/Content` | a paragraph, `inv.field=IncludedNote`, with `inv.subject_code`/`inv.content_code` |
-| parties (`SellerTradeParty`, `BuyerTradeParty`, `PayeeTradeParty`, `SellerTaxRepresentativeTradeParty`, `ShipToTradeParty`, `InvoiceeTradeParty` and the other `*TradeParty`) | a section with no heading; every block in it carries `inv.party` (`seller`, `buyer`, `payee`, `seller_tax_representative`, `ship_to`, ...). Each value is a paragraph with `inv.field` (the element's local name: `Name`, `ID`, `GlobalID`, `CityName`...) and `inv.group` for the aggregate it is in (`PostalTradeAddress`, `SpecifiedTaxRegistration`, `SpecifiedLegalOrganization`, `DefinedTradeContact`, ...). `schemeID` is `inv.schemeID` |
-| references (`BuyerOrderReferencedDocument`, `AdditionalReferencedDocument`, ...), delivery event, billing period, payment means, payment terms | sections whose paragraphs carry `inv.group`; IBAN, BIC, mandate, due date as written, with `inv.field` (`IBANID`, `BICID`, `DirectDebitMandateID`, `DueDateDateTime` with `inv.format`); accounts carry `inv.account` |
-| lines (`IncludedSupplyChainTradeLineItem`) | one table, a row per line with `RowLocs` |
-| `ApplicableTradeTax` (header) | a one-row table each: tax type, VAT category, rate, basis, tax amount, exemption reason and code, other |
-| `SpecifiedTradeAllowanceCharge` (header) | a one-row table each |
-| `SpecifiedTradeSettlementHeaderMonetarySummation` | a one-row table |
-| `AdditionalReferencedDocument/AttachmentBinaryObject` | an attachment: decoded from base64 and handed to `Options.ExtractChild` (`"encoding": "base64"`), named by `@filename`, media type `@mimeCode` as written (`application/octet-stream` when absent). The base64 is not in the body; a child not extracted is still listed in `Document.Children` with `xml.parent_offset`/`length`/`element`, and the section of its `AdditionalReferencedDocument` carries `Attrs["children"]`. Text that is not base64 stays as a paragraph with `media_type` and `input.stream_damaged` |
-| `SpecifiedLogisticsServiceCharge/AppliedTradeTax` | `CategoryCode` (`inv.listID`) and `RateApplicablePercent` are paragraphs with `inv.field` |
+| parties (`SellerTradeParty`, `BuyerTradeParty`, `PayeeTradeParty`, `SellerTaxRepresentativeTradeParty`, `ShipToTradeParty`, `InvoiceeTradeParty` and the other `*TradeParty`) | a table of names and values (`pairs`), no heading, carrying `inv.party` (`seller`, `buyer`, `payee`, `seller_tax_representative`, `ship_to`, ...) on the table block. A row per value: its path of local names below the party (`Name`, `PostalTradeAddress/CityName`, `SpecifiedTaxRegistration/ID`, `GlobalID`), its text; each attribute a row of its own after its element's (`SpecifiedTaxRegistration/ID/@schemeID`) |
+| references (`BuyerOrderReferencedDocument`, `AdditionalReferencedDocument`, ...), delivery event, billing period, payment means, payment terms, logistics charges, currency exchange, accounting account, project | a table of names and values each, carrying `inv.group` (the element's name): `TypeCode`, `PayeePartyCreditorFinancialAccount/IBANID`, `DueDateDateTime/DateTimeString` with `.../@format`, ... |
+| a value outside these (`BuyerReference`, `PaymentReference`, `CreditorReferenceID`, ...) | a table of its own of one row (and its attributes): its local name, its text |
+| lines (`IncludedSupplyChainTradeLineItem`) | one table, a row per line with `RowLocs`; then the line values table (below) |
+| `ApplicableTradeTax` (header) | a one-row table each: tax type, VAT category, rate, basis, tax amount, exemption reason and code; then, if it holds more (`DueDateTypeCode`, `TaxPointDate`, ...), a table of names and values |
+| `SpecifiedTradeAllowanceCharge` (header) | a one-row table each; then a table of names and values for the rest (`CategoryTradeTax/TypeCode`, ...) |
+| `SpecifiedTradeSettlementHeaderMonetarySummation` | a one-row table; then a table of names and values for the rest |
+| `AdditionalReferencedDocument/AttachmentBinaryObject` | an attachment: decoded from base64 and handed to `Options.ExtractChild` (`"encoding": "base64"`), named by `@filename`, media type `@mimeCode` as written (`application/octet-stream` when absent). The base64 is not in the body; a child not extracted is still listed in `Document.Children` with `xml.parent_offset`/`length`/`element`, and the table of its `AdditionalReferencedDocument` carries `Attrs["children"]`. Text that is not base64 stays as a paragraph with `media_type` and `input.stream_damaged`, before that table |
+
+**Names.** A table of names and values (profile keys `pairs` and
+`rest_table`, `PROFILE_FORMAT.md`) writes each value with the file's name
+for it: the path of local names below the party, group or line, as
+written, never translated; `/@` and the attribute's name for an attribute.
+Its header row (`name`, `value`, or `line id`, `name`, `value`) is the
+profile's (`header_source=profile`). Each row's `RowLocs` is the value's
+element. Rules for the elements inside are not applied (an attachment's
+is), so a value's codes and amounts keep their attributes as rows of
+their own, not as `inv.*` Attrs.
 
 **The lines table.** CII has no element around the lines, so
 `SupplyChainTradeTransaction` is the table; the header agreement, delivery
@@ -38,16 +48,17 @@ quantity (with `unitCode`), net price (`ChargeAmount`, then `BasisQuantity`
 with `unitCode`), line net amount, VAT category, VAT rate, note, item
 identifiers (seller's, buyer's, global with `schemeID`), gross price, item
 attributes (`ApplicableProductCharacteristic`: description, value), billing
-period, and **other**: everything else the line holds (origin country, tax
-type, exemption reason, line allowances and charges, references, accounting
-account), one value per line of the cell, in file order, each with its
-`schemeID`/`listID`/`unitCode`/`currencyID`/`format`. Nothing of a line is
-outside its row.
+period. Everything else a line holds (origin country, tax type, exemption
+reason, line allowances and charges, references, accounting account) is a
+row of the **line values table** right after it: line id (the text of the
+line's first column, as written), name (path below the line element:
+`SpecifiedTradeProduct/OriginTradeCountry/ID`), value, in file order, with
+`RowLocs` on the value's element. There is no `other` column.
 
 **Amounts** are as written, with `currencyID` after the value in the cell
 text (`9.60 EUR`), through the profile key `with`; CII writes currency on
 few amounts (`TaxTotalAmount`), the invoice currency being
-`inv.currency`. In paragraphs the attribute is in `Attrs` (`inv.currencyID`).
+`inv.currency`. In a table of names and values, `currencyID` is a row.
 
 CII has no element around the allowances or the VAT breakdown either, so
 each is a table of one row (`one_row`), not one table for all.
@@ -65,20 +76,25 @@ Measured by `TestInvoiceCorpus` and `TestInvoiceOracles` at this commit:
 | read with `cii` / `ubl` / generic | 123 / 82 / 17 | 56 / 28 / 7 |
 | errors | 1 (`ErrUnsupported`, the encoding label) | 0 |
 | `Validate` failures, panics | 0 | 0 |
-| blocks (all files) | paragraph 7733, table 771, note attribute 546, stored `markup_comment` 892 | paragraph 3950, table 320, note attribute 222, stored 356 |
-| warnings | `xml.unmapped_elements` 2 | `xml.unmapped_elements` 1, `xml.unmapped_attributes` 2 |
+| blocks (all files) | table 2700, paragraph 1784, note attribute 546, stored `markup_comment` 892 | table 1208, paragraph 748, note attribute 222, stored 356 |
+| warnings (documents with) | `xml.unmapped_elements` 2 | `xml.unmapped_elements` 1, `xml.unmapped_attributes` 1 |
 | attachments handed over (cii and ubl) | 29 | not counted |
+| names checked by the oracle (cii and ubl) | 8363 | not run |
+
+Under `cii` and `ubl` on dev, the only paragraphs of the body are the
+notes (`IncludedNote/Content` 240, `cbc:Note` 79) and the two generic
+`BuyerReference` below; every other value is in a table with its name.
+The other paragraphs counted above are those of the 17 generic files.
 
 **Left generic on dev:** `BuyerReference` (2, in two files that write it
 in no namespace, outside the `ram` namespace the rules name): its text is
 an inferred paragraph at its place. Nothing else under `cii` or `ubl`.
 
-**Depth in a line.** The rules for a line's other values go five levels
-below the line element; on dev, character data below a line is at depth
-1 (754 runs), 2 (2077), 3 (2825), 4 (295) and 5 (27), never deeper. An
-element deeper than five levels would have no rule: its text stays in the
-paragraph of the level-five element it stands in (not lost, not moved)
-and it is counted in `xml.unmapped_elements`.
+**Depth in a line.** A value in the line values table may be at any
+depth below the line. Inside a column cell (item attributes, billing
+period) the rules go five levels below the line element; on dev,
+character data below a line is at depth 1 (754 runs), 2 (2077), 3 (2825),
+4 (295) and 5 (27), never deeper.
 
 **Oracles** (`TestInvoiceOracles`, dev, with and without a child
 extractor): (a) every character data run is found exactly once, in its
@@ -88,8 +104,13 @@ go to `Metadata` (`ExchangedDocument/ID`, `TypeCode`, `Name`,
 `IssueDateTime`, guideline and business process `ID`, `TestIndicator`,
 `InvoiceCurrencyCode`, `TaxCurrencyCode`), the note codes that go to
 `Attrs` (`IncludedNote/SubjectCode`, `ContentCode`), the attachments
-(handed over), and the profile's header rows; attribute values written
-into cells (`with`) are matched after their element's text. (b) every
-block's text is in the source at its offsets, every row's `RowLocs` lie in
-its table and in file order, and each word of a row's cells is in the
-source at its `RowLocs`. All pass.
+(handed over), the profile's header rows, and the names of a table of
+names and values with its line ids: each name is checked to be the end of
+the path of local names of the element its row cites (an `/@` name: an
+attribute of that element whose value is the row's value), each line id
+the text of a cell of the line row holding that element (8363 names on
+dev); attribute values written into cells (`with`) are matched after
+their element's text. (b) every block's text is in the source at its
+offsets, every row's `RowLocs` lie in its table and in file order (an
+attribute's row may cite its element again), and each word of a row's
+value cells is in the source at its `RowLocs`. All pass.
