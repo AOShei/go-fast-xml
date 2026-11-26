@@ -4,7 +4,7 @@
   "format": 1,
   "match": [
     {"root": "ARTICLE"}, {"root": "TEXTE_VERSION"}, {"root": "SECTION_TA"}, {"root": "TEXTELR"}, {"root": "JO"}, {"root": "CONTENEUR"},
-    {"root": "TEXTEKALI"}, {"root": "IDCC"}
+    {"root": "TEXTEKALI"}, {"root": "IDCC"}, {"root": "TEXTE_CNIL"}
   ],
   "heading_base": 2,
   "rules": [
@@ -17,6 +17,11 @@
     {"match": "/TEXTEKALI", "as": "transparent", "extra": {"lf.root": "TEXTEKALI"}},
     {"match": "/IDCC", "as": "transparent", "extra": {"lf.root": "IDCC"}},
     {"match": "/IDCC/META/META_SPEC/META_CONTENEUR/TITRE", "as": "metadata", "field": "title", "also_heading": 1},
+    {"match": "/TEXTE_CNIL", "as": "transparent", "extra": {"lf.root": "TEXTE_CNIL"}},
+    {"match": "META_CNIL", "as": "transparent"},
+    {"match": "META_CNIL/NUMERO", "as": "metadata", "field": "extra", "key": "lf.numero"},
+    {"match": "META_CNIL/NATURE_DELIB", "as": "metadata", "field": "extra", "key": "lf.nature_delib"},
+    {"match": "META_CNIL/ETAT_JURIDIQUE", "as": "metadata", "field": "extra", "key": "lf.etat_juridique"},
     {"match": "TXTS_ISO", "as": "transparent", "mark": {"lf.group": "TXTS_ISO"}},
     {"match": "ACTS_PRO", "as": "transparent"},
     {"match": "ACT_PRO", "as": "metadata", "field": "extra", "key": "lf.act_pro"},

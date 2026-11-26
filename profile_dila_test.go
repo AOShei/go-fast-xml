@@ -27,7 +27,7 @@ func dilaCollection(path string) string {
 // dilaProfile is the profile a collection is read with.
 var dilaProfile = map[string]string{
 	"jade": "dila-juri", "cass": "dila-juri", "inca": "dila-juri", "capp": "dila-juri", "constit": "dila-juri",
-	"kali": "legifrance",
+	"kali": "legifrance", "cnil": "legifrance",
 }
 
 // TestDilaCorpus reads every file of the xml-dila dev and held-out sets
@@ -140,6 +140,9 @@ var dilaLegifranceSpec = &aknOracleSpec{
 		"DATE_DEBUT": "metadata", "DATE_FIN": "metadata", "APPLI_GEO": "metadata", "CODES_NOMENCLATURES": "metadata",
 		"LIBELLE_EXTENSION": "metadata", "MCS_TXT": "metadata", "META_CONTENEUR/NUM": "metadata",
 		"META_CONTENEUR/DATE_PUBLI": "metadata", "ACTS_PRO": "metadata", "NUMS_BROCH": "metadata",
+		"META_CNIL/TITRE": "metadata", "META_CNIL/NUMERO": "metadata", "META_CNIL/NATURE_DELIB": "metadata",
+		"META_CNIL/ETAT_JURIDIQUE": "metadata", "META_CNIL/DATE_TEXTE": "metadata", "META_CNIL/DATE_PUBLI": "metadata",
+		"META_CNIL/NOR": "metadata", "META_CNIL/NUM_SEQUENCE": "metadata", "META_CNIL/ORIGINE_PUBLI": "metadata",
 	},
 	outOfLine:  map[string]bool{},
 	blocks:     map[string]bool{"p": true, "LIEN": true, "LIEN_SECTION_TA": true, "CONDITION_DIFFERE": true, "li": true, "blockquote": true},
@@ -318,6 +321,29 @@ func TestLegifranceKali(t *testing.T) {
 	}
 	if x := bs[2]; x.Attrs["lf.idtxt"] != "KALITEXT000000000006" || x.Attrs["lf.group"] != "STRUCTURE_TXT" || x.Attrs[AttrAttribute] != "titretxt" {
 		t.Errorf("idcc link %+v", x)
+	}
+}
+
+// TestLegifranceCnil checks a CNIL deliberation, read by legifrance: its
+// metadata are LEGI/JORF's, with three of its own.
+func TestLegifranceCnil(t *testing.T) {
+	src := `<TEXTE_CNIL><META><META_COMMUN><ID>CNILTEXT000000000001</ID><NATURE>DELIBERATION</NATURE></META_COMMUN><META_SPEC><META_CNIL>` +
+		`<TITRE>Délibération n°2026-001 du</TITRE><TITREFULL>Délibération n° 2026-001 portant avis</TITREFULL><NUMERO>2026-001</NUMERO>` +
+		`<NATURE_DELIB>Avis</NATURE_DELIB><DATE_TEXTE>2026-01-08</DATE_TEXTE><DATE_PUBLI>2999-01-01</DATE_PUBLI><NOR>CNIL2600001X</NOR>` +
+		`<ETAT_JURIDIQUE>VIGUEUR</ETAT_JURIDIQUE></META_CNIL></META_SPEC></META><BLOC_TEXTUEL><CONTENU><p align="center">La Commission,</p>` +
+		`<ul><li>vu la loi ;</li></ul></CONTENU></BLOC_TEXTUEL><LIENS/></TEXTE_CNIL>`
+	doc, err := ExtractBytes(context.Background(), []byte(src), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := doc.Metadata
+	if m.Extra[ExtraProfile] != "legifrance" || m.Extra["lf.root"] != "TEXTE_CNIL" || m.Extra["lf.numero"] != "2026-001" ||
+		m.Extra["lf.nature_delib"] != "Avis" || m.Extra["lf.etat_juridique"] != "VIGUEUR" || m.Extra["lf.date_publi"] != "2999-01-01" ||
+		m.Extra["lf.id"] != "CNILTEXT000000000001" || m.Extra["lf.nor"] != "CNIL2600001X" || m.Title != "Délibération n° 2026-001 portant avis" {
+		t.Errorf("metadata %+v", m)
+	}
+	if got := brief(blocks(doc)); got != "heading1:Délibération n° 2026-001 portant avis\nparagraph:La Commission,\nlist_item1:vu la loi ;\n" {
+		t.Errorf("blocks:\n%s", got)
 	}
 }
 
