@@ -95,7 +95,7 @@ func TestLoadErrors(t *testing.T) {
 		{`{"match": "a", "as": "metadata", "field": "extra"}`, `"key" goes with`},
 		{`{"match": "a", "as": "item", "marker": {"attr": "n", "child": "b", "of": "c"}}`, `exactly one of`},
 		{`{"match": "a", "as": "item", "marker": {"child": "b", "structure": "c"}}`, `exactly one of`},
-		{`{"match": "a", "as": "row", "cells": [{"attr": "n", "child": "b"}]}`, `attribute of the row's element`},
+		{`{"match": "a", "as": "row", "cells": [{"attr": "n", "child": "b"}]}`, `needs "rest"`},
 		{`{"match": "a", "as": "item", "marker": {"atr": "n"}}`, `unknown field "atr"`},
 		{`{"match": "a", "as": "section", "attrs": {"stored": "x"}}`, `core's`},
 		{`{"match": "a", "as": "list", "ordered": {"attr": "t"}}`, `needs "attr" and "in"`},

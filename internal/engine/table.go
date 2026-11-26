@@ -123,12 +123,19 @@ func (t *table) keyHeader() {
 // (a row rule's "cells"); an absent attribute gives an empty cell. A row
 // with "rest" stays open: its element's content fills the columns after
 // (column cells, rest).
-func (e *Engine) attrRow(t *table, cells []*profile.Value, open bool) {
+func (e *Engine) attrRow(f *frame, t *table, cells []*profile.Value, open bool) {
 	for _, cv := range cells {
+		n := cv.Attr.Local
 		v, _ := e.value(cv)
 		t.startCell(e, 1, 1, false)
+		if cv.AttrChild != nil {
+			// A child's attribute (XLIFF target@state): the cell is
+			// empty until the child starts, then filled in its column.
+			n = cv.AttrChild.Source + "@" + n
+			f.slots = append(f.slots, slot{v: cv, use: useCell, col: t.col})
+		}
 		t.endCell(v, "")
-		if n := cv.Attr.Local; !slices.Contains(t.attrNames, n) && len(t.attrNames) < profile.MaxCells {
+		if !slices.Contains(t.attrNames, n) && len(t.attrNames) < profile.MaxCells {
 			t.attrNames = append(t.attrNames, n)
 		}
 	}

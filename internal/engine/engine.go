@@ -144,6 +144,7 @@ type slot struct {
 	key    string
 	use    useKind
 	filled bool
+	col    int // useCell: the row's column
 }
 
 type useKind uint8
@@ -161,6 +162,7 @@ const (
 	useLink
 	useTitle
 	useAnchor
+	useCell // a row's cell read from a child's attribute
 )
 
 type held struct {
@@ -1174,6 +1176,18 @@ func (e *Engine) startRule(f *frame, el *xmlread.Element) {
 	switch r.As {
 	case profile.AsSection:
 		f.sections++
+		for _, v := range r.Heading {
+			// The section's heading from its own attribute (XLIFF
+			// file@original), located at its start tag.
+			if s, _ := e.value(v); s != "" {
+				e.flushStray()
+				b := gofastcore.Block{Kind: gofastcore.KindHeading, Text: s, Level: uint8(min(max(e.p.HeadingBase+f.sections-1, 1), 255)),
+					Loc:   gofastcore.Location{Offset: el.Start, Length: max(el.End-el.Start, 0)},
+					Attrs: map[string]string{generic.AttrAttribute: v.Attr.Local}}
+				e.add(b, f, true)
+				break
+			}
+		}
 	case profile.AsHeading, profile.AsBlock, profile.AsNote:
 		if r.Value != nil {
 			f.val, f.hasVal = e.resolve(f, r.Value, "", useValue)
@@ -1247,7 +1261,7 @@ func (e *Engine) startRule(f *frame, el *xmlread.Element) {
 			f.owner = t
 			t.startRow(e.test(r.Header))
 			if len(r.Cells) > 0 {
-				e.attrRow(t, r.Cells, r.Rest > 0)
+				e.attrRow(f, t, r.Cells, r.Rest > 0)
 			}
 			if r.Rest > 0 {
 				e.openSink(f, skCell, el.Start)
@@ -2319,6 +2333,10 @@ func (e *Engine) fill(o *frame, s *slot, v string) {
 		}
 	case useValue:
 		o.val, o.hasVal = v, true
+	case useCell:
+		if o.owner != nil && o.rest {
+			o.owner.columnCell(s.col, v, "")
+		}
 	case useLink:
 		o.href = v
 	case useTitle:
