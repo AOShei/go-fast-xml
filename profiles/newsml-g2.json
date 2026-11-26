@@ -96,6 +96,7 @@
     {"match": "g:inlineXML/nitf", "as": "transparent", "anchor": {"attr": "id-string", "child": "head/docdata/doc-id"},
       "attrs": {"nitf.version": {"attr": "version"}, "nitf.change_date": {"attr": "change.date"}, "nitf.change_time": {"attr": "change.time"}, "nitf.baselang": {"attr": "baselang"}, "nitf.uno": {"attr": "uno"}, "nitf.class": {"attr": "class"}}},
     {"match": "nitf/head", "as": "table", "pairs": "path", "header": ["name", "value"]},
+    {"match": "docdata/date.issue", "as": "metadata", "field": "created", "value": {"attr": "norm"}, "note": "inside the head table: the row stays, the date is also Metadata.Created when the engine reads its form"},
     {"match": "nitf/body", "as": "transparent"},
     {"match": "body/body.head", "as": "transparent"},
     {"match": "body/body.content", "as": "transparent"},

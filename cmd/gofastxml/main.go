@@ -5,8 +5,9 @@
 //	gofastxml [flags] file-or-directory...
 //
 // A directory stands for the XML files in it and below it (.xml, .dita,
-// .ditamap, .docbook, .tei, .rss, .atom, .xlf, .xliff, .tmx). With one input
-// the JSON is indented; with several, each document is one line. Only the
+// .ditamap, .docbook, .tei, .rss, .atom, .xlf, .xliff, .sdlxliff,
+// .mxliff, .mqxliff, .tmx). With one input the JSON is indented; with
+// several, each document is one line. Only the
 // documents go to standard output: everything said about them goes to
 // standard error, and the exit status is 1 if any input could not be
 // read.
@@ -67,7 +68,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	flags.Lookup("stored").Usage += " (this library writes markup_comment, the file's <!-- --> comments)"
 	flags.Usage = func() {
 		fmt.Fprintln(stderr, "usage: gofastxml [flags] file-or-directory...")
-		fmt.Fprintln(stderr, "Extracts XML documents. A directory stands for the files in it and below it named .xml, .dita, .ditamap, .docbook, .tei, .rss, .atom, .xlf, .xliff or .tmx.")
+		fmt.Fprintln(stderr, "Extracts XML documents. A directory stands for the files in it and below it named .xml, .dita, .ditamap, .docbook, .tei, .rss, .atom, .xlf, .xliff, .sdlxliff, .mxliff, .mqxliff or .tmx.")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -306,7 +307,7 @@ func moduleVersion() string {
 // files), in any case.
 func xmlName(path string) bool {
 	switch strings.ToLower(filepath.Ext(path)) {
-	case ".xml", ".dita", ".ditamap", ".docbook", ".tei", ".rss", ".atom", ".xlf", ".xliff", ".tmx":
+	case ".xml", ".dita", ".ditamap", ".docbook", ".tei", ".rss", ".atom", ".xlf", ".xliff", ".sdlxliff", ".mxliff", ".mqxliff", ".tmx":
 		return true
 	}
 	return false

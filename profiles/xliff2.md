@@ -77,6 +77,10 @@ table holds rows, not paragraphs).
 
 ## Measured
 
+- The set had 921 dev and 325 held-out files when this was measured; the
+  37 dev and 9 held-out files added since (`.mxliff`, `.mqxliff`) are
+  all XLIFF 1.x, read with xliff, and the xliff2 figures below are the
+  same on the larger set. Its totals now are in `profiles/xliff.md`.
 - dev (921 files of `xml-xliff`): 528 read with xliff, 393 with xliff2;
   0 errors, 0 Validate failures, 0 panics; blocks over the whole set:
   heading 1,145, table 1,103, paragraph 61,901, note (attribute)
