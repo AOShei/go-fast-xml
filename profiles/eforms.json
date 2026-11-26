@@ -1,0 +1,65 @@
+{
+  "profile": "eforms",
+  "title": "EU eForms public procurement notices (UBL ContractNotice, ContractAwardNotice, PriorInformationNotice with the eForms extensions)",
+  "format": 1,
+  "namespaces": {
+    "cn": "urn:oasis:names:specification:ubl:schema:xsd:ContractNotice-2",
+    "can": "urn:oasis:names:specification:ubl:schema:xsd:ContractAwardNotice-2",
+    "pin": "urn:oasis:names:specification:ubl:schema:xsd:PriorInformationNotice-2",
+    "cac": "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2",
+    "cbc": "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2",
+    "ext": "urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2",
+    "efext": "http://data.europa.eu/p27/eforms-ubl-extensions/1",
+    "efac": "http://data.europa.eu/p27/eforms-ubl-extension-aggregate-components/1",
+    "efbc": "http://data.europa.eu/p27/eforms-ubl-extension-basic-components/1"
+  },
+  "default_namespace": "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2",
+  "match": [
+    {"root": "ContractNotice", "namespace": "urn:oasis:names:specification:ubl:schema:xsd:ContractNotice-2"},
+    {"root": "ContractAwardNotice", "namespace": "urn:oasis:names:specification:ubl:schema:xsd:ContractAwardNotice-2"},
+    {"root": "PriorInformationNotice", "namespace": "urn:oasis:names:specification:ubl:schema:xsd:PriorInformationNotice-2"}
+  ],
+  "heading_base": 2,
+  "notes": "See profiles/eforms.md. The notice's title is the level-1 heading; each lot is a section whose identifier (LOT-0001) is a level-2 heading and the anchor, its title a level-3 heading. Everything else is tables of names and values, the name being the file's own element path. Codes are as written.",
+  "rules": [
+    {"match": "/*", "as": "transparent"},
+    {"match": "/*/*", "as": "table", "pairs": "path", "header": ["name", "value"]},
+    {"match": "/*/UBLVersionID", "as": "metadata", "field": "extra", "key": "eforms.ubl_version"},
+    {"match": "/*/CustomizationID", "as": "metadata", "field": "extra", "key": "eforms.customization_id"},
+    {"match": "/*/ProfileID", "as": "metadata", "field": "extra", "key": "eforms.profile_id"},
+    {"match": "/*/ID", "as": "metadata", "field": "extra", "key": "eforms.notice_id", "extra": {"eforms.notice_id_scheme": {"attr": "schemeName"}}},
+    {"match": "/*/ContractFolderID", "as": "metadata", "field": "extra", "key": "eforms.contract_folder_id"},
+    {"match": "/*/IssueDate", "as": "metadata", "field": "created"},
+    {"match": "/*/IssueTime", "as": "metadata", "field": "extra", "key": "eforms.issue_time"},
+    {"match": "/*/VersionID", "as": "metadata", "field": "extra", "key": "eforms.version_id"},
+    {"match": "/*/RegulatoryDomain", "as": "metadata", "field": "extra", "key": "eforms.regulatory_domain"},
+    {"match": "/*/NoticeTypeCode", "as": "metadata", "field": "extra", "key": "eforms.notice_type", "extra": {"eforms.notice_type_list": {"attr": "listName"}}},
+    {"match": "/*/NoticeLanguageCode", "as": "metadata", "field": "extra", "key": "eforms.notice_language", "extra": {"eforms.notice_language_list": {"attr": "listName"}, "eforms.notice_language_list_id": {"attr": "listID"}}},
+    {"match": "/*/RequestedPublicationDate", "as": "metadata", "field": "extra", "key": "eforms.requested_publication_date"},
+    {"match": "/*/PlannedDate", "as": "metadata", "field": "extra", "key": "eforms.planned_date"},
+
+    {"match": "/*/ext:UBLExtensions", "as": "transparent"},
+    {"match": "/*/ext:UBLExtensions/ext:UBLExtension", "as": "transparent"},
+    {"match": "/*/ext:UBLExtensions/ext:UBLExtension/ext:ExtensionContent", "as": "transparent"},
+    {"match": "/*/ext:UBLExtensions/ext:UBLExtension/ext:ExtensionContent/efext:EformsExtension", "as": "transparent"},
+    {"match": "/*/ext:UBLExtensions/ext:UBLExtension/ext:ExtensionContent/efext:EformsExtension/*", "as": "table", "pairs": "path", "header": ["name", "value"]},
+    {"match": "/*/ext:UBLExtensions/ext:UBLExtension/ext:ExtensionContent/efext:EformsExtension/efac:Organizations", "as": "transparent"},
+    {"match": "/*/ext:UBLExtensions/ext:UBLExtension/ext:ExtensionContent/efext:EformsExtension/efac:Organizations/*", "as": "table", "pairs": "path", "header": ["name", "value"]},
+    {"match": "/*/ext:UBLExtensions/ext:UBLExtension/ext:ExtensionContent/efext:EformsExtension/efac:NoticeResult", "as": "transparent"},
+    {"match": "/*/ext:UBLExtensions/ext:UBLExtension/ext:ExtensionContent/efext:EformsExtension/efac:NoticeResult/*", "as": "table", "pairs": "parent", "header": ["name", "value"]},
+
+    {"match": "/*/cac:ProcurementProject", "as": "transparent"},
+    {"match": "/*/cac:ProcurementProject/*", "as": "table", "pairs": "parent", "header": ["name", "value"]},
+    {"match": "/*/cac:ProcurementProject/Name", "as": "metadata", "field": "title", "also_heading": 1, "extra": {"eforms.title_language": {"attr": "languageID"}}},
+    {"match": "/*/cac:ProcurementProject/Description", "as": "block", "kind": "paragraph", "attrs": {"eforms.field": "Description", "eforms.languageID": {"attr": "languageID"}}},
+    {"match": "/*/cac:ProcurementProject/Note", "as": "block", "kind": "paragraph", "attrs": {"eforms.field": "Note", "eforms.languageID": {"attr": "languageID"}}},
+
+    {"match": "/*/cac:ProcurementProjectLot", "as": "section", "anchor": {"child": "ID"}, "heading": "anchor", "attrs": {"eforms.scheme": {"attr": "schemeName", "child": "ID"}}},
+    {"match": "/*/cac:ProcurementProjectLot/*", "as": "table", "pairs": "path", "header": ["name", "value"]},
+    {"match": "/*/cac:ProcurementProjectLot/cac:ProcurementProject", "as": "section"},
+    {"match": "/*/cac:ProcurementProjectLot/cac:ProcurementProject/*", "as": "table", "pairs": "parent", "header": ["name", "value"]},
+    {"match": "/*/cac:ProcurementProjectLot/cac:ProcurementProject/Name", "as": "heading", "level": "nesting", "attrs": {"eforms.languageID": {"attr": "languageID"}}},
+    {"match": "/*/cac:ProcurementProjectLot/cac:ProcurementProject/Description", "as": "block", "kind": "paragraph", "attrs": {"eforms.field": "Description", "eforms.languageID": {"attr": "languageID"}}},
+    {"match": "/*/cac:ProcurementProjectLot/cac:ProcurementProject/Note", "as": "block", "kind": "paragraph", "attrs": {"eforms.field": "Note", "eforms.languageID": {"attr": "languageID"}}}
+  ]
+}

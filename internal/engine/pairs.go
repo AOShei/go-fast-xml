@@ -17,6 +17,9 @@ import (
 type pairTarget struct {
 	t     *table
 	local bool
+	// parent: names start with the element the table's element stands
+	// in ("pairs": "parent").
+	parent bool
 	rest  *profile.RestTable
 	first int
 }
@@ -105,16 +108,23 @@ func (e *Engine) pairAttrs(f *frame, el *xmlread.Element) {
 // starts with the table's own element (SellerTradeParty/Name), which is
 // what tells one party's table from another's in rendered text; in a
 // "rest_table" it starts below the row's element, whose id is the row's
-// first cell. The scope's own element is named by its local name.
+// first cell. The scope's own element is named by its local name. With
+// "pairs": "parent" every name has the name of the table's parent
+// element before it (ProcurementProject/ID), for a table that is one
+// value of a record whose other values are read by rules of their own.
 func (e *Engine) pairName(at int, local bool) string {
 	n := len(e.frames)
-	if local || at == n-1 {
+	parent := e.frames[at].pt.parent && at > 0
+	if local || at == n-1 && !parent {
 		return generic.CleanName(generic.CutString(e.frames[n-1].name.Local, generic.MaxNameBytes), &e.scratch)
 	}
 	var b strings.Builder
 	from := at + 1
 	if e.frames[at].pt.rest == nil {
 		from = at
+	}
+	if parent {
+		from = at - 1
 	}
 	for i := from; i < n; i++ {
 		s := generic.CutString(e.frames[i].name.Local, generic.MaxNameBytes)

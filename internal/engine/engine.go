@@ -1297,7 +1297,7 @@ func (e *Engine) startRule(f *frame, el *xmlread.Element) {
 		if r.Pairs != "" {
 			// Names and values: the element's own text, if any, is a
 			// row named by its local name.
-			f.pt = &pairTarget{t: f.table, local: r.Pairs == "local"}
+			f.pt = &pairTarget{t: f.table, local: r.Pairs == "local", parent: r.Pairs == "parent"}
 			e.startPair(f, el, len(e.frames)-1)
 		}
 	case profile.AsRow:

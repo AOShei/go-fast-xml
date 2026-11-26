@@ -105,3 +105,35 @@ func TestProfilePairs(t *testing.T) {
 		}
 	}
 }
+
+// TestProfilePairsParent: "pairs": "parent" names every value from the
+// element the table's element stands in, so that a table that is one
+// value of a record says whose it is.
+func TestProfilePairsParent(t *testing.T) {
+	prof := head("pairsparent", `{"root": "Doc"}`) + `"rules": [
+		{"match": "/Doc", "as": "transparent"},
+		{"match": "Project", "as": "transparent"},
+		{"match": "Project/*", "as": "table", "pairs": "parent"},
+		{"match": "Project/Name", "as": "heading", "level": 1},
+		{"match": "/Doc/Top", "as": "table", "pairs": "parent"}]}`
+	src := `<Doc><Project><ID s="x">7</ID><Name>N</Name><Class><Code list="cpv">15</Code></Class></Project><Top>t</Top></Doc>`
+	doc := extractWith(t, prof, src, nil)
+	if err := doc.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if bad := citeCheck([]byte(src), doc); bad != "" {
+		t.Errorf("cite: %s", bad)
+	}
+	var got []string
+	for _, b := range blocks(doc) {
+		if b.Kind == gofastcore.KindTable {
+			for _, row := range b.Table.Rows {
+				got = append(got, strings.Join(row, "="))
+			}
+		}
+	}
+	want := "Project/ID=7 Project/ID/@s=x Project/Class/Code=15 Project/Class/Code/@list=cpv Doc/Top=t"
+	if strings.Join(got, " ") != want {
+		t.Errorf("got  %s\nwant %s", strings.Join(got, " "), want)
+	}
+}

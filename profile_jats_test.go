@@ -117,6 +117,13 @@ type jatsOracleCase struct {
 	// prep, if set, adjusts a document before the oracles see it (blocks
 	// whose text or Marker the profile takes from an attribute).
 	prep func(doc *gofastcore.Document)
+	// mixed: the set also holds files the profile is not chosen for
+	// (another root), which are counted and not compared.
+	mixed bool
+	// rawCells: the profile has no lists, so a cell that starts with a
+	// number and a full stop holds the file's own text, which oracle (a)
+	// keeps.
+	rawCells bool
 }
 
 func (c *jatsOracleCase) skipped(stack []string) (string, bool) {
@@ -273,6 +280,7 @@ func (c *jatsOracleCase) run(t *testing.T) {
 		tally := newTally()
 		unmapped := map[string]map[string]int{WarnUnmappedElements: {}, WarnUnmappedAttributes: {}}
 		unmappedTotal := map[string]int{}
+		others := 0
 		start := time.Now()
 		for _, path := range files {
 			res := corpusOne(path)
@@ -290,6 +298,9 @@ func (c *jatsOracleCase) run(t *testing.T) {
 				t.Errorf("%s: error: %s", label, firstLine(res.err.Error(), set))
 			case res.invalid != nil:
 				t.Errorf("%s: Validate: %s", label, firstLine(res.invalid.Error(), set))
+			case res.doc.Metadata.Extra[ExtraProfile] != c.profile && c.mixed:
+				others++
+				continue
 			case res.doc.Metadata.Extra[ExtraProfile] != c.profile:
 				t.Errorf("%s: read with profile %q, not %s", label, res.doc.Metadata.Extra[ExtraProfile], c.profile)
 			}
@@ -311,6 +322,9 @@ func (c *jatsOracleCase) run(t *testing.T) {
 			}
 		}
 		t.Logf("%s: %d files in %v\n%s", set, len(files), time.Since(start).Round(time.Millisecond), tally)
+		if c.mixed {
+			t.Logf("%s: %d files read with %s, %d with another profile or none", set, len(files)-others, c.profile, others)
+		}
 		for _, code := range []string{WarnUnmappedElements, WarnUnmappedAttributes} {
 			line := fmt.Sprintf("%s: %s: %d in all", set, code, unmappedTotal[code])
 			if set == "dev" {
@@ -341,6 +355,9 @@ func (c *jatsOracleCase) oracles(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", path, err)
 		}
+		if c.mixed && doc.Metadata.Extra[ExtraProfile] != c.profile {
+			continue
+		}
 		src, err := c.sourceText(data, used)
 		if err != nil {
 			t.Fatalf("%s: encoding/xml: %v", path, err)
@@ -349,7 +366,10 @@ func (c *jatsOracleCase) oracles(t *testing.T) {
 			c.prep(doc)
 		}
 		got := jatsDocText(doc)
-		if got != src {
+		if c.rawCells {
+			got = procDocText(doc)
+		}
+		if got != src && !c.rawCells {
 			// The numbers the engine writes for the items of an ordered
 			// list joined into a block or cell are not in the file: compare
 			// both sides without numbers followed by a full stop.
