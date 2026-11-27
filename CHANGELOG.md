@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+- **A character reference that names no character XML allows** (`&#0;`,
+  a surrogate, a number past U+10FFFF) is reported in a
+  `text.unmapped_glyphs` warning of its own, beside the one for bytes not
+  valid in the encoding, with the wording the go-fast libraries share:
+  "N character references name no character (&#0;, a surrogate or a
+  number past U+10FFFF) and appear as U+FFFD". Each is U+FFFD in the
+  text, as before. v0.5.0 counted them in `input.repaired`; before it a
+  reference to a surrogate or past U+10FFFF had no warning.
+- **`input.repaired` no longer counts these references or names
+  `&#0;`.** Its message is as it was in v0.4.1.
+- **The same in the declared value of an entity**: such a reference there
+  is U+FFFD (`&#0;` was dropped as a control character) and counted once
+  if the document uses the entity.
+- The output of every corpus file is as in v0.4.1; against v0.5.0 only
+  the `input.repaired` message of 3 files differs.
+- Core pin v0.1.14 (was v0.1.13).
+
 ## v0.5.0 (2026-11-27)
 
 - **The XML scanner, the character decoders and the HTML character names

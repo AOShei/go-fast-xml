@@ -630,6 +630,16 @@ func plural(n int, one, many string) string {
 	return fmt.Sprintf("%d %s", n, many)
 }
 
+// replacedMessage is the text.unmapped_glyphs message for n character
+// references to no character, each read as U+FFFD. The wording is the
+// series', as go-fast-html has it.
+func replacedMessage(n int) string {
+	if n == 1 {
+		return "1 character reference names no character (&#0;, a surrogate or a number past U+10FFFF) and appears as U+FFFD"
+	}
+	return fmt.Sprintf("%d character references name no character (&#0;, a surrogate or a number past U+10FFFF) and appear as U+FFFD", n)
+}
+
 func docWarnings(doc *gofastcore.Document, rep *xmlread.Report, enc xmlenc.Result, dec *xmlenc.Reader, stats xmlscan.Stats) {
 	if enc.Detected {
 		doc.Warn(gofastcore.SeverityWarning, gofastcore.WarnTextEncodingDetected,
@@ -637,7 +647,7 @@ func docWarnings(doc *gofastcore.Document, rep *xmlread.Report, enc xmlenc.Resul
 	}
 	if n := rep.Repairs + stats.EntitiesRecursive; n > 0 {
 		doc.Warn(gofastcore.SeverityWarning, gofastcore.WarnInputRepaired,
-			fmt.Sprintf("%s where the markup is not well formed read leniently (mismatched or unclosed tags, a stray < or &, attributes without quotes or values, references to an entity inside its own replacement, a character reference to U+0000)",
+			fmt.Sprintf("%s where the markup is not well formed read leniently (mismatched or unclosed tags, a stray < or &, attributes without quotes or values, references to an entity inside its own replacement)",
 				plural(n, "place", "places")))
 	}
 	for kind, n := range rep.External {
@@ -666,6 +676,9 @@ func partWarnings(part *gofastcore.Part, g interface{ Counts() (int, int) }, out
 	if n := invalid + dec.Invalid(); n > 0 {
 		part.Warn(gofastcore.SeverityWarning, gofastcore.WarnTextUnmappedGlyphs,
 			fmt.Sprintf("%s not valid in the encoding written as U+FFFD", plural(n, "byte sequence", "byte sequences")))
+	}
+	if n := rep.CharRefsReplaced; n > 0 {
+		part.Warn(gofastcore.SeverityWarning, gofastcore.WarnTextUnmappedGlyphs, replacedMessage(n))
 	}
 	if controls > 0 {
 		part.Warn(gofastcore.SeverityInfo, gofastcore.WarnTextControlCharactersRemoved,

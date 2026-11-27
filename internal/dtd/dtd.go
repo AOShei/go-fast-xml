@@ -35,6 +35,10 @@ type Entity struct {
 	// Value is the replacement text of an internal entity: character
 	// references expanded, line ends normalized, other references kept.
 	Value []byte
+	// Replaced counts the character references in the value that name no
+	// character XML allows (&#0;, a surrogate, a number past U+10FFFF),
+	// each read as U+FFFD.
+	Replaced int
 	// External reports an entity declared with SYSTEM or PUBLIC; Unparsed
 	// one with NDATA as well.
 	External, Unparsed bool
@@ -212,7 +216,7 @@ func (p *parser) entity() {
 	p.space()
 	e := &Entity{}
 	if v, ok := p.literal(); ok {
-		e.Value = replacement(v)
+		e.Value, e.Replaced = replacement(v)
 	} else if _, sys, ok := p.externalID(); ok {
 		e.External, e.SystemID = true, sys
 		p.space()
@@ -242,12 +246,13 @@ func (p *parser) entity() {
 
 // replacement makes the replacement text of an entity value literal:
 // character references are expanded and line ends normalized; entity and
-// parameter entity references are kept.
-func replacement(v []byte) []byte {
+// parameter entity references are kept. A reference to no character XML
+// allows is U+FFFD, and replaced counts them.
+func replacement(v []byte) (out []byte, replaced int) {
 	if bytes.IndexByte(v, '&') < 0 && bytes.IndexByte(v, '\r') < 0 {
-		return bytes.Clone(v)
+		return bytes.Clone(v), 0
 	}
-	out := make([]byte, 0, len(v))
+	out = make([]byte, 0, len(v))
 	for i := 0; i < len(v); i++ {
 		c := v[i]
 		switch {
@@ -257,10 +262,13 @@ func replacement(v []byte) []byte {
 				i++
 			}
 		case c == '&' && i+1 < len(v) && v[i+1] == '#':
-			r, n := charRef(v[i:])
+			r, n, bad := charRef(v[i:])
 			if n == 0 {
 				out = append(out, c)
 				continue
+			}
+			if bad {
+				replaced++
 			}
 			out = utf8.AppendRune(out, r)
 			i += n - 1
@@ -268,18 +276,18 @@ func replacement(v []byte) []byte {
 			out = append(out, c)
 		}
 	}
-	return out
+	return out, replaced
 }
 
 // charRef decodes the character reference at the start of b, returning
-// the character and its length, or a length of 0.
-func charRef(b []byte) (rune, int) {
+// the character and its length, or a length of 0. bad reports a reference
+// to no character XML allows, given as U+FFFD.
+func charRef(b []byte) (r rune, n int, bad bool) {
 	i, base := 2, rune(10)
 	if i < len(b) && (b[i] == 'x' || b[i] == 'X') {
 		base, i = 16, 3
 	}
 	first := i
-	var r rune
 	for ; i < len(b); i++ {
 		c := b[i]
 		var d rune
@@ -299,10 +307,10 @@ func charRef(b []byte) (rune, int) {
 	}
 done:
 	if i == first || i >= len(b) || b[i] != ';' {
-		return 0, 0
+		return 0, 0, false
 	}
-	if r > utf8.MaxRune || r >= 0xD800 && r <= 0xDFFF {
-		r = utf8.RuneError
+	if r == 0 || r > utf8.MaxRune || r >= 0xD800 && r <= 0xDFFF {
+		return utf8.RuneError, i + 1, true
 	}
-	return r, i + 1
+	return r, i + 1, false
 }
