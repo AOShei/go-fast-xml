@@ -115,8 +115,8 @@ type Report struct {
 	Repairs int
 	// CharRefsReplaced counts character references to no character XML
 	// allows (&#0;, a surrogate, a number past U+10FFFF), each read as
-	// U+FFFD: those of the document, and those in the declared value of
-	// each entity the document uses.
+	// U+FFFD: those of the document, and those in the values of the entity
+	// declarations read, whether or not the document uses the entity.
 	CharRefsReplaced int
 	// Elements counts elements read.
 	Elements int
@@ -135,16 +135,13 @@ type Options struct {
 
 // Reader reads one document.
 type Reader struct {
-	s     *xmlscan.Scanner
-	stack []*Element
-	free  []*Element
-	names map[string]string
-	ents  map[string][]byte
-	// replaced holds the entities whose replaced character references are
-	// counted already.
-	replaced map[*dtd.Entity]bool
-	Report   Report
-	ctx      context.Context
+	s      *xmlscan.Scanner
+	stack  []*Element
+	free   []*Element
+	names  map[string]string
+	ents   map[string][]byte
+	Report Report
+	ctx    context.Context
 }
 
 // New returns a Reader of the decoded text r. ExpansionLimit in opts
@@ -218,13 +215,6 @@ func (r *Reader) resolve(name []byte) ([]byte, xmlscan.Resolution) {
 				r.Report.External[RefExternalEntity]++
 				return nil, xmlscan.Keep
 			}
-			if e.Replaced > 0 && !r.replaced[e] {
-				if r.replaced == nil {
-					r.replaced = map[*dtd.Entity]bool{}
-				}
-				r.replaced[e] = true
-				r.Report.CharRefsReplaced += e.Replaced
-			}
 			return e.Value, xmlscan.Expand
 		}
 		if d.HasExternal {
@@ -282,6 +272,7 @@ func (r *Reader) Run(h Handler) error {
 				continue
 			}
 			r.Report.Doctype = dtd.Parse(s.Text())
+			r.Report.CharRefsReplaced += r.Report.Doctype.CharRefsReplaced
 			if r.Report.Doctype.HasExternal {
 				r.Report.External[RefExternalSubset]++
 			}
