@@ -398,3 +398,47 @@ func TestCharRefsReplaced(t *testing.T) {
 		t.Errorf("both kinds: %q, want two warnings", got)
 	}
 }
+
+// Bytes that are not valid in the encoding are U+FFFD, counted by the
+// scanner (UTF-8 text and attribute values), by this library (names) or
+// by the decoder (other encodings), in one text.unmapped_glyphs warning
+// that names the encoding.
+func TestInvalidBytesWarning(t *testing.T) {
+	const decl = `<?xml version="1.0" encoding="UTF-8"?>`
+	for _, c := range []struct{ name, src, text, want string }{
+		{"one in text", decl + "<r><p>a\xffb</p></r>", "a\uFFFDb",
+			"1 byte sequence is not valid UTF-8 and is read as U+FFFD"},
+		{"a cut character and a lone byte", decl + "<r><p>a\xe3\x81b\x80</p></r>", "a\uFFFD\uFFFDb\uFFFD",
+			"3 byte sequences are not valid UTF-8 and are read as U+FFFD"},
+		{"text and an attribute value", decl + "<r t=\"x\xffy\"><p>a\xfe</p></r>", "a\uFFFD",
+			"2 byte sequences are not valid UTF-8 and are read as U+FFFD"},
+		{"a written U+FFFD is not counted", decl + "<r t=\"\uFFFD\"><p>a\uFFFD&#xFFFD;</p></r>", "a\uFFFD\uFFFD", ""},
+		{"in names", decl + "<r\xff a\xfe=\"1\"><p\xfc>a</p\xfc></r\xff>", "a", " not valid UTF-8 and "},
+		{"windows-1252", "<?xml version=\"1.0\" encoding=\"windows-1252\"?><r><p>a\xe9b</p></r>", "a\u00e9b", ""},
+		{"shift_jis", "<?xml version=\"1.0\" encoding=\"Shift_JIS\"?><r><p>a\x82\xa0\xfd\xfdb</p></r>", "",
+			" not valid shift_jis and "},
+	} {
+		doc := extract(t, c.src, nil)
+		var text string
+		for _, bl := range doc.Parts[0].Blocks {
+			if bl.Kind == gofastcore.KindParagraph {
+				text += bl.Text
+			}
+		}
+		if c.text != "" && text != c.text {
+			t.Errorf("%s: text %q, want %q", c.name, text, c.text)
+		}
+		var got []string
+		for _, w := range doc.AllWarnings() {
+			if w.Code == gofastcore.WarnTextUnmappedGlyphs {
+				got = append(got, w.Message)
+			}
+		}
+		switch {
+		case c.want == "" && len(got) != 0:
+			t.Errorf("%s: text.unmapped_glyphs %q, want none", c.name, got)
+		case c.want != "" && (len(got) != 1 || !strings.Contains(got[0], c.want) || !strings.HasSuffix(got[0], "read as U+FFFD")):
+			t.Errorf("%s: text.unmapped_glyphs %q, want %q", c.name, got, c.want)
+		}
+	}
+}

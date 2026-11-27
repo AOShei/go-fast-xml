@@ -414,7 +414,7 @@ func (e *Extractor) extract(ctx context.Context, r io.ReaderAt, size int64, opts
 				fmt.Sprintf("the decode budget (Limits.MaxDecodedBytes) was spent; %s not handed to the child extractor and kept in the body", plural(childCut, "embedded document was", "embedded documents were")))
 		}
 	}
-	partWarnings(last, d, out, rep, dec, stats, runErr, at, size)
+	partWarnings(last, d, out, rep, enc, dec, stats, runErr, at, size)
 	for _, p := range parts {
 		if p.Kind == gofastcore.PartStored && o.Parts != (gofastcore.PartRange{}) {
 			continue
@@ -604,7 +604,7 @@ func metadata(doc *gofastcore.Document, rep *xmlread.Report, enc xmlenc.Result, 
 				v = generic.CutString(v, MaxValueBytes)
 				out.ValuesCut++
 			}
-			extra[k] = generic.CleanName(strings.ToValidUTF8(v, "�"), &clean)
+			extra[k] = generic.CleanName(v, &clean)
 		}
 	}
 	set(ExtraRoot, rep.RootName)
@@ -619,7 +619,7 @@ func metadata(doc *gofastcore.Document, rep *xmlread.Report, enc xmlenc.Result, 
 	set(ExtraEncoding, enc.Name())
 	doc.Metadata.Extra = extra
 	if lang := strings.TrimSpace(rep.RootLang); lang != "" && len(lang) <= generic.MaxLangBytes {
-		doc.Metadata.Language = generic.CleanName(strings.ToValidUTF8(lang, "�"), &clean)
+		doc.Metadata.Language = generic.CleanName(lang, &clean)
 	}
 }
 
@@ -628,6 +628,25 @@ func plural(n int, one, many string) string {
 		return "1 " + one
 	}
 	return fmt.Sprintf("%d %s", n, many)
+}
+
+// encodingName names the encoding in a message: UTF-8, else the label
+// Extra gives.
+func encodingName(enc xmlenc.Result) string {
+	if enc.UTF8 {
+		return "UTF-8"
+	}
+	return enc.Name()
+}
+
+// invalidMessage is the text.unmapped_glyphs message for n byte sequences
+// that are not valid in the encoding enc, each read as U+FFFD. The
+// wording is the series'.
+func invalidMessage(n int, enc string) string {
+	if n == 1 {
+		return "1 byte sequence is not valid " + enc + " and is read as U+FFFD"
+	}
+	return fmt.Sprintf("%d byte sequences are not valid %s and are read as U+FFFD", n, enc)
 }
 
 // replacedMessage is the text.unmapped_glyphs message for n character
@@ -662,7 +681,7 @@ func docWarnings(doc *gofastcore.Document, rep *xmlread.Report, enc xmlenc.Resul
 	}
 }
 
-func partWarnings(part *gofastcore.Part, g interface{ Counts() (int, int) }, out *generic.Out, rep *xmlread.Report, dec *xmlenc.Reader, stats xmlscan.Stats, runErr error, at, size int64) {
+func partWarnings(part *gofastcore.Part, g interface{ Counts() (int, int) }, out *generic.Out, rep *xmlread.Report, enc xmlenc.Result, dec *xmlenc.Reader, stats xmlscan.Stats, runErr error, at, size int64) {
 	if rep.Assumed > 0 {
 		part.Warn(gofastcore.SeverityInfo, WarnEntitiesAssumed,
 			fmt.Sprintf("%s to entities the file does not declare read as the HTML 4 character entities of those names; the file's external DTD subset was not loaded",
@@ -673,9 +692,8 @@ func partWarnings(part *gofastcore.Part, g interface{ Counts() (int, int) }, out
 			fmt.Sprintf("%s to entities the file does not declare kept in the text as written", plural(rep.Undeclared, "reference", "references")))
 	}
 	controls, invalid := g.Counts()
-	if n := invalid + dec.Invalid(); n > 0 {
-		part.Warn(gofastcore.SeverityWarning, gofastcore.WarnTextUnmappedGlyphs,
-			fmt.Sprintf("%s not valid in the encoding written as U+FFFD", plural(n, "byte sequence", "byte sequences")))
+	if n := stats.InvalidUTF8 + invalid + dec.Invalid(); n > 0 {
+		part.Warn(gofastcore.SeverityWarning, gofastcore.WarnTextUnmappedGlyphs, invalidMessage(n, encodingName(enc)))
 	}
 	if n := rep.CharRefsReplaced; n > 0 {
 		part.Warn(gofastcore.SeverityWarning, gofastcore.WarnTextUnmappedGlyphs, replacedMessage(n))

@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+- **Bytes that are not valid UTF-8 are checked once, by go-fast-core's
+  scanner** (core v0.1.17), which hands on text and attribute values as
+  valid UTF-8 and counts each such byte. This library's own checks of
+  them are removed; it still mends and counts bytes in element and
+  attribute names, which the scanner does not check.
+- **The `text.unmapped_glyphs` warning for such bytes has the wording
+  the go-fast libraries share** and names the encoding: "N byte
+  sequences are not valid UTF-8 and are read as U+FFFD"; for a file in
+  another encoding, its label ("... not valid shift_jis ..."). It said
+  "N byte sequences not valid in the encoding written as U+FFFD".
+- **The count of a UTF-8 file takes in everything the scanner reads**:
+  comments, processing instructions, the document type declaration and
+  attribute values, also where a value does not reach the output. A
+  U+FFFD written in a name or identifier is no longer counted as an
+  invalid byte.
+- The output of every corpus file is unchanged: none has such bytes.
+- Core pin v0.1.17 (was v0.1.15). With it the library executes about
+  2 % more instructions over the dev corpus (129 to 132 per byte with
+  profiles, 114 to 116 generic): the cost of the scanner's check.
+
 ## v0.5.2 (2026-11-27)
 
 - **The `text.unmapped_glyphs` warning for character references that

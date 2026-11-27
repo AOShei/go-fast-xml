@@ -2316,7 +2316,7 @@ func (e *Engine) endCapture(f *frame, end int64) blockRef {
 		if len(v) > generic.MaxValueBytes {
 			v = generic.CutString(v, generic.MaxValueBytes)
 		}
-		v = generic.CleanName(strings.ToValidUTF8(v, "�"), &e.scratch)
+		v = generic.CleanName(v, &e.scratch)
 	} else {
 		v = s.b.String()
 	}
@@ -2931,7 +2931,7 @@ func names(m map[string]int) string {
 			sep = ": "
 		}
 		var clean generic.Builder
-		fmt.Fprintf(&b, "%s%s (%d)", sep, generic.CleanName(strings.ToValidUTF8(generic.CutString(x.n, generic.MaxNameBytes), "�"), &clean), x.c)
+		fmt.Fprintf(&b, "%s%s (%d)", sep, generic.CleanName(generic.CutString(x.n, generic.MaxNameBytes), &clean), x.c)
 	}
 	return b.String()
 }
