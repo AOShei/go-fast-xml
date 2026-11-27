@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.5.2 (2026-11-27)
 
 - **The `text.unmapped_glyphs` warning for character references that
   name no character says "read as"**, the wording the go-fast libraries
