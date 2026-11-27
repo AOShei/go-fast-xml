@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.5.0 (2026-11-27)
 
 - **The XML scanner, the character decoders and the HTML character names
   are go-fast-core's** (`xmlscan`, `charset`, `entity`, core v0.1.13),
