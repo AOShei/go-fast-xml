@@ -333,3 +333,66 @@ func TestTextOutsideRoot(t *testing.T) {
 		t.Errorf("got %s", got)
 	}
 }
+
+// A character reference to no character XML allows is U+FFFD, counted in
+// a text.unmapped_glyphs warning of its own and not in input.repaired.
+func TestCharRefsReplaced(t *testing.T) {
+	warnings := func(doc *gofastcore.Document, code string) (msgs []string) {
+		for _, w := range doc.AllWarnings() {
+			if w.Code == code {
+				msgs = append(msgs, w.Message)
+			}
+		}
+		return msgs
+	}
+	const many = " character references name no character (&#0;, a surrogate or a number past U+10FFFF) and appear as U+FFFD"
+	for _, c := range []struct {
+		name, src, text, want string
+		repaired              bool
+	}{
+		{"one in text", `<r><p>a&#0;b</p></r>`, "a�b",
+			"1 character reference names no character (&#0;, a surrogate or a number past U+10FFFF) and appears as U+FFFD", false},
+		{"each kind in text", `<r><p>a&#x0;b&#xD800;c&#x110000;d&#99999999999;e</p></r>`, "a�b�c�d�e", "4" + many, false},
+		{"in an attribute value", `<r t="x&#0;y&#xDFFF;"><p>a</p></r>`, "a", "2" + many, false},
+		{"beside damaged markup", `<r><p>a&#0;b & c</p></r>`, "a�b & c",
+			"1 character reference names no character (&#0;, a surrogate or a number past U+10FFFF) and appears as U+FFFD", true},
+		{"in the value of an entity used twice", `<!DOCTYPE r [<!ENTITY e "x&#0;y&#xD800;">]><r><p>&e;&e;</p></r>`, "x�y�x�y�", "2" + many, false},
+		{"in the value of an entity not used", `<!DOCTYPE r [<!ENTITY e "x&#0;y">]><r><p>a</p></r>`, "a", "", false},
+		{"allowed characters", `<r><p>a&#65;&#x10FFFF;&#xD7FF;</p></r>`, "aA\U0010FFFF퟿", "", false},
+	} {
+		doc := extract(t, c.src, nil)
+		var text string
+		for _, bl := range doc.Parts[0].Blocks {
+			if bl.Kind == gofastcore.KindParagraph {
+				text += bl.Text
+			}
+		}
+		if text != c.text {
+			t.Errorf("%s: text %q, want %q", c.name, text, c.text)
+		}
+		var got []string
+		for _, m := range warnings(doc, gofastcore.WarnTextUnmappedGlyphs) {
+			if strings.Contains(m, "character reference") {
+				got = append(got, m)
+			}
+		}
+		if c.want == "" && len(got) != 0 || c.want != "" && (len(got) != 1 || got[0] != c.want) {
+			t.Errorf("%s: text.unmapped_glyphs %q, want %q", c.name, got, c.want)
+		}
+		rep := warnings(doc, gofastcore.WarnInputRepaired)
+		if (len(rep) > 0) != c.repaired {
+			t.Errorf("%s: input.repaired %q, want %v", c.name, rep, c.repaired)
+		}
+		if c.repaired && !strings.HasPrefix(rep[0], "1 place ") {
+			t.Errorf("%s: input.repaired %q, want 1 place", c.name, rep[0])
+		}
+		if len(warnings(doc, gofastcore.WarnTextControlCharactersRemoved)) != 0 {
+			t.Errorf("%s: text.control_characters_removed raised", c.name)
+		}
+	}
+	// Bytes not valid in the encoding keep their own warning beside it.
+	doc := extract(t, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><r><p>a\xffb&#0;</p></r>", nil)
+	if got := warnings(doc, gofastcore.WarnTextUnmappedGlyphs); len(got) != 2 {
+		t.Errorf("both kinds: %q, want two warnings", got)
+	}
+}

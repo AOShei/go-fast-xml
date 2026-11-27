@@ -110,8 +110,14 @@ type Report struct {
 	// character HTML 4 gives that name, in a file with an
 	// external DTD subset; Undeclared those kept as written.
 	Assumed, Undeclared int
-	// Repairs counts places where damaged markup was read leniently.
+	// Repairs counts places where damaged markup was read leniently. It
+	// leaves out what CharRefsReplaced counts.
 	Repairs int
+	// CharRefsReplaced counts character references to no character XML
+	// allows (&#0;, a surrogate, a number past U+10FFFF), each read as
+	// U+FFFD: those of the document, and those in the declared value of
+	// each entity the document uses.
+	CharRefsReplaced int
 	// Elements counts elements read.
 	Elements int
 	// Root is the root element, Doctype the declaration, if any.
@@ -129,13 +135,16 @@ type Options struct {
 
 // Reader reads one document.
 type Reader struct {
-	s      *xmlscan.Scanner
-	stack  []*Element
-	free   []*Element
-	names  map[string]string
-	ents   map[string][]byte
-	Report Report
-	ctx    context.Context
+	s     *xmlscan.Scanner
+	stack []*Element
+	free  []*Element
+	names map[string]string
+	ents  map[string][]byte
+	// replaced holds the entities whose replaced character references are
+	// counted already.
+	replaced map[*dtd.Entity]bool
+	Report   Report
+	ctx      context.Context
 }
 
 // New returns a Reader of the decoded text r. ExpansionLimit in opts
@@ -209,6 +218,13 @@ func (r *Reader) resolve(name []byte) ([]byte, xmlscan.Resolution) {
 				r.Report.External[RefExternalEntity]++
 				return nil, xmlscan.Keep
 			}
+			if e.Replaced > 0 && !r.replaced[e] {
+				if r.replaced == nil {
+					r.replaced = map[*dtd.Entity]bool{}
+				}
+				r.replaced[e] = true
+				r.Report.CharRefsReplaced += e.Replaced
+			}
 			return e.Value, xmlscan.Expand
 		}
 		if d.HasExternal {
@@ -244,7 +260,10 @@ func isSpaceOnly(b []byte) bool {
 func (r *Reader) Run(h Handler) error {
 	s := r.s
 	rootDone := false
-	defer func() { r.Report.Repairs += s.Stats.Repairs }()
+	defer func() {
+		r.Report.Repairs += s.Stats.Repairs - s.Stats.CharRefsReplaced
+		r.Report.CharRefsReplaced += s.Stats.CharRefsReplaced
+	}()
 	for n := 0; ; n++ {
 		if n&1023 == 0 {
 			if err := r.ctx.Err(); err != nil {
