@@ -231,9 +231,69 @@ func TestEncodings(t *testing.T) {
 	if got := doc.Parts[0].Blocks[0].Text; got != "a\uFFFDb" || warned(doc, gofastcore.WarnTextUnmappedGlyphs) == "" {
 		t.Errorf("invalid utf-8 %q", got)
 	}
-	_, err := ExtractBytes(context.Background(), []byte(`<?xml version="1.0" encoding="ISO-2022-JP"?><a/>`), nil)
+	_, err := ExtractBytes(context.Background(), []byte(`<?xml version="1.0" encoding="ISO-2022-KR"?><a/>`), nil)
 	if !errors.Is(err, gofastcore.ErrUnsupported) {
 		t.Errorf("unsupported: %v", err)
+	}
+}
+
+// ISO-2022-JP is read (core's charset decodes it), and locations are
+// bytes of the file although the encoding keeps a state: the character
+// set an escape sequence selects holds across the 32 KiB pieces the
+// input is decoded in, and the map back to the source starts each piece
+// in the state it was decoded in.
+func TestISO2022JP(t *testing.T) {
+	const kanji, ascii = "\x1b$B", "\x1b(B"
+	var b strings.Builder
+	b.WriteString(`<?xml version="1.0" encoding="ISO-2022-JP"?><doc>`)
+	var starts []int
+	for i := range 3000 {
+		starts = append(starts, b.Len())
+		b.WriteString("<p>")
+		if i%2 == 0 {
+			// 日本 and then ASCII in one paragraph.
+			b.WriteString(kanji + "F|K\\" + ascii + " abc")
+		} else {
+			// A long run in the two-byte set, which crosses pieces
+			// without an escape sequence at their start.
+			b.WriteString(kanji + strings.Repeat("F|", 40) + ascii)
+		}
+		b.WriteString("</p>")
+	}
+	b.WriteString("</doc>")
+	src := b.String()
+	if len(src) < 4*(32<<10) {
+		t.Fatalf("the document is %d bytes: too short to cross pieces", len(src))
+	}
+	doc, err := ExtractBytes(context.Background(), []byte(src), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := doc.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if got := doc.Metadata.Extra[ExtraEncoding]; got != "iso-2022-jp" {
+		t.Errorf("read as %q", got)
+	}
+	blocks := doc.Parts[0].Blocks
+	if len(blocks) != len(starts) {
+		t.Fatalf("%d blocks, want %d", len(blocks), len(starts))
+	}
+	for i, bl := range blocks {
+		want := "日本 abc"
+		if i%2 == 1 {
+			want = strings.Repeat("日", 40)
+		}
+		if bl.Text != want {
+			t.Fatalf("block %d: %q, want %q", i, bl.Text, want)
+		}
+		end := len(src) - len("</doc>")
+		if i+1 < len(starts) {
+			end = starts[i+1]
+		}
+		if int(bl.Loc.Offset) != starts[i] || int(bl.Loc.Offset+bl.Loc.Length) != end {
+			t.Fatalf("block %d: at %d+%d, want %d to %d", i, bl.Loc.Offset, bl.Loc.Length, starts[i], end)
+		}
 	}
 }
 

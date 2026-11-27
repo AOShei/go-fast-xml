@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+- **The XML scanner, the character decoders and the HTML character names
+  are go-fast-core's** (`xmlscan`, `charset`, `entity`, core v0.1.13),
+  shared by the go-fast libraries. This library's copies
+  (`internal/xmlscan`, `internal/charset`, `internal/entity`) are
+  removed. The output of every corpus file is unchanged.
+- **ISO-2022-JP is read.** It was refused as an unsupported encoding.
+  Locations are bytes of the file, as for every encoding.
+- **More encoding labels are accepted**: `cp874`, `x-cp874`, `cp932`,
+  `cp936`, `windows-936`, `cp949`, `cp950`, `windows-950`, `cp10000`,
+  `latin9`, `latin-9`, `iso-2022-jp`, `csiso2022jp`. A file declaring one
+  was refused.
+- **GBK byte 0x80 is the euro sign** (was U+FFFD).
+- **A character reference to U+0000 (`&#0;`) is U+FFFD**, counted in
+  `input.repaired`. It was dropped as a control character and counted in
+  `text.control_characters_removed`. The message of `input.repaired`
+  names it.
+- Core pin v0.1.13 (was v0.1.6).
+
 ## v0.4.1 (2026-11-26)
 
 - **A date and time written with a space in place of the `T`** fills

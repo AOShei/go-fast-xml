@@ -11,7 +11,7 @@ import (
 	"unicode/utf16"
 
 	"github.com/AOShei/go-fast-core"
-	"github.com/AOShei/go-fast-xml/internal/charset"
+	"github.com/AOShei/go-fast-core/charset"
 )
 
 // testEntities are the internal entities the generated documents declare.
@@ -243,7 +243,7 @@ func TestLocationsInEncodings(t *testing.T) {
 				t.Fatalf("%s doc %d read as %s", enc, i, got)
 			}
 			checkLocations(t, fmt.Sprintf("%s doc %d", enc, i), src, doc, func(b []byte) string {
-				out, _, _ := charset.DecodeChunk(nil, b, enc, true)
+				out, _, _ := charset.NewDecoder(enc).Decode(nil, b, true)
 				return string(out)
 			})
 		}

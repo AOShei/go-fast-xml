@@ -1,2 +1,0 @@
-go test fuzz v1
-[]byte("<a b\x00\x00c\">d<e/\x81$>&amp;&x;<!-Kf--><\x89aDTi \xac\x89C/<\x89]A\x15\x15\x15\x15\x80h<?>")
