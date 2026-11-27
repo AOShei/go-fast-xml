@@ -15,9 +15,9 @@ import (
 	"context"
 	"io"
 
+	"github.com/AOShei/go-fast-core/entity"
+	"github.com/AOShei/go-fast-core/xmlscan"
 	"github.com/AOShei/go-fast-xml/internal/dtd"
-	"github.com/AOShei/go-fast-xml/internal/entity"
-	"github.com/AOShei/go-fast-xml/internal/xmlscan"
 )
 
 // Namespaces the reader recognises.
@@ -143,15 +143,30 @@ type Reader struct {
 func New(ctx context.Context, r io.Reader, opts Options) *Reader {
 	rd := &Reader{names: map[string]string{}, ctx: ctx}
 	so := opts.Scan
+	scanOptions(&so)
 	so.Resolve, so.Interrupt = rd.resolve, ctx.Err
 	rd.s = xmlscan.New(r, &so)
 	return rd
+}
+
+// scanOptions sets what this library asks of core's scanner, whatever
+// the caller's options: damaged markup is read on through (Recover),
+// comments, processing instructions and the document type declaration
+// are tokens (Markup), every token has its offsets (Spans), and the
+// input is already UTF-8, decoded by xmlenc (Decoded). A value's bound
+// keeps this library's default where the caller sets none.
+func scanOptions(so *xmlscan.Options) {
+	so.Recover, so.Markup, so.Spans, so.Decoded = true, true, true, true
+	if so.MaxValueBytes == 0 {
+		so.MaxValueBytes = xmlscan.DefaultMaxValueBytes
+	}
 }
 
 // NewBytes is New for text in memory.
 func NewBytes(ctx context.Context, data []byte, opts Options) *Reader {
 	rd := &Reader{names: map[string]string{}, ctx: ctx}
 	so := opts.Scan
+	scanOptions(&so)
 	so.Resolve, so.Interrupt = rd.resolve, ctx.Err
 	rd.s = xmlscan.NewBytes(data, &so)
 	return rd
@@ -323,7 +338,7 @@ func (r *Reader) open() *Element {
 		e.Preserve = p.Preserve
 	}
 	for i := range s.NumAttr() {
-		uri, local, value := s.AttrAt(i)
+		uri, local, value := s.AttrURIAt(i)
 		a := Attr{Name: r.intern(kept(s.AttrNameAt(i))), URI: r.intern(uri), Local: r.intern(kept(local)), Value: string(value)}
 		if a.URI == xmlscan.XMLNamespace && a.Local == "space" {
 			switch a.Value {

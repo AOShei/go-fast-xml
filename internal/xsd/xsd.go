@@ -20,9 +20,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/AOShei/go-fast-core/xmlscan"
 	"github.com/AOShei/go-fast-xml/internal/xmlenc"
 	"github.com/AOShei/go-fast-xml/internal/xmlread"
-	"github.com/AOShei/go-fast-xml/internal/xmlscan"
 )
 
 // Namespaces.

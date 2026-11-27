@@ -15,10 +15,10 @@ import (
 	"unicode"
 
 	"github.com/AOShei/go-fast-core"
+	"github.com/AOShei/go-fast-core/xmlscan"
 	"github.com/AOShei/go-fast-xml/internal/generic"
 	"github.com/AOShei/go-fast-xml/internal/profile"
 	"github.com/AOShei/go-fast-xml/internal/xmlread"
-	"github.com/AOShei/go-fast-xml/internal/xmlscan"
 )
 
 // Fixed bounds. What they cut is reported with limit.exceeded.

@@ -20,12 +20,12 @@ import (
 	"strings"
 
 	"github.com/AOShei/go-fast-core"
-	"github.com/AOShei/go-fast-xml/internal/charset"
+	"github.com/AOShei/go-fast-core/charset"
+	"github.com/AOShei/go-fast-core/xmlscan"
 	"github.com/AOShei/go-fast-xml/internal/engine"
 	"github.com/AOShei/go-fast-xml/internal/generic"
 	"github.com/AOShei/go-fast-xml/internal/xmlenc"
 	"github.com/AOShei/go-fast-xml/internal/xmlread"
-	"github.com/AOShei/go-fast-xml/internal/xmlscan"
 )
 
 // Defaults for the limits of gofastcore.Options.Limits, used where a limit
@@ -637,7 +637,7 @@ func docWarnings(doc *gofastcore.Document, rep *xmlread.Report, enc xmlenc.Resul
 	}
 	if n := rep.Repairs + stats.EntitiesRecursive; n > 0 {
 		doc.Warn(gofastcore.SeverityWarning, gofastcore.WarnInputRepaired,
-			fmt.Sprintf("%s where the markup is not well formed read leniently (mismatched or unclosed tags, a stray < or &, attributes without quotes or values, references to an entity inside its own replacement)",
+			fmt.Sprintf("%s where the markup is not well formed read leniently (mismatched or unclosed tags, a stray < or &, attributes without quotes or values, references to an entity inside its own replacement, a character reference to U+0000)",
 				plural(n, "place", "places")))
 	}
 	for kind, n := range rep.External {

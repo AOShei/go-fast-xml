@@ -56,7 +56,8 @@ func TestSniff(t *testing.T) {
 
 func TestUnsupported(t *testing.T) {
 	for _, src := range []string{
-		`<?xml version="1.0" encoding="ISO-2022-JP"?><a/>`,
+		`<?xml version="1.0" encoding="ISO-2022-KR"?><a/>`,
+		`<?xml version="1.0" encoding="UTF-7"?><a/>`,
 		`<?xml version="1.0" encoding="x-nonsense"?><a/>`,
 		"\x00\x00\xFE\xFF\x00\x00\x00<",
 	} {

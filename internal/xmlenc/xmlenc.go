@@ -18,7 +18,7 @@ import (
 	"sort"
 	"unicode/utf8"
 
-	"github.com/AOShei/go-fast-xml/internal/charset"
+	"github.com/AOShei/go-fast-core/charset"
 )
 
 // ErrUnsupported is returned, wrapped, for an encoding that is not read.
@@ -205,7 +205,7 @@ func isSpace(c byte) bool { return c == ' ' || c == '\t' || c == '\r' || c == '\
 // as it is.
 type Reader struct {
 	r       io.Reader
-	enc     charset.Encoding
+	dec     charset.Decoder // the stream's decoder: it keeps ISO-2022-JP's state
 	utf8    bool
 	src     []byte
 	n       int // bytes of src held
@@ -222,12 +222,20 @@ type Reader struct {
 	decSum, usedSum int64
 }
 
-type checkpoint struct{ dec, src int64 }
+// st is the decoder as it was where the chunk starts, so that Map
+// decodes the chunk again from the same state (ISO-2022-JP's character
+// set; no other encoding has any).
+type checkpoint struct {
+	dec, src int64
+	st       charset.Decoder
+}
 
 // NewReader returns a reader of r, which starts after the bytes Sniff
 // said to skip, that gives UTF-8.
 func NewReader(r io.Reader, res Result) *Reader {
-	return &Reader{r: r, enc: res.Enc, utf8: res.UTF8}
+	d := &Reader{r: r, utf8: res.UTF8}
+	d.dec.Reset(res.Enc)
+	return d
 }
 
 // Invalid returns the byte sequences so far that were not a character in
@@ -251,6 +259,7 @@ func (d *Reader) Map(src io.ReaderAt, base int64, offs []int64) error {
 	var buf []byte
 	var dpos int64
 	var bi, limit int
+	var st charset.Decoder
 	for k, off := range offs {
 		i := sort.Search(len(d.cps), func(i int) bool { return d.cps[i].dec > off }) - 1
 		if i < 0 {
@@ -274,13 +283,17 @@ func (d *Reader) Map(src io.ReaderAt, base int64, offs []int64) error {
 				return err
 			}
 			buf = buf[:n]
-			dpos, bi = d.cps[i].dec, 0
+			dpos, bi, st = d.cps[i].dec, 0, d.cps[i].st
 		}
 		for dpos < off && bi < limit {
-			dn, n := charset.Step(buf, bi, d.enc)
+			// A copy steps first: a character that covers the offset is
+			// not passed, and the state stays where it starts.
+			next := st
+			dn, n := next.Step(buf, bi)
 			if dpos+int64(dn) > off {
 				break
 			}
+			st = next
 			dpos += int64(dn)
 			bi += n
 		}
@@ -312,8 +325,9 @@ func (d *Reader) Read(p []byte) (int, error) {
 			}
 		}
 		var used, bad int
-		d.out, used, bad = charset.DecodeChunk(d.out[:0], d.src[:d.n], d.enc, d.eof)
-		d.cps = append(d.cps, checkpoint{d.decSum, d.usedSum})
+		start := d.dec
+		d.out, used, bad = d.dec.Decode(d.out[:0], d.src[:d.n], d.eof)
+		d.cps = append(d.cps, checkpoint{d.decSum, d.usedSum, start})
 		d.decSum += int64(len(d.out))
 		d.usedSum += int64(used)
 		d.off = 0
