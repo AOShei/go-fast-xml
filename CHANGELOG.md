@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.5.1 (2026-11-27)
 
 - **A character reference that names no character XML allows** (`&#0;`,
   a surrogate, a number past U+10FFFF) is reported in a
