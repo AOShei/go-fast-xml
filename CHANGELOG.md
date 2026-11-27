@@ -4,9 +4,10 @@
 
 - **Bytes that are not valid UTF-8 are checked once, by go-fast-core's
   scanner** (core v0.1.17), which hands on text and attribute values as
-  valid UTF-8 and counts each such byte. This library's own checks of
-  them are removed; it still mends and counts bytes in element and
-  attribute names, which the scanner does not check.
+  valid UTF-8 and counts each such byte. This library no longer mends
+  metadata, structure and name values a second time; it still mends and
+  counts bytes in element and attribute names, which the scanner does
+  not check.
 - **The `text.unmapped_glyphs` warning for such bytes has the wording
   the go-fast libraries share** and names the encoding: "N byte
   sequences are not valid UTF-8 and are read as U+FFFD"; for a file in

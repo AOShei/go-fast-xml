@@ -28,6 +28,7 @@ func TestBuilder(t *testing.T) {
 		{[]string{"\n  line 1\n\tline 2  \n"}, true, "line 1\n\tline 2", true, true},
 		{[]string{"a\x00b\x1bc" + nel + "d" + c1 + "e"}, false, "abc de", false, false},
 		{[]string{ffi + "x", repl + "y"}, false, "ffix" + repl + "y", false, false},
+		{[]string{"<a\xFF>"}, false, "<a" + repl + ">", false, false},
 	} {
 		var b Builder
 		for _, s := range c.in {

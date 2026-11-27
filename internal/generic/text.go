@@ -20,8 +20,9 @@ type Builder struct {
 	lead    bool   // white space came before the first character
 	started bool   // anything was appended
 	// Controls counts control characters removed, Invalid the bytes of
-	// names (CleanName) that were not UTF-8. Text and attribute values
-	// come from the scanner as valid UTF-8, with its own count.
+	// names that were not UTF-8 (in CleanName, and in markup kept as
+	// text). Text and attribute values come from the scanner as valid
+	// UTF-8, with its own count.
 	Controls, Invalid int
 }
 
@@ -131,10 +132,14 @@ func (b *Builder) Append(t []byte, preserve bool) {
 		}
 		r, n := utf8.DecodeRune(t[i:])
 		i += n
-		// What is appended is valid UTF-8: the scanner hands on text and
-		// attribute values with U+FFFD for each byte that is no character,
-		// and counts them.
 		switch {
+		case r == utf8.RuneError && n == 1:
+			// Only in a name: the scanner hands on text and attribute
+			// values as valid UTF-8, with its own count, but does not
+			// check names, and markup kept as text holds them as written.
+			b.Invalid++
+			b.text()
+			b.buf = utf8.AppendRune(b.buf, utf8.RuneError)
 		case r == 0x85:
 			// NEL is a line end in XML 1.1 and in the text conventions.
 			if preserve {
