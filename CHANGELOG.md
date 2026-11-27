@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- **The `text.unmapped_glyphs` warning for character references that
+  name no character says "read as"**, the wording the go-fast libraries
+  now share: "N character references name no character (&#0;, a
+  surrogate or a number past U+10FFFF) and are read as U+FFFD". It said
+  "appear as". The count takes in every reference read, also where the
+  value does not reach the output.
+- **Such a reference in the value of an entity declaration is counted
+  when the declaration is read**, whether or not the document uses the
+  entity, and in a parameter entity too. v0.5.1 counted it only if the
+  document used the entity.
+- The output of every corpus file is unchanged.
+- Core pin v0.1.15 (was v0.1.14). Nothing in it changes this library.
+
 ## v0.5.1 (2026-11-27)
 
 - **A character reference that names no character XML allows** (`&#0;`,

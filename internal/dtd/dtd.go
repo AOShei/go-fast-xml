@@ -21,6 +21,11 @@ type Doctype struct {
 	// Entities are the general entities, by name. The first declaration
 	// of a name is the one that counts.
 	Entities map[string]*Entity
+	// CharRefsReplaced counts the character references in the values of
+	// the entity declarations read (general and parameter, used or not)
+	// that name no character XML allows (&#0;, a surrogate, a number past
+	// U+10FFFF), each read as U+FFFD.
+	CharRefsReplaced int
 	// ParamRefs counts references to parameter entities in the internal
 	// subset; ExternalParamRefs those to parameter entities declared
 	// external, which a validating processor would load.
@@ -35,10 +40,6 @@ type Entity struct {
 	// Value is the replacement text of an internal entity: character
 	// references expanded, line ends normalized, other references kept.
 	Value []byte
-	// Replaced counts the character references in the value that name no
-	// character XML allows (&#0;, a surrogate, a number past U+10FFFF),
-	// each read as U+FFFD.
-	Replaced int
 	// External reports an entity declared with SYSTEM or PUBLIC; Unparsed
 	// one with NDATA as well.
 	External, Unparsed bool
@@ -216,7 +217,9 @@ func (p *parser) entity() {
 	p.space()
 	e := &Entity{}
 	if v, ok := p.literal(); ok {
-		e.Value, e.Replaced = replacement(v)
+		var replaced int
+		e.Value, replaced = replacement(v)
+		p.d.CharRefsReplaced += replaced
 	} else if _, sys, ok := p.externalID(); ok {
 		e.External, e.SystemID = true, sys
 		p.space()

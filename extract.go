@@ -635,9 +635,9 @@ func plural(n int, one, many string) string {
 // series', as go-fast-html has it.
 func replacedMessage(n int) string {
 	if n == 1 {
-		return "1 character reference names no character (&#0;, a surrogate or a number past U+10FFFF) and appears as U+FFFD"
+		return "1 character reference names no character (&#0;, a surrogate or a number past U+10FFFF) and is read as U+FFFD"
 	}
-	return fmt.Sprintf("%d character references name no character (&#0;, a surrogate or a number past U+10FFFF) and appear as U+FFFD", n)
+	return fmt.Sprintf("%d character references name no character (&#0;, a surrogate or a number past U+10FFFF) and are read as U+FFFD", n)
 }
 
 func docWarnings(doc *gofastcore.Document, rep *xmlread.Report, enc xmlenc.Result, dec *xmlenc.Reader, stats xmlscan.Stats) {

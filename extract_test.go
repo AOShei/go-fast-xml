@@ -345,19 +345,21 @@ func TestCharRefsReplaced(t *testing.T) {
 		}
 		return msgs
 	}
-	const many = " character references name no character (&#0;, a surrogate or a number past U+10FFFF) and appear as U+FFFD"
+	const many = " character references name no character (&#0;, a surrogate or a number past U+10FFFF) and are read as U+FFFD"
 	for _, c := range []struct {
 		name, src, text, want string
 		repaired              bool
 	}{
 		{"one in text", `<r><p>a&#0;b</p></r>`, "a�b",
-			"1 character reference names no character (&#0;, a surrogate or a number past U+10FFFF) and appears as U+FFFD", false},
+			"1 character reference names no character (&#0;, a surrogate or a number past U+10FFFF) and is read as U+FFFD", false},
 		{"each kind in text", `<r><p>a&#x0;b&#xD800;c&#x110000;d&#99999999999;e</p></r>`, "a�b�c�d�e", "4" + many, false},
 		{"in an attribute value", `<r t="x&#0;y&#xDFFF;"><p>a</p></r>`, "a", "2" + many, false},
 		{"beside damaged markup", `<r><p>a&#0;b & c</p></r>`, "a�b & c",
-			"1 character reference names no character (&#0;, a surrogate or a number past U+10FFFF) and appears as U+FFFD", true},
+			"1 character reference names no character (&#0;, a surrogate or a number past U+10FFFF) and is read as U+FFFD", true},
 		{"in the value of an entity used twice", `<!DOCTYPE r [<!ENTITY e "x&#0;y&#xD800;">]><r><p>&e;&e;</p></r>`, "x�y�x�y�", "2" + many, false},
-		{"in the value of an entity not used", `<!DOCTYPE r [<!ENTITY e "x&#0;y">]><r><p>a</p></r>`, "a", "", false},
+		{"in the value of an entity not used", `<!DOCTYPE r [<!ENTITY e "x&#0;y">]><r><p>a</p></r>`, "a",
+			"1 character reference names no character (&#0;, a surrogate or a number past U+10FFFF) and is read as U+FFFD", false},
+		{"in the value of a parameter entity", `<!DOCTYPE r [<!ENTITY % e "x&#xD800;y&#0;">]><r><p>a</p></r>`, "a", "2" + many, false},
 		{"allowed characters", `<r><p>a&#65;&#x10FFFF;&#xD7FF;</p></r>`, "aA\U0010FFFF퟿", "", false},
 	} {
 		doc := extract(t, c.src, nil)
