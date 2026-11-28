@@ -12,6 +12,14 @@
   time this library wrote the name (in a path, a note, a warning).
 - Values and names are cut to their bounds with core's
   `charset.CutUTF8`. On valid UTF-8 the cut is where it was.
+- **Fixed: the start of an inline element after a line break.** Where a
+  profile's line break stands inside an inline element (a link, bold
+  text) and follows white space kept as written (`xml:space="preserve"`,
+  a code block), the element's span started past its first character,
+  and the text of a link's record in the stored part was cut the same
+  way. The start could fall inside a character: the record's text then
+  began with U+FFFD, and without this fix would not be valid UTF-8 now
+  that the text builder no longer mends. Found by `FuzzProfile` in CI.
 - The output of every corpus file is unchanged: none has such bytes.
 - Core pin v0.1.18 (was v0.1.17). With it the library executes about
   0.4 % more instructions over the dev corpus with profiles (131.5 to
