@@ -68,6 +68,17 @@ jobs:
           go test -run '^$' -fuzz '^FuzzLoad$' -fuzztime 20s -fuzzminimizetime 0s ./internal/xsd
           go test -run '^$' -fuzz '^FuzzDraft$' -fuzztime 20s -fuzzminimizetime 0s ./internal/draft
 
+      # A failing input is written to testdata/fuzz on the runner, which
+      # is gone when the job ends: print it, so that it can be added as
+      # a seed.
+      - name: Show failing fuzz inputs
+        if: failure() && matrix.os == 'ubuntu-latest' && matrix.go == 'stable'
+        run: |
+          git status --porcelain -uall | awk '/testdata\/fuzz/ {print $2}' | while read -r f; do
+            echo "== $f"
+            cat "$f"
+          done
+
   dependencies:
     # The series rule: the standard library and go-fast modules only.
     runs-on: ubuntu-latest
