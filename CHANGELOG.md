@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.5.4 (2026-11-28)
 
 - **Names are checked by go-fast-core's scanner too** (core v0.1.18):
   element names, attribute names and processing instruction targets come
