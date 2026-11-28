@@ -354,8 +354,8 @@ type Engine struct {
 	RowSpanCut int
 	// PendingCut counts blocks cut because more than MaxPendingBlocks
 	// attribute notes waited for them.
-	PendingCut        int
-	Controls, Invalid int
+	PendingCut int
+	Controls   int
 
 	// Embedded documents ("document" rules): the documents and where each
 	// came from, in file order. DocsCut counts contents cut to
@@ -455,8 +455,7 @@ func (e *Engine) getSink(kind sinkKind, start int64) *sink {
 
 func (e *Engine) putSink(s *sink) {
 	e.Controls += s.b.Controls
-	e.Invalid += s.b.Invalid
-	s.b.Controls, s.b.Invalid = 0, 0
+	s.b.Controls = 0
 	if len(e.free) < 64 {
 		e.free = append(e.free, s)
 	}
@@ -946,8 +945,7 @@ func (e *Engine) clean(v string) string {
 	}
 	s := generic.Clean(v, false, &e.scratch)
 	e.Controls += e.scratch.Controls
-	e.Invalid += e.scratch.Invalid
-	e.scratch.Controls, e.scratch.Invalid = 0, 0
+	e.scratch.Controls = 0
 	return s
 }
 
@@ -2865,10 +2863,10 @@ func (e *Engine) Finish(end int64) {
 	e.flushExtra()
 }
 
-// Counts returns the control characters removed and invalid bytes met in
+// Counts returns the control characters removed in
 // all the text made.
-func (e *Engine) Counts() (controls, invalid int) {
-	return e.Controls + e.com.Controls + e.scratch.Controls, e.Invalid + e.com.Invalid + e.scratch.Invalid
+func (e *Engine) Counts() (controls int) {
+	return e.Controls + e.com.Controls + e.scratch.Controls
 }
 
 // PartWarnings writes the engine's warnings about part p.

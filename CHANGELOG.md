@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+- **Names are checked by go-fast-core's scanner too** (core v0.1.18):
+  element names, attribute names and processing instruction targets come
+  as valid UTF-8, a byte that is no character being U+FFFD, counted with
+  the other such bytes in `text.unmapped_glyphs`. This library's own
+  mending and counting of names is removed.
+- **A name with such bytes is counted once for each element, attribute
+  or processing instruction that has it.** Before, it was counted each
+  time this library wrote the name (in a path, a note, a warning).
+- Values and names are cut to their bounds with core's
+  `charset.CutUTF8`. On valid UTF-8 the cut is where it was.
+- The output of every corpus file is unchanged: none has such bytes.
+- Core pin v0.1.18 (was v0.1.17). With it the library executes about
+  0.4 % more instructions over the dev corpus with profiles (131.5 to
+  132.1 per byte).
+
 ## v0.5.3 (2026-11-28)
 
 - **Bytes that are not valid UTF-8 are checked once, by go-fast-core's

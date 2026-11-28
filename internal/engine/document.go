@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/AOShei/go-fast-core"
+	"github.com/AOShei/go-fast-core/charset"
 	"github.com/AOShei/go-fast-xml/internal/generic"
 	"github.com/AOShei/go-fast-xml/internal/profile"
 	"github.com/AOShei/go-fast-xml/internal/xmlread"
@@ -157,15 +158,7 @@ func (d *docCap) put(b []byte) {
 }
 
 // cutAt returns n or less, so that b[:n] ends at a character boundary.
-func cutAt(b []byte, n int) int {
-	if n >= len(b) {
-		return len(b)
-	}
-	for n > 0 && !utf8.RuneStart(b[n]) {
-		n--
-	}
-	return n
-}
+func cutAt(b []byte, n int) int { return len(charset.CutUTF8(b, n)) }
 
 // closeTag ends a start tag left open, in what is handed over and, for
 // HTML, in the fallback text.
