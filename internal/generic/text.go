@@ -19,8 +19,10 @@ type Builder struct {
 	pending []byte // white space held until text follows it
 	lead    bool   // white space came before the first character
 	started bool   // anything was appended
-	// Controls counts control characters removed, Invalid bytes that were
-	// not UTF-8.
+	// Controls counts control characters removed, Invalid the bytes of
+	// names that were not UTF-8 (in CleanName, and in markup kept as
+	// text). Text and attribute values come from the scanner as valid
+	// UTF-8, with its own count.
 	Controls, Invalid int
 }
 
@@ -132,6 +134,9 @@ func (b *Builder) Append(t []byte, preserve bool) {
 		i += n
 		switch {
 		case r == utf8.RuneError && n == 1:
+			// Only in a name: the scanner hands on text and attribute
+			// values as valid UTF-8, with its own count, but does not
+			// check names, and markup kept as text holds them as written.
 			b.Invalid++
 			b.text()
 			b.buf = utf8.AppendRune(b.buf, utf8.RuneError)
@@ -240,7 +245,9 @@ func Clean(s string, preserve bool, b *Builder) string {
 }
 
 // CleanName returns s, a name or identifier, valid UTF-8 and with no
-// control characters; nothing else is changed.
+// control characters; nothing else is changed. A byte that is not part
+// of a character is U+FFFD and counted: the scanner does not check
+// names. A U+FFFD already in s is kept and not counted.
 func CleanName(s string, b *Builder) string {
 	clean := true
 	for i := 0; i < len(s); i++ {
@@ -253,9 +260,11 @@ func CleanName(s string, b *Builder) string {
 		return s
 	}
 	out := make([]byte, 0, len(s))
-	for _, r := range s {
+	for i := 0; i < len(s); {
+		r, n := utf8.DecodeRuneInString(s[i:])
+		i += n
 		switch {
-		case r == utf8.RuneError:
+		case r == utf8.RuneError && n == 1:
 			b.Invalid++
 			out = utf8.AppendRune(out, r)
 		case r < 0x20 || r >= 0x7F && r < 0xA0:

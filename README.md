@@ -289,7 +289,7 @@ The encoding is decided as XML 1.0 (section 4.3.3 and appendix F) says: a byte o
 
 UTF-8, UTF-16 and windows-1252 are decoded natively, and US-ASCII and ISO-8859-1 as windows-1252, as the WHATWG Encoding standard and browsers do (the bytes 0x80 to 0x9F are then the characters windows-1252 has there, not C1 controls). Every other label is looked up in go-fast-core's `charset`, the decoder all the go-fast libraries share (the other single-byte encodings, Shift_JIS, EUC-JP, ISO-2022-JP, GBK, GB18030, EUC-KR, Big5). A declared encoding not among them (ISO-2022-KR, UTF-7, EBCDIC), and UTF-32, is `ErrUnsupported`.
 
-A file that declares no encoding and whose first MiB is not valid UTF-8 is read in the encoding recognised from its bytes where go-fast-html's detection is certain, with `text.encoding_detected` naming it; otherwise it is `ErrUnsupported`. Bytes that are not a character in the encoding are written as U+FFFD and counted in `text.unmapped_glyphs`, in UTF-8 files too.
+A file that declares no encoding and whose first MiB is not valid UTF-8 is read in the encoding recognised from its bytes where go-fast-html's detection is certain, with `text.encoding_detected` naming it; otherwise it is `ErrUnsupported`. Bytes that are not a character in the encoding are read as U+FFFD and counted in `text.unmapped_glyphs`, whose message names the encoding ("3 byte sequences are not valid UTF-8 and are read as U+FFFD"). In a UTF-8 file the count is go-fast-core's scanner's, one per byte, over the text, comments, processing instructions, document type declaration and attribute values it reads, with the bytes in names added.
 
 ## Entities and document type declarations
 
@@ -310,7 +310,7 @@ Processing instructions other than the XML declaration and `xml-stylesheet` are 
 | Code | Severity | Where | What happened |
 |---|---|---|---|
 | `limit.exceeded` | error | part; document for `Limits.MaxParts` | a bound cut the output; the message says which and how much |
-| `text.unmapped_glyphs` | warning | part | byte sequences not valid in the encoding were written as U+FFFD; in a warning of its own, character references that name no character (`&#0;`, a surrogate, a number past U+10FFFF) are read as U+FFFD |
+| `text.unmapped_glyphs` | warning | part | byte sequences not valid in the encoding are read as U+FFFD; in a warning of its own, character references that name no character (`&#0;`, a surrogate, a number past U+10FFFF) are read as U+FFFD |
 | `text.control_characters_removed` | info | part | control characters other than tab and line feed were removed |
 | `text.encoding_detected` | warning | document | no encoding declared, not UTF-8; read in the encoding named |
 | `input.repaired` | warning | document | damaged markup read leniently, with the count |
