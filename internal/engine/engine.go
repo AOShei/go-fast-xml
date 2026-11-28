@@ -648,7 +648,7 @@ func (e *Engine) StartElement(r *xmlread.Reader, el *xmlread.Element) {
 			if s.kind == skCapture {
 				s.b.Space()
 			} else {
-				s.b.LineBreak()
+				e.lineBreak(s, false)
 			}
 		}
 		return
@@ -1125,7 +1125,7 @@ func (e *Engine) nested(f *frame, el *xmlread.Element) bool {
 		case profile.AsBlock, profile.AsHeading, profile.AsNote, profile.AsRow:
 			f.role = roleInline
 			if !s.fresh {
-				s.b.Break()
+				e.lineBreak(s, true)
 			}
 			s.fresh = false
 			f.broken = s
@@ -1139,7 +1139,7 @@ func (e *Engine) nested(f *frame, el *xmlread.Element) bool {
 		case profile.AsItem:
 			f.role = roleInline
 			f.broken = s
-			s.b.Break()
+			e.lineBreak(s, true)
 			if p := e.parent(); p != nil {
 				m := ""
 				if r.Marker != nil {
@@ -2133,7 +2133,7 @@ func (e *Engine) EndElement(r *xmlread.Reader, el *xmlread.Element, start, end i
 		f.spaced.b.Space()
 	}
 	if f.broken != nil && f.broken == e.active() {
-		f.broken.b.Break()
+		e.lineBreak(f.broken, true)
 	}
 	if f.held != nil {
 		e.addHeld(f.held)
@@ -2266,6 +2266,26 @@ func (e *Engine) endInline(f *frame, end int64) {
 		}
 		e.addStored(gofastcore.Block{Kind: gofastcore.KindNote, Text: text, Attrs: attrs,
 			Loc: gofastcore.Location{Offset: f.start, Length: max(end-f.start, 0)}})
+	}
+}
+
+// lineBreak writes a line break into a sink's text: one the markup
+// writes (LineBreak), or a hard one that replaces the white space held
+// before it. Either may shorten that white space, and an inline element
+// open in the sink took its start after it: its start is moved back to
+// where the next character will be, so that it stays at a character and
+// its span covers its own text.
+func (e *Engine) lineBreak(s *sink, hard bool) {
+	if hard {
+		s.b.Break()
+	} else {
+		s.b.LineBreak()
+	}
+	p := s.b.Pos()
+	for i := range e.frames {
+		if f := &e.frames[i]; f.span == s && f.spanGen == s.gen && f.spanStart > p {
+			f.spanStart = p
+		}
 	}
 }
 

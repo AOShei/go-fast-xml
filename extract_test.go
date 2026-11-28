@@ -443,3 +443,35 @@ func TestInvalidBytesWarning(t *testing.T) {
 		}
 	}
 }
+
+// A line break inside an inline element, after white space that is kept
+// as written, shortens that white space. The element's span and the text
+// of its record in the stored part start at its own first character, not
+// past it (which could be inside a character).
+func TestSpanAfterLineBreak(t *testing.T) {
+	p, err := LoadProfile(strings.NewReader(fuzzProfile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct{ name, src, text string }{
+		{"code", "<r><code>x   <a title=\"t\" href=\"h\"><br/>a\u00e9z</a> w</code></r>", "x\na\u00e9z w"},
+		{"xml:space", "<r><p xml:space=\"preserve\">x   <a title=\"t\" href=\"h\"><br/>a\u00e9z</a> w</p></r>", "x\na\u00e9z w"},
+		{"no break", "<r><code>x   <a title=\"t\" href=\"h\">a\u00e9z</a> w</code></r>", "x   a\u00e9z w"},
+	} {
+		x := &Extractor{Profiles: []*Profile{p}, Profile: "fuzz"}
+		doc, err := x.Extract(context.Background(), strings.NewReader(c.src), int64(len(c.src)), &gofastcore.Options{Spans: true})
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		if err := doc.Validate(); err != nil {
+			t.Errorf("%s: invalid: %v", c.name, err)
+		}
+		b := doc.Parts[0].Blocks[0]
+		if b.Text != c.text || len(b.Spans) != 1 || b.Text[b.Spans[0].Start:b.Spans[0].End] != "a\u00e9z" {
+			t.Errorf("%s: text %q spans %+v", c.name, b.Text, b.Spans)
+		}
+		if len(doc.Parts) != 2 || len(doc.Parts[1].Blocks) != 1 || doc.Parts[1].Blocks[0].Text != "a\u00e9z" {
+			t.Errorf("%s: stored part %+v", c.name, doc.Parts[1:])
+		}
+	}
+}
