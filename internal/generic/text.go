@@ -7,6 +7,7 @@ import (
 	"unsafe"
 
 	"github.com/AOShei/go-fast-core"
+	"github.com/AOShei/go-fast-core/charset"
 )
 
 // Builder makes the text of one block from pieces, applying the text
@@ -19,11 +20,10 @@ type Builder struct {
 	pending []byte // white space held until text follows it
 	lead    bool   // white space came before the first character
 	started bool   // anything was appended
-	// Controls counts control characters removed, Invalid the bytes of
-	// names that were not UTF-8 (in CleanName, and in markup kept as
-	// text). Text and attribute values come from the scanner as valid
-	// UTF-8, with its own count.
-	Controls, Invalid int
+	// Controls counts control characters removed. What is appended is
+	// valid UTF-8: the scanner hands out text, attribute values and names
+	// with U+FFFD for each byte that is no character, and counts them.
+	Controls int
 }
 
 // Reset empties the builder, keeping its counts and buffers.
@@ -133,13 +133,6 @@ func (b *Builder) Append(t []byte, preserve bool) {
 		r, n := utf8.DecodeRune(t[i:])
 		i += n
 		switch {
-		case r == utf8.RuneError && n == 1:
-			// Only in a name: the scanner hands on text and attribute
-			// values as valid UTF-8, with its own count, but does not
-			// check names, and markup kept as text holds them as written.
-			b.Invalid++
-			b.text()
-			b.buf = utf8.AppendRune(b.buf, utf8.RuneError)
 		case r == 0x85:
 			// NEL is a line end in XML 1.1 and in the text conventions.
 			if preserve {
@@ -195,10 +188,7 @@ func (b *Builder) SplitAt(limit int) (string, int) {
 		}
 	}
 	if cut < 0 {
-		cut = limit
-		for cut > 0 && !utf8.RuneStart(b.buf[cut]) {
-			cut--
-		}
+		cut = len(charset.CutUTF8(b.buf, limit))
 	}
 	piece := string(bytes.TrimRightFunc(b.buf[:cut], unicode.IsSpace))
 	rest := bytes.TrimLeftFunc(b.buf[cut:], unicode.IsSpace)
@@ -245,9 +235,8 @@ func Clean(s string, preserve bool, b *Builder) string {
 }
 
 // CleanName returns s, a name or identifier, valid UTF-8 and with no
-// control characters; nothing else is changed. A byte that is not part
-// of a character is U+FFFD and counted: the scanner does not check
-// names. A U+FFFD already in s is kept and not counted.
+// control characters; nothing else is changed. The scanner hands out
+// names and values as valid UTF-8, so s is valid.
 func CleanName(s string, b *Builder) string {
 	clean := true
 	for i := 0; i < len(s); i++ {
@@ -260,13 +249,8 @@ func CleanName(s string, b *Builder) string {
 		return s
 	}
 	out := make([]byte, 0, len(s))
-	for i := 0; i < len(s); {
-		r, n := utf8.DecodeRuneInString(s[i:])
-		i += n
+	for _, r := range s {
 		switch {
-		case r == utf8.RuneError && n == 1:
-			b.Invalid++
-			out = utf8.AppendRune(out, r)
 		case r < 0x20 || r >= 0x7F && r < 0xA0:
 			b.Controls++
 		default:

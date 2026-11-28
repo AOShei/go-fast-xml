@@ -681,7 +681,7 @@ func docWarnings(doc *gofastcore.Document, rep *xmlread.Report, enc xmlenc.Resul
 	}
 }
 
-func partWarnings(part *gofastcore.Part, g interface{ Counts() (int, int) }, out *generic.Out, rep *xmlread.Report, enc xmlenc.Result, dec *xmlenc.Reader, stats xmlscan.Stats, runErr error, at, size int64) {
+func partWarnings(part *gofastcore.Part, g interface{ Counts() int }, out *generic.Out, rep *xmlread.Report, enc xmlenc.Result, dec *xmlenc.Reader, stats xmlscan.Stats, runErr error, at, size int64) {
 	if rep.Assumed > 0 {
 		part.Warn(gofastcore.SeverityInfo, WarnEntitiesAssumed,
 			fmt.Sprintf("%s to entities the file does not declare read as the HTML 4 character entities of those names; the file's external DTD subset was not loaded",
@@ -691,8 +691,8 @@ func partWarnings(part *gofastcore.Part, g interface{ Counts() (int, int) }, out
 		part.Warn(gofastcore.SeverityWarning, WarnEntityUndeclared,
 			fmt.Sprintf("%s to entities the file does not declare kept in the text as written", plural(rep.Undeclared, "reference", "references")))
 	}
-	controls, invalid := g.Counts()
-	if n := stats.InvalidUTF8 + invalid + dec.Invalid(); n > 0 {
+	controls := g.Counts()
+	if n := stats.InvalidUTF8 + dec.Invalid(); n > 0 {
 		part.Warn(gofastcore.SeverityWarning, gofastcore.WarnTextUnmappedGlyphs, invalidMessage(n, encodingName(enc)))
 	}
 	if n := rep.CharRefsReplaced; n > 0 {

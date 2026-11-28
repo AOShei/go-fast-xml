@@ -15,6 +15,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/AOShei/go-fast-core/charset"
 	"github.com/AOShei/go-fast-core/entity"
 	"github.com/AOShei/go-fast-core/xmlscan"
 	"github.com/AOShei/go-fast-xml/internal/dtd"
@@ -367,14 +368,7 @@ func (r *Reader) open() *Element {
 // kept cuts an attribute name as the scanner cuts element names, to
 // xmlscan.MaxNameKept bytes at a character boundary.
 func kept(b []byte) []byte {
-	if len(b) <= xmlscan.MaxNameKept {
-		return b
-	}
-	n := xmlscan.MaxNameKept
-	for n > 0 && b[n]&0xC0 == 0x80 {
-		n--
-	}
-	return b[:n]
+	return charset.CutUTF8(b, xmlscan.MaxNameKept)
 }
 
 func (r *Reader) close() {

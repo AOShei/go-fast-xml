@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/AOShei/go-fast-core"
+	"github.com/AOShei/go-fast-core/charset"
 	"github.com/AOShei/go-fast-core/xmlscan"
 	"github.com/AOShei/go-fast-xml/internal/xmlread"
 )
@@ -67,8 +68,7 @@ const (
 type Out struct {
 	Part   *gofastcore.Part
 	Budget *gofastcore.TextBudget
-	// Clean collects the counts of removed control characters and
-	// invalid bytes.
+	// Clean collects the count of removed control characters.
 	Clean Builder
 	// Stopped is set when the text budget is spent; StoppedAt is the
 	// offset reading had reached.
@@ -681,15 +681,7 @@ func (g *Generic) pathOf(d int) string {
 // CutString cuts s to at most n bytes at a character boundary.
 func CutString(s string, n int) string { return cutString(s, n) }
 
-func cutString(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	for n > 0 && s[n]&0xC0 == 0x80 {
-		n--
-	}
-	return s[:n]
-}
+func cutString(s string, n int) string { return charset.CutUTF8(s, n) }
 
 // anchorOf returns the identifier that names a text element's block:
 // xml:id, else id.
@@ -744,8 +736,7 @@ func (g *Generic) attrNotes(d int, dst []gofastcore.Block) []gofastcore.Block {
 		}
 		text := Clean(v, false, &tmp)
 		g.out.Clean.Controls += tmp.Controls
-		g.out.Clean.Invalid += tmp.Invalid
-		tmp.Controls, tmp.Invalid = 0, 0
+		tmp.Controls = 0
 		if text == "" {
 			continue
 		}
@@ -762,8 +753,8 @@ func (g *Generic) attrNotes(d int, dst []gofastcore.Block) []gofastcore.Block {
 	return dst
 }
 
-// Counts returns the control characters removed and invalid bytes met in
+// Counts returns the control characters removed in
 // all the text made.
-func (g *Generic) Counts() (controls, invalid int) {
-	return g.b.Controls + g.cb.Controls + g.out.Clean.Controls, g.b.Invalid + g.cb.Invalid + g.out.Clean.Invalid
+func (g *Generic) Counts() (controls int) {
+	return g.b.Controls + g.cb.Controls + g.out.Clean.Controls
 }

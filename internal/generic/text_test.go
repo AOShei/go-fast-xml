@@ -28,7 +28,6 @@ func TestBuilder(t *testing.T) {
 		{[]string{"\n  line 1\n\tline 2  \n"}, true, "line 1\n\tline 2", true, true},
 		{[]string{"a\x00b\x1bc" + nel + "d" + c1 + "e"}, false, "abc de", false, false},
 		{[]string{ffi + "x", repl + "y"}, false, "ffix" + repl + "y", false, false},
-		{[]string{"<a\xFF>"}, false, "<a" + repl + ">", false, false},
 	} {
 		var b Builder
 		for _, s := range c.in {
@@ -40,12 +39,11 @@ func TestBuilder(t *testing.T) {
 	}
 }
 
-// CleanName mends and counts bytes that are no character, and keeps a
-// U+FFFD that is written without counting it.
-func TestCleanNameInvalid(t *testing.T) {
+// CleanName removes control characters and keeps a U+FFFD.
+func TestCleanName(t *testing.T) {
 	var b Builder
-	if got := CleanName("a\xFF\xFEb"+repl+"c\x01", &b); got != "a"+repl+repl+"b"+repl+"c" || b.Invalid != 2 || b.Controls != 1 {
-		t.Errorf("%q invalid %d controls %d", got, b.Invalid, b.Controls)
+	if got := CleanName("a"+repl+"b\x01"+c1+eAc, &b); got != "a"+repl+"b"+eAc || b.Controls != 2 {
+		t.Errorf("%q controls %d", got, b.Controls)
 	}
 }
 

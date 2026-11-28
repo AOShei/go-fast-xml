@@ -206,11 +206,10 @@ func (d *dispatch) Finish(end int64) {
 	d.g.Finish(end)
 }
 
-func (d *dispatch) Counts() (controls, invalid int) {
-	c, i := d.g.Counts()
+func (d *dispatch) Counts() (controls int) {
+	c := d.g.Counts()
 	if d.eng != nil {
-		c2, i2 := d.eng.Counts()
-		c, i = c+c2, i+i2
+		c += d.eng.Counts()
 	}
-	return c, i
+	return c
 }
