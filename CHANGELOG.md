@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.5.3 (2026-11-28)
 
 - **Bytes that are not valid UTF-8 are checked once, by go-fast-core's
   scanner** (core v0.1.17), which hands on text and attribute values as
